@@ -48,7 +48,7 @@ return (
         {def?.exec}, A&R • {def?.city} • {def?.type.toUpperCase()} LABEL
       </div>
       <div className="offer-letterhead-date">
-        Re: {state.artistName || "Artist"} -- {state.genre} • Week {state.week}
+        Re: {state.artistName || "Artist"} - {state.genre} • Week {state.week}
       </div>
     </div>
 
@@ -113,7 +113,7 @@ return (
     {/* YOUR CUTS (360) */}
     <div className="offer-section">
       <div className="offer-section-title">
-        YOUR CUTS -- 360 PARTICIPATION
+        YOUR CUTS - 360 PARTICIPATION
         <span className="offer-severity" style={{ color: threeSixty.color }}>
           {threeSixty.severity.toUpperCase()}
         </span>
@@ -325,7 +325,7 @@ desc: string;
 return (
 <div className={`clause-block ${active ? (good ? "clause-good" : "clause-bad") : "clause-neutral"}`}>
 <div className="clause-block-header">
-<span className="clause-block-icon">{active ? (good ? "✓" : "⚠") : "--"}</span>
+<span className="clause-block-icon">{active ? (good ? "✓" : "⚠") : "-"}</span>
 <span className="clause-block-label">{label}</span>
 </div>
 <div className="clause-block-desc">{desc}</div>
@@ -387,7 +387,7 @@ const values = offers.map(fmt);
 let bestIdx = 0;
 if (higherIsBetter) {
 bestIdx = offers.reduce((best, o, i) => {
-const score = scoreDeal(o); // simplistic -- just for visual highlight we compare raw values
+const score = scoreDeal(o); // simplistic - just for visual highlight we compare raw values
 const bestScore = scoreDeal(offers[best]);
 // Actually for individual rows we need the raw numeric values
 // This is tricky with mixed units. Let’s just not highlight best for now,

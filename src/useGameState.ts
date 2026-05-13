@@ -253,7 +253,7 @@ currentStep: 0,
 fireOnWeek: s.week + (firstStep?.delay ?? 1),
 choicePath: [],
 };
-s.activeArcs = […(s.activeArcs ?? []), inst];
+s.activeArcs = [(s.activeArcs ?? []), inst];
 s.log.unshift({
 week: s.week,
 msg: `New chapter: ${chosen.title} -- ${chosen.subtitle.toLowerCase()}.`,

@@ -18,7 +18,7 @@ import {
   computeTrackWritingQuality, computeAlbumWritingMix, producerStyleBonus,
   getHook, getLyric,
   LABELS, MANAGERS, getLabel, getManager,
-  generateLabelOffers, generateManagerOffers,
+  generateLabelOffers, generateManagerOffers, signLabel, type LabelOffer,
   rnd, roll, clamp, fmt, fmtMoney,
   genAlbumName, genFanReviews,
   // Streaming platform system (v2.0)
@@ -757,6 +757,7 @@ function advance(prev:GameState): GameState {
 
 // ─── HOOK ─────────────────────────────────────────────────
 export function useGameState() {
+  const [viewingOffer, setViewingOffer] = useState<LabelOffer | null>(null);
   const [state,setState] = useState<GameState>(()=>{
     const saved=loadFromDisk();
     if (saved) return {
@@ -1335,21 +1336,17 @@ export function useGameState() {
 
   // Accept / reject a queued label offer. Accepting locks in the contract & pays the advance.
   const doAcceptLabelOffer = useCallback((labelId:string)=>upd(s=>{
-    const offer = s.pendingLabelOffers.find(o => o.labelId === labelId);
+    const offer = s.pendingLabelOffers.find((o: LabelOffer) => o.labelId === labelId);
     if (!offer) return s;
     const L = getLabel(labelId);
     if (!L) return s;
-    s.money += offer.advance;
+    const signed = signLabel(offer, s as any);
+    s.money += signed.advance;
     s.fame = clamp(s.fame + 10, 0, 100);
-    s.currentLabel = {
-      labelId: L.id, name: L.name, exec: L.exec,
-      streamingCut: offer.streamingCut, tourCut: offer.tourCut, marketingBoost: offer.marketingBoost,
-      weeksLeft: offer.contractWeeks, signedAtWeek: s.week, totalAdvance: offer.advance,
-    };
+    s.currentLabel = signed as any;
     s.labelSigned = true;
     s.pendingLabelOffers = [];
-    s.log.unshift({week:s.week,msg:`Signed with ${L.name}! ${fmtMoney(offer.advance)} advance.`,type:"great"});
-    // Build signing presentation
+    s.log.unshift({week:s.week,msg:`Signed with ${L.name}! ${fmtMoney(signed.advance)} advance.`,type:"great"});
     const typeColor: Record<string,string> = {
       major:"#c0442c", americana:"#d4a820", indie:"#6a8d5a", boutique:"#a47bb8", specialty:"#5a8da8",
     };
@@ -1359,12 +1356,12 @@ export function useGameState() {
       exec: L.exec,
       city: L.city,
       accentColor: typeColor[L.type] ?? "#d4a820",
-      advance: offer.advance,
+      advance: signed.advance,
       terms: [
-        { label: "Streaming cut", value: Math.round(offer.streamingCut * 100) + "%", isGood: false },
-        { label: "Tour cut", value: Math.round(offer.tourCut * 100) + "%", isGood: false },
-        { label: "Marketing boost", value: "×" + offer.marketingBoost.toFixed(2), isGood: true },
-        { label: "Contract length", value: offer.contractWeeks + " wk", isGood: true },
+        { label: "Streaming cut", value: Math.round(signed.streamingCut * 100) + "%", isGood: false },
+        { label: "Tour cut", value: Math.round((signed.tourGrossCut ?? signed.tourCut ?? 0) * 100) + "%", isGood: false },
+        { label: "Marketing boost", value: "×" + signed.marketingBoost.toFixed(2), isGood: true },
+        { label: "Contract length", value: signed.weeksLeft + " wk", isGood: true },
       ],
       perks: L.perks,
       quote: L.pitch,
@@ -1487,14 +1484,32 @@ export function useGameState() {
   // AND blocks new label pitches for a long cooldown to prevent advance-farming.
   const doDropLabel = useCallback(()=>upd(s=>{
     if (!s.currentLabel) return s;
-    s.log.unshift({week:s.week,msg:`Dropped from ${s.currentLabel.name}. -5 rep. Word travels fast.`,type:"bad"});
-    s.rep = clamp(s.rep - 5, 0, 100);
+    const label = s.currentLabel as any;
+    const advance = label.advance ?? label.totalAdvance ?? 0;
+    const recouped = label.advanceRecouped ?? 0;
+    const remaining = Math.max(0, advance - recouped);
+    let moneyHit = 0;
+    let repHit = -8;
+    if (remaining > 0) {
+      if (label.type === "major") { moneyHit = Math.floor(remaining * 0.3); repHit = -15; }
+      else if (label.type === "indie" || label.type === "boutique") { moneyHit = 0; repHit = -5; }
+      else { moneyHit = Math.floor(remaining * 0.1); repHit = -8; }
+    }
+    const msg = moneyHit > 0
+      ? `Dropped ${label.name}. Paid ${fmtMoney(moneyHit)} settlement. -${Math.abs(repHit)} rep.`
+      : `Parted ways with ${label.name}. -${Math.abs(repHit)} rep.`;
+    s.log.unshift({week:s.week,msg,type:moneyHit > 0 ? "bad" : "neutral"});
+    s.rep = clamp(s.rep + repHit, 0, 100);
+    s.money = Math.max(0, s.money - moneyHit);
     s.currentLabel = null;
     s.labelSigned = false;
-    // 26-week (~6 month) industry-wide cooldown — labels talk to each other.
     s.cooldowns["net_label"] = 26;
     return s;
   }),[upd]);
+
+  const doViewLabelOffer = useCallback((offer: LabelOffer) => {
+    setViewingOffer(offer);
+  }, []);
 
   const doDropManager = useCallback(()=>upd(s=>{
     if (!s.currentManager) return s;
@@ -1827,7 +1842,7 @@ export function useGameState() {
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo,
     doSignBrandDeal, doSignLabel, doSwitchGenre,
-    doAcceptLabelOffer, doDismissLabelOffers, doAcceptManagerOffer, doDismissManagerOffers,
+    doAcceptLabelOffer, doDismissLabelOffers, doViewLabelOffer, viewingOffer, doAcceptManagerOffer, doDismissManagerOffers,
     doAcceptFeatureRequest, doDismissFeatureRequests,
     doDropLabel, doDropManager,
     doAddMerchItem, doToggleMerchItem, doRemoveMerchItem,

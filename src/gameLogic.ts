@@ -239,223 +239,820 @@ export const PRODUCER_SPECIALTY_QUALITY_BONUS = 4;
 // Eight labels with distinct personalities. Each has an A&R rep voice,
 // a stylistic preference (genre + favorite themes), eligibility gates,
 // and contract terms (advance, cuts, marketing boost, length).
+
+// ═══════════════════════════════════════════════════════════════
+// RECORD LABELS — REALISTIC CONTRACT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+// Replaces the old simple label system with a full contract simulation:
+// • Advances & recoupment tracking
+// • Recording funds (separate budget per album)
+// • Royalty rates (points) paid AFTER recoupment
+// • 360-deal cuts: streaming, tour gross, merch, sync, publishing
+// • Legal clauses: cross-collateralization, controlled composition,
+//   suspension rights, key-person, creative control, approval rights
+// • Term structure: albums committed + options
+// • Marketing commitment & performance boost
+// • Risk assessment and lawyer-review flavor on every offer
+// ═══════════════════════════════════════════════════════════════
+
+export type LabelType = "major" | "americana" | "indie" | "boutique" | "specialty";
+export type DealRisk = "low" | "moderate" | "high" | "predatory";
+
 export interface Label {
   id: string;
   name: string;
-  exec: string;                // The A&R rep / "voice on the phone"
-  type: "major" | "americana" | "indie" | "boutique" | "specialty";
-  city: string;
-  blurb: string;               // 1-2 sentence label vibe
-  pitch: string;               // Opening line they say in the offer
-  genrePref: ("Country" | "Blues" | "Both")[];
-  themePrefs: string[];        // Themes they're hot on (matches THEMES.id)
-  minFame: number;
-  minRep: number;
-  minFans: number;
-  advanceMin: number;
-  advanceMax: number;
-  streamingCut: number;        // 0..1 — what label takes from streams
-  tourCut: number;             // 0..1 — what label takes from tour gross
-  marketingBoost: number;      // multiplier on release peak streams (legacy=1.3)
-  contractWeeks: number;
-  perks: string[];             // Human-readable perks for the offer card
-  real?: boolean;
-}
-
-export const LABELS: Label[] = [
-  { id:"big_wheel", name:"Big Wheel Records", exec:"Carl Roosevelt", type:"major", city:"Nashville, TN",
-    blurb:"Music Row machine. Spins gold from co-writes and radio plays.",
-    pitch:"We can put you on every truck radio between here and Tulsa. We just need to make a few... adjustments.",
-    genrePref:["Country"], themePrefs:["love","hometown","road","heartbreak"],
-    minFame:25, minRep:15, minFans:5000,
-    advanceMin:60000, advanceMax:120000,
-    streamingCut:0.22, tourCut:0.12, marketingBoost:1.5, contractWeeks:104,
-    perks:["Guaranteed radio promotion","Full marketing department","Tour booking support","Heavy creative input expected"] },
-  { id:"hard_country", name:"Hard Country Records", exec:"Mitchell \"Mitch\" Lavoie", type:"major", city:"Nashville, TN",
-    blurb:"Mid-major with arena ambitions. Polished. Aggressive. Cuts you a real check.",
-    pitch:"You've got the hooks. We've got the machine. Let's go make some money together.",
-    genrePref:["Country"], themePrefs:["love","road","freedom","heartbreak"],
-    minFame:30, minRep:18, minFans:8000,
-    advanceMin:80000, advanceMax:180000,
-    streamingCut:0.25, tourCut:0.13, marketingBoost:1.6, contractWeeks:104,
-    perks:["Major radio push","Arena tour booking","Brand deal pipeline","Significant creative input"] },
-  { id:"crossroads", name:"Crossroads Blues", exec:"Doris Mae Holloway", type:"specialty", city:"Memphis, TN",
-    blurb:"Blues-only. Run by an 80-year-old woman who knew Albert King personally.",
-    pitch:"We don't make pop. We don't make crossover. We make blues records that'll still mean something in fifty years.",
-    genrePref:["Blues"], themePrefs:["loss","whiskey","redemption","heartbreak"],
-    minFame:15, minRep:25, minFans:3000,
-    advanceMin:25000, advanceMax:55000,
-    streamingCut:0.14, tourCut:0.06, marketingBoost:1.20, contractWeeks:78,
-    perks:["Blues press connections","Festival booking circuit","Vinyl-first releases","Full creative control"] },
-  { id:"smokehouse", name:"Smokehouse Recordings", exec:"Wyatt Pearce", type:"americana", city:"East Nashville, TN",
-    blurb:"Americana darling. Distributes through a Brooklyn warehouse and a prayer.",
-    pitch:"You make the records you want to make. We just make sure they get heard by the right people.",
-    genrePref:["Country","Blues"], themePrefs:["hometown","road","outlaw","nostalgia","redemption"],
-    minFame:12, minRep:18, minFans:2500,
-    advanceMin:18000, advanceMax:42000,
-    streamingCut:0.15, tourCut:0.08, marketingBoost:1.25, contractWeeks:52,
-    perks:["Indie credibility","NPR & AAA press","Festival circuit","Total creative freedom"] },
-  { id:"two_step_rec", name:"Two-Step Records", exec:"Buck Hennessey", type:"indie", city:"Austin, TX",
-    blurb:"Outlaw country revival. Office is the upstairs of a honky tonk.",
-    pitch:"Half this town wants to make Nashville pop. We don't. Come make a real damn country record.",
-    genrePref:["Country"], themePrefs:["outlaw","whiskey","freedom","road","workingman"],
-    minFame:10, minRep:20, minFans:2000,
-    advanceMin:15000, advanceMax:35000,
-    streamingCut:0.13, tourCut:0.07, marketingBoost:1.18, contractWeeks:52,
-    perks:["Texas circuit booking","Outlaw cred","Vinyl runs guaranteed","Total creative control"] },
-  { id:"magnolia", name:"Magnolia House", exec:"June Hartwell", type:"boutique", city:"Asheville, NC",
-    blurb:"Singer-songwriter boutique. Three employees and a candle budget.",
-    pitch:"We sign songwriters. Just songwriters. If you've got something to say, we'll help you say it.",
-    genrePref:["Country","Blues"], themePrefs:["heartbreak","loss","love","faith","redemption"],
-    minFame:8, minRep:15, minFans:1500,
-    advanceMin:8000, advanceMax:22000,
-    streamingCut:0.12, tourCut:0.05, marketingBoost:1.10, contractWeeks:52,
-    perks:["Songwriter publishing help","NPR/AAA press","Listening-room tour circuit","All creative control"] },
-  { id:"coal_holler", name:"Coal Holler Music", exec:"Ezra Tibbs", type:"indie", city:"Bristol, VA/TN",
-    blurb:"Working-class roots label. Founder's daddy worked the Pittston mines.",
-    pitch:"We make records for people who work for a living. And we pay our artists like it.",
-    genrePref:["Country","Blues"], themePrefs:["workingman","hometown","faith","loss","whiskey"],
-    minFame:6, minRep:12, minFans:1000,
-    advanceMin:6000, advanceMax:18000,
-    streamingCut:0.11, tourCut:0.05, marketingBoost:1.08, contractWeeks:52,
-    perks:["Honest 50/50 publishing splits","Appalachian press network","Bluegrass festival circuit","Creative control"] },
-  { id:"front_porch", name:"Front Porch Records", exec:"Lanie Winslow", type:"boutique", city:"Athens, GA",
-    blurb:"Heartbreak ballad specialists. Roster is mostly women under thirty-five.",
-    pitch:"You're writing some of the best heartbreak songs I've heard all year. Let us be the home for them.",
-    genrePref:["Country","Blues"], themePrefs:["heartbreak","love","loss"],
-    minFame:8, minRep:14, minFans:1800,
-    advanceMin:10000, advanceMax:28000,
-    streamingCut:0.13, tourCut:0.06, marketingBoost:1.15, contractWeeks:52,
-    perks:["Strong female artist roster","Streaming playlist push","Targeted demographic marketing","Creative freedom"] },
-];
-
-// ─── MANAGERS ─────────────────────────────────────────────
-// Five managers ranging from steady old-timer to legendary. Each charges
-// a weekly fee and provides distinct perks beyond the show-revenue bump.
-export interface Manager {
-  id: string;
-  name: string;
-  type: "old_school" | "aggressive" | "boutique" | "legend";
+  exec: string;
+  type: LabelType;
   city: string;
   blurb: string;
   pitch: string;
+  genrePref: ("Country" | "Blues" | "Both")[];
+  themePrefs: string[];
+
+  // ── Eligibility Gates ──
   minFame: number;
   minRep: number;
-  weeklyFee: number;            // $ per week deducted from your account
-  showRevPct: number;           // bonus to show net (0..1)
-  brandDealBoost: number;       // multiplier on weekly brand deal income (1.0 = none)
-  repPerWeek: number;           // small rep accrual each week
-  perks: string[];              // Human-readable perks for the offer card
+  minFans: number;
+
+  // ── Financial Terms ──
+  advanceMin: number;
+  advanceMax: number;
+  recordingFundMin: number;
+  recordingFundMax: number;
+  royaltyRate: number;        // 0.10 = 10% — paid AFTER recoupment
+  recoupRate: number;         // usually 1.0 (100% of label share recoups)
+
+  // ── 360 Deal Cuts (what label takes OFF THE TOP of each stream) ──
+  streamingCut: number;      // 0..1
+  tourGrossCut: number;        // 0..1 — of tour GROSS revenue
+  merchCut: number;          // 0..1
+  syncCut: number;           // 0..1
+  publishingCut: number;     // 0..1 — of songwriting/publishing income
+
+  // ── Marketing ──
+  marketingCommitmentMin: number;
+  marketingCommitmentMax: number;
+  marketingBoost: number;    // release performance multiplier
+
+  // ── Contract Structure ──
+  albumsCommitted: number;   // must deliver
+  options: number;           // label can pick up
+  optionWeeks: number;       // weeks per option period
+  termWeeks: number;         // hard cap on contract length
+
+  // ── Legal Clauses ──
+  crossCollateralization: boolean;  // all albums recoup together?
+  controlledComposition: number;     // % of statutory mechanical (0.75 = 75%)
+  controlledCompositionCap: number;  // max songs affected
+  suspensionRights: boolean;        // can label suspend contract?
+  keyPersonClause: boolean;         // tied to specific A&R exec?
+  creativeControl: number;          // 0..100 (artist control %)
+  approvalRights: string[];         // e.g. ["producer","artwork","singles"]
+
+  perks: string[];
+  real?: boolean;
 }
 
-export const MANAGERS: Manager[] = [
-  { id:"earl_tex", name:"Earl 'Tex' McAllister", type:"old_school", city:"Nashville, TN",
-    minFame:5, minRep:8,
-    blurb:"Forty years in the business. Steady, conservative, doesn't suffer foolishness.",
-    pitch:"Look — I'm not flashy. I won't book you opening for some pop star. But I'll get you respectable shows and a real career.",
-    weeklyFee:75, showRevPct:0.15, brandDealBoost:1.0, repPerWeek:0.10,
-    perks:["+15% show net revenue","Steady venue booking","Respected industry network","Slow & steady rep growth"] },
-  { id:"june_b", name:"June Buchanan", type:"boutique", city:"Asheville, NC",
-    minFame:6, minRep:12,
-    blurb:"Manages four artists, two of them her cousins. Means it when she says she'll fight for you.",
-    pitch:"I take a small roster on purpose. If I sign you, you get my whole attention. Always.",
-    weeklyFee:90, showRevPct:0.18, brandDealBoost:1.0, repPerWeek:0.15,
-    perks:["+18% show net revenue","Personal attention","Songwriter circle access","+0.15 rep/week"] },
-  { id:"bobby2p", name:"Bobby 'Two-Phones' Crandall", type:"aggressive", city:"Nashville, TN",
-    minFame:12, minRep:5,
-    blurb:"Calls everyone 'pal'. Knows everyone. Probably owes them money. Gets it done anyway.",
-    pitch:"You don't need a saint, pal — you need somebody who answers when the phone rings at 2am. That's me.",
-    weeklyFee:120, showRevPct:0.22, brandDealBoost:1.10, repPerWeek:0,
-    perks:["+22% show net revenue","Aggressive label pitching","+10% brand deal income","Rumored shady connections"] },
-  { id:"marisol", name:"Marisol Quinn", type:"aggressive", city:"Nashville, TN",
-    minFame:18, minRep:10,
-    blurb:"Young, hungry, on every A&R rep's speed dial. Texts eighteen hours a day.",
-    pitch:"You're sitting on a moment and you're not pressing it. That changes today. I'll have brands calling by Friday.",
-    weeklyFee:200, showRevPct:0.20, brandDealBoost:1.25, repPerWeek:0.15,
-    perks:["+20% show net revenue","+25% brand deal income","Major label introductions","Aggressive press push"] },
-  { id:"patricia_v", name:"Patricia Vance", type:"legend", city:"Nashville, TN",
-    minFame:45, minRep:35,
-    blurb:"Three decades of country royalty on her client list. Charges accordingly.",
-    pitch:"I don't take new clients. Somebody played me your record and I made an exception. Let's discuss.",
-    weeklyFee:600, showRevPct:0.25, brandDealBoost:1.50, repPerWeek:0.40,
-    perks:["+25% show net revenue","+50% brand deal income","+0.4 rep/week","Open door to anyone in town"] },
-];
-
-// ─── OFFER + CONTRACT TYPES ───────────────────────────────
 export interface LabelOffer {
   labelId: string;
-  advance: number;              // randomized within label.advanceMin..advanceMax
+  // Financial
+  advance: number;
+  recordingFund: number;
+  royaltyRate: number;
+  recoupRate: number;
+  // 360 cuts
   streamingCut: number;
-  tourCut: number;
+  tourGrossCut: number;
+  merchCut: number;
+  syncCut: number;
+  publishingCut: number;
+  // Marketing
+  marketingCommitment: number;
   marketingBoost: number;
-  contractWeeks: number;
-  fitNote: string;              // why they're interested in YOU specifically
-}
-export interface ManagerOffer {
-  managerId: string;
-  weeklyFee: number;
-  showRevPct: number;
-  brandDealBoost: number;
-  repPerWeek: number;
+  // Contract
+  albumsCommitted: number;
+  options: number;
+  optionWeeks: number;
+  termWeeks: number;
+  // Legal
+  crossCollateralization: boolean;
+  controlledComposition: number;
+  controlledCompositionCap: number;
+  suspensionRights: boolean;
+  keyPersonClause: boolean;
+  creativeControl: number;
+  approvalRights: string[];
+  // Presentation
   fitNote: string;
+  riskLevel: DealRisk;
+  dealScore: number;        // 0-100 computed attractiveness
+  lawyerNote: string;       // flavor text from "your attorney"
 }
+
 export interface SignedLabel {
   labelId: string;
   name: string;
   exec: string;
+  type: LabelType;
+
+  // Financial tracking
+  advance: number;              // original advance amount
+  advanceRecouped: number;        // how much paid back so far
+  recordingFund: number;          // original recording fund
+  recordingFundUsed: number;      // how much spent
+  royaltyRate: number;
+  recoupRate: number;
+
+  // 360 cuts
   streamingCut: number;
-  tourCut: number;
+  tourGrossCut: number;
+  merchCut: number;
+  syncCut: number;
+  publishingCut: number;
+
+  // Marketing
+  marketingCommitment: number;
   marketingBoost: number;
+  marketingSpendYTD: number;
+
+  // Contract tracking
+  albumsCommitted: number;
+  albumsDelivered: number;
+  optionsRemaining: number;
+  optionWeeks: number;
   weeksLeft: number;
+  totalWeeks: number;
   signedAtWeek: number;
-  totalAdvance: number;
-}
-export interface SignedManager {
-  managerId: string;
-  name: string;
-  weeklyFee: number;
-  showRevPct: number;
-  brandDealBoost: number;
-  repPerWeek: number;
-  signedAtWeek: number;
+
+  // Legal
+  crossCollateralization: boolean;
+  controlledComposition: number;
+  controlledCompositionCap: number;
+  suspensionRights: boolean;
+  keyPersonClause: boolean;
+  creativeControl: number;
+  approvalRights: string[];
+
+  // Status
+  isRecouped: boolean;
+  perks: string[];
 }
 
-export function getLabel(id: string): Label | undefined { return LABELS.find(l => l.id === id); }
-export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
+// ── LABEL DATABASE ─────────────────────────────────────────
+export const LABELS: Label[] = [
+  // ═══════════════════════════════════════════════════════
+  // MAJORS
+  // ═══════════════════════════════════════════════════════
+  {
+    id: "big_wheel",
+    name: "Big Wheel Records",
+    exec: "Carl Roosevelt",
+    type: "major",
+    city: "Nashville, TN",
+    blurb: "Music Row machine. Spins gold from co-writes and radio plays. The advance is real; the fine print is longer.",
+    pitch: "We can put you on every truck radio between here and Tulsa. We just need to make a few... adjustments. Read the deal carefully — our lawyers did.",
+    genrePref: ["Country"],
+    themePrefs: ["love", "hometown", "road", "heartbreak"],
+    minFame: 25, minRep: 15, minFans: 5000,
+    // Financial
+    advanceMin: 80000, advanceMax: 250000,
+    recordingFundMin: 40000, recordingFundMax: 100000,
+    royaltyRate: 0.13, recoupRate: 1.0,
+    // 360 cuts — heavy
+    streamingCut: 0.25, tourGrossCut: 0.15, merchCut: 0.15,
+    syncCut: 0.20, publishingCut: 0.15,
+    // Marketing
+    marketingCommitmentMin: 60000, marketingCommitmentMax: 150000,
+    marketingBoost: 1.65,
+    // Contract
+    albumsCommitted: 3, options: 4, optionWeeks: 78, termWeeks: 312,
+    // Legal — major-label aggressive
+    crossCollateralization: true,
+    controlledComposition: 0.75, controlledCompositionCap: 10,
+    suspensionRights: true,
+    keyPersonClause: false,
+    creativeControl: 25,
+    approvalRights: ["singles"],
+    perks: [
+      "Guaranteed radio promotion",
+      "Full marketing department",
+      "Tour booking support",
+      "In-house sync team",
+      "Heavy creative input expected",
+      "Cross-collateralization across all albums",
+    ],
+  },
+  {
+    id: "hard_country",
+    name: "Hard Country Records",
+    exec: "Mitchell "Mitch" Lavoie",
+    type: "major",
+    city: "Nashville, TN",
+    blurb: "Mid-major with arena ambitions. Polished. Aggressive. Cuts you a real check — then takes a real cut.",
+    pitch: "You've got the hooks. We've got the machine. Let's go make some money together. Just understand: we make money first, you make money second.",
+    genrePref: ["Country"],
+    themePrefs: ["love", "road", "freedom", "heartbreak"],
+    minFame: 30, minRep: 18, minFans: 8000,
+    advanceMin: 120000, advanceMax: 400000,
+    recordingFundMin: 60000, recordingFundMax: 150000,
+    royaltyRate: 0.11, recoupRate: 1.0,
+    streamingCut: 0.28, tourGrossCut: 0.18, merchCut: 0.18,
+    syncCut: 0.25, publishingCut: 0.20,
+    marketingCommitmentMin: 80000, marketingCommitmentMax: 200000,
+    marketingBoost: 1.80,
+    albumsCommitted: 4, options: 5, optionWeeks: 78, termWeeks: 364,
+    crossCollateralization: true,
+    controlledComposition: 0.75, controlledCompositionCap: 10,
+    suspensionRights: true,
+    keyPersonClause: false,
+    creativeControl: 20,
+    approvalRights: ["producer", "singles"],
+    perks: [
+      "Major radio push",
+      "Arena tour booking",
+      "Brand deal pipeline",
+      "Significant creative input",
+      "360 participation on all revenue streams",
+      "Controlled composition clause (75% rate cap)",
+    ],
+  },
 
-// Generate up to 3 ranked label offers based on player's profile.
+  // ═══════════════════════════════════════════════════════
+  // SPECIALTY
+  // ═══════════════════════════════════════════════════════
+  {
+    id: "crossroads",
+    name: "Crossroads Blues",
+    exec: "Doris Mae Holloway",
+    type: "specialty",
+    city: "Memphis, TN",
+    blurb: "Blues-only. Run by an 80-year-old woman who knew Albert King personally. Old-school terms, no 360 nonsense.",
+    pitch: "We don't make pop. We don't make crossover. We make blues records that'll still mean something in fifty years. And we don't touch your touring money.",
+    genrePref: ["Blues"],
+    themePrefs: ["loss", "whiskey", "redemption", "heartbreak"],
+    minFame: 15, minRep: 25, minFans: 3000,
+    advanceMin: 15000, advanceMax: 60000,
+    recordingFundMin: 8000, recordingFundMax: 25000,
+    royaltyRate: 0.18, recoupRate: 1.0,
+    streamingCut: 0.12, tourGrossCut: 0.03, merchCut: 0.0,
+    syncCut: 0.08, publishingCut: 0.0,
+    marketingCommitmentMin: 12000, marketingCommitmentMax: 35000,
+    marketingBoost: 1.22,
+    albumsCommitted: 2, options: 2, optionWeeks: 52, termWeeks: 156,
+    crossCollateralization: false,
+    controlledComposition: 1.0, controlledCompositionCap: 12,
+    suspensionRights: false,
+    keyPersonClause: true,
+    creativeControl: 75,
+    approvalRights: ["producer", "artwork", "singles", "release date"],
+    perks: [
+      "Blues press connections",
+      "Festival booking circuit",
+      "Vinyl-first releases",
+      "Full creative control",
+      "No merch or touring cuts",
+      "Key-person clause (Doris is your A&R)",
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // AMERICANA
+  // ═══════════════════════════════════════════════════════
+  {
+    id: "smokehouse",
+    name: "Smokehouse Recordings",
+    exec: "Wyatt Pearce",
+    type: "americana",
+    city: "East Nashville, TN",
+    blurb: "Americana darling. Distributes through a Brooklyn warehouse and a prayer. Fair splits, modest reach.",
+    pitch: "You make the records you want to make. We just make sure they get heard by the right people. Our cut is moderate because our reach is moderate.",
+    genrePref: ["Country", "Blues"],
+    themePrefs: ["hometown", "road", "outlaw", "nostalgia", "redemption"],
+    minFame: 12, minRep: 18, minFans: 2500,
+    advanceMin: 12000, advanceMax: 50000,
+    recordingFundMin: 10000, recordingFundMax: 30000,
+    royaltyRate: 0.16, recoupRate: 1.0,
+    streamingCut: 0.15, tourGrossCut: 0.08, merchCut: 0.08,
+    syncCut: 0.12, publishingCut: 0.10,
+    marketingCommitmentMin: 15000, marketingCommitmentMax: 45000,
+    marketingBoost: 1.28,
+    albumsCommitted: 2, options: 3, optionWeeks: 52, termWeeks: 182,
+    crossCollateralization: true,
+    controlledComposition: 0.90, controlledCompositionCap: 11,
+    suspensionRights: true,
+    keyPersonClause: false,
+    creativeControl: 60,
+    approvalRights: ["producer", "artwork"],
+    perks: [
+      "Indie credibility",
+      "NPR & AAA press",
+      "Festival circuit",
+      "Moderate creative control",
+      "Cross-collateralization (albums only)",
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // INDIE
+  // ═══════════════════════════════════════════════════════
+  {
+    id: "two_step_rec",
+    name: "Two-Step Records",
+    exec: "Buck Hennessey",
+    type: "indie",
+    city: "Austin, TX",
+    blurb: "Outlaw country revival. Office is the upstairs of a honky tonk. Artist-friendly terms, artist-sized reach.",
+    pitch: "Half this town wants to make Nashville pop. We don't. Come make a real damn country record. We take a small cut because we don't have a tower downtown.",
+    genrePref: ["Country"],
+    themePrefs: ["outlaw", "whiskey", "freedom", "road", "workingman"],
+    minFame: 10, minRep: 20, minFans: 2000,
+    advanceMin: 8000, advanceMax: 35000,
+    recordingFundMin: 5000, recordingFundMax: 18000,
+    royaltyRate: 0.20, recoupRate: 1.0,
+    streamingCut: 0.12, tourGrossCut: 0.05, merchCut: 0.05,
+    syncCut: 0.10, publishingCut: 0.0,
+    marketingCommitmentMin: 8000, marketingCommitmentMax: 22000,
+    marketingBoost: 1.15,
+    albumsCommitted: 1, options: 2, optionWeeks: 52, termWeeks: 130,
+    crossCollateralization: false,
+    controlledComposition: 1.0, controlledCompositionCap: 12,
+    suspensionRights: false,
+    keyPersonClause: true,
+    creativeControl: 85,
+    approvalRights: ["producer", "artwork", "singles", "release date"],
+    perks: [
+      "Texas circuit booking",
+      "Outlaw cred",
+      "Vinyl runs guaranteed",
+      "Total creative control",
+      "No publishing cut",
+      "No cross-collateralization",
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════
+  // BOUTIQUE
+  // ═══════════════════════════════════════════════════════
+  {
+    id: "magnolia",
+    name: "Magnolia House",
+    exec: "June Hartwell",
+    type: "boutique",
+    city: "Asheville, NC",
+    blurb: "Singer-songwriter boutique. Three employees and a candle budget. The deal is gentle; the reach is intimate.",
+    pitch: "We sign songwriters. Just songwriters. If you've got something to say, we'll help you say it. We won't make you rich overnight, but you won't wake up owing us your house.",
+    genrePref: ["Country", "Blues"],
+    themePrefs: ["heartbreak", "loss", "love", "faith", "redemption"],
+    minFame: 8, minRep: 15, minFans: 1500,
+    advanceMin: 5000, advanceMax: 25000,
+    recordingFundMin: 3000, recordingFundMax: 12000,
+    royaltyRate: 0.22, recoupRate: 1.0,
+    streamingCut: 0.10, tourGrossCut: 0.03, merchCut: 0.05,
+    syncCut: 0.08, publishingCut: 0.05,
+    marketingCommitmentMin: 5000, marketingCommitmentMax: 15000,
+    marketingBoost: 1.10,
+    albumsCommitted: 1, options: 2, optionWeeks: 52, termWeeks: 104,
+    crossCollateralization: false,
+    controlledComposition: 1.0, controlledCompositionCap: 12,
+    suspensionRights: false,
+    keyPersonClause: true,
+    creativeControl: 90,
+    approvalRights: ["producer", "artwork", "singles", "release date", "tour routing"],
+    perks: [
+      "Songwriter publishing help",
+      "NPR/AAA press",
+      "Listening-room tour circuit",
+      "All creative control",
+      "Low 360 participation",
+      "June manages your A&R personally",
+    ],
+  },
+  {
+    id: "coal_holler",
+    name: "Coal Holler Music",
+    exec: "Ezra Tibbs",
+    type: "indie",
+    city: "Bristol, VA/TN",
+    blurb: "Working-class roots label. Founder's daddy worked the Pittston mines. Honest splits for honest music.",
+    pitch: "We make records for people who work for a living. And we pay our artists like it. No 360. No cross-collateralization. Just a straight deal.",
+    genrePref: ["Country", "Blues"],
+    themePrefs: ["workingman", "hometown", "faith", "loss", "whiskey"],
+    minFame: 6, minRep: 12, minFans: 1000,
+    advanceMin: 3000, advanceMax: 15000,
+    recordingFundMin: 2000, recordingFundMax: 8000,
+    royaltyRate: 0.25, recoupRate: 1.0,
+    streamingCut: 0.08, tourGrossCut: 0.0, merchCut: 0.0,
+    syncCut: 0.05, publishingCut: 0.0,
+    marketingCommitmentMin: 3000, marketingCommitmentMax: 10000,
+    marketingBoost: 1.08,
+    albumsCommitted: 1, options: 1, optionWeeks: 52, termWeeks: 78,
+    crossCollateralization: false,
+    controlledComposition: 1.0, controlledCompositionCap: 12,
+    suspensionRights: false,
+    keyPersonClause: false,
+    creativeControl: 95,
+    approvalRights: ["producer", "artwork", "singles", "release date", "tour routing", "merch design"],
+    perks: [
+      "Honest 50/50 publishing splits",
+      "Appalachian press network",
+      "Bluegrass festival circuit",
+      "Creative control",
+      "NO 360 cuts (no tour, no merch, no publishing)",
+      "No cross-collateralization",
+    ],
+  },
+  {
+    id: "front_porch",
+    name: "Front Porch Records",
+    exec: "Lanie Winslow",
+    type: "boutique",
+    city: "Athens, GA",
+    blurb: "Heartbreak ballad specialists. Roster is mostly women under thirty-five. Fair deal, strong playlist team.",
+    pitch: "You're writing some of the best heartbreak songs I've heard all year. Let us be the home for them. We'll push them to the right ears.",
+    genrePref: ["Country", "Blues"],
+    themePrefs: ["heartbreak", "love", "loss"],
+    minFame: 8, minRep: 14, minFans: 1800,
+    advanceMin: 6000, advanceMax: 28000,
+    recordingFundMin: 4000, recordingFundMax: 15000,
+    royaltyRate: 0.19, recoupRate: 1.0,
+    streamingCut: 0.13, tourGrossCut: 0.06, merchCut: 0.08,
+    syncCut: 0.10, publishingCut: 0.08,
+    marketingCommitmentMin: 8000, marketingCommitmentMax: 22000,
+    marketingBoost: 1.18,
+    albumsCommitted: 2, options: 2, optionWeeks: 52, termWeeks: 130,
+    crossCollateralization: false,
+    controlledComposition: 0.95, controlledCompositionCap: 12,
+    suspensionRights: false,
+    keyPersonClause: true,
+    creativeControl: 70,
+    approvalRights: ["producer", "artwork", "singles"],
+    perks: [
+      "Strong female artist roster",
+      "Streaming playlist push",
+      "Targeted demographic marketing",
+      "Creative freedom",
+      "Moderate 360 participation",
+    ],
+  },
+];
+
+// ── HELPERS ────────────────────────────────────────────────
+
+export function getLabel(id: string): Label | undefined {
+  return LABELS.find((l) => l.id === id);
+}
+
+export function getRiskLabel(risk: DealRisk): { text: string; color: string; icon: string } {
+  switch (risk) {
+    case "low":    return { text: "Artist-Friendly", color: "var(--sage)", icon: "🟢" };
+    case "moderate": return { text: "Standard Terms", color: "var(--amber)", icon: "🟡" };
+    case "high":   return { text: "Label-Favorable", color: "var(--rust)", icon: "🟠" };
+    case "predatory": return { text: "Heavy — Lawyer Up", color: "#c0392b", icon: "🔴" };
+  }
+}
+
+// Compute a 0-100 deal-attractiveness score from the artist's perspective.
+// Higher = better for the artist.
+export function scoreDeal(offer: LabelOffer): number {
+  let score = 50;
+  // Advance generosity (normalized against a $200k baseline)
+  score += (offer.advance / 200000) * 15;
+  // Recording fund
+  score += (offer.recordingFund / 80000) * 10;
+  // Royalty rate (18% is neutral; each point away shifts 4)
+  score += (offer.royaltyRate - 0.18) * 400;
+  // 360 cuts — each percentage point costs 1.5 score
+  score -= offer.streamingCut * 150;
+  score -= offer.tourGrossCut * 200;
+  score -= offer.merchCut * 200;
+  score -= offer.syncCut * 120;
+  score -= offer.publishingCut * 180;
+  // Marketing
+  score += (offer.marketingCommitment / 100000) * 8;
+  score += (offer.marketingBoost - 1.0) * 20;
+  // Creative control
+  score += (offer.creativeControl - 50) * 0.4;
+  // Legal protections
+  if (!offer.crossCollateralization) score += 8;
+  if (!offer.suspensionRights) score += 5;
+  if (offer.keyPersonClause) score += 3;
+  if (offer.controlledComposition >= 1.0) score += 5;
+  // Term length (shorter is better)
+  score -= (offer.termWeeks / 52) * 1.5;
+  return clamp(score, 0, 100);
+}
+
+// Determine risk level from offer terms.
+export function assessRisk(offer: LabelOffer): DealRisk {
+  let redFlags = 0;
+  if (offer.crossCollateralization) redFlags += 2;
+  if (offer.suspensionRights) redFlags += 1;
+  if (offer.tourGrossCut > 0.12) redFlags += 2;
+  if (offer.merchCut > 0.12) redFlags += 2;
+  if (offer.publishingCut > 0.12) redFlags += 2;
+  if (offer.streamingCut > 0.22) redFlags += 1;
+  if (offer.royaltyRate < 0.13) redFlags += 2;
+  if (offer.creativeControl < 30) redFlags += 1;
+  if (offer.controlledComposition < 0.85) redFlags += 1;
+  if (offer.termWeeks > 260) redFlags += 1;
+
+  if (redFlags >= 7) return "predatory";
+  if (redFlags >= 4) return "high";
+  if (redFlags >= 2) return "moderate";
+  return "low";
+}
+
+// Generate lawyer flavor text based on offer terms.
+export function generateLawyerNote(offer: LabelOffer): string {
+  const notes: string[] = [];
+  if (offer.advance > 150000) notes.push("Big advance, but remember — it's all recoupable.");
+  else if (offer.advance < 15000) notes.push("Small advance means low risk, but you'll need tour money elsewhere.");
+
+  if (offer.royaltyRate >= 0.20) notes.push("Strong royalty rate. You'll see back-end money faster once recouped.");
+  else if (offer.royaltyRate <= 0.12) notes.push("Low royalty rate. You'll be unrecouped for a long time.");
+
+  if (offer.crossCollateralization) notes.push("CROSS-COLLATERALIZATION: Every album pays for every other album. Dangerous.");
+  if (offer.suspensionRights) notes.push("SUSPENSION RIGHTS: They can freeze you indefinitely.");
+  if (offer.tourGrossCut > 0.10) notes.push(`Tour gross cut of ${Math.round(offer.tourGrossCut*100)}% — they'll take a bite before you pay your crew.`);
+  if (offer.merchCut > 0.10) notes.push(`Merch cut of ${Math.round(offer.merchCut*100)}% — your table revenue isn't fully yours.`);
+  if (offer.publishingCut > 0.10) notes.push(`Publishing cut of ${Math.round(offer.publishingCut*100)}% — they want your songwriting money too.`);
+  if (offer.creativeControl < 35) notes.push("Low creative control. Expect notes on your mixes, your look, and your singles.");
+  if (offer.keyPersonClause) notes.push("Key-person clause: if your A&R leaves, you may have an exit window.");
+  if (offer.controlledComposition < 1.0) notes.push(`Controlled composition: mechanical rates capped at ${Math.round(offer.controlledComposition*100)}%. Songwriters get less.`);
+
+  if (notes.length === 0) return "Clean deal. Nothing here that'll keep me up at night.";
+  return notes.join(" ");
+}
+
+// ── OFFER GENERATION ───────────────────────────────────────
+
 export function generateLabelOffers(s: GameState): LabelOffer[] {
   const sig = getSignatureTheme(s.themeCounts);
-  const eligible = LABELS.filter(L =>
-    s.fame >= L.minFame && s.rep >= L.minRep && s.fans >= L.minFans &&
-    (L.genrePref.includes(s.genre as any) || L.genrePref.includes("Both" as any))
+  const eligible = LABELS.filter(
+    (L) =>
+      s.fame >= L.minFame &&
+      s.rep >= L.minRep &&
+      s.fans >= L.minFans &&
+      (L.genrePref.includes(s.genre as any) || L.genrePref.includes("Both" as any))
   );
   if (!eligible.length) return [];
-  const scored = eligible.map(L => {
-    let score = 1;
-    if (sig && L.themePrefs.includes(sig.themeId)) score += 1.5;
-    if (L.genrePref.includes(s.genre as any)) score += 0.5;
-    // Closeness in fame band — small labels lose interest if you're way too big
-    score += Math.max(0, 1 - Math.abs(L.minFame - s.fame) / 40);
-    score += Math.random() * 0.7;
-    return { L, score };
-  }).sort((a,b)=>b.score-a.score);
+
+  const scored = eligible
+    .map((L) => {
+      let score = 1;
+      if (sig && L.themePrefs.includes(sig.themeId)) score += 1.5;
+      if (L.genrePref.includes(s.genre as any)) score += 0.5;
+      score += Math.max(0, 1 - Math.abs(L.minFame - s.fame) / 40);
+      score += Math.random() * 0.7;
+      return { L, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
   const picks = scored.slice(0, Math.min(3, scored.length));
-  return picks.map(({L}) => {
+
+  return picks.map(({ L }) => {
     const adv = Math.floor(L.advanceMin + Math.random() * (L.advanceMax - L.advanceMin));
+    const recFund = Math.floor(L.recordingFundMin + Math.random() * (L.recordingFundMax - L.recordingFundMin));
+    const mkCommit = Math.floor(L.marketingCommitmentMin + Math.random() * (L.marketingCommitmentMax - L.marketingCommitmentMin));
+
+    // Slight variance on cuts based on player leverage (fame/rep)
+    const leverage = clamp((s.fame + s.rep * 2) / 100, 0, 1); // 0..1
+    const cutDiscount = leverage * 0.04; // up to 4% better cuts
+
+    const offer: LabelOffer = {
+      labelId: L.id,
+      advance: adv,
+      recordingFund: recFund,
+      royaltyRate: L.royaltyRate,
+      recoupRate: L.recoupRate,
+      streamingCut: clamp(L.streamingCut - cutDiscount, 0.02, 0.40),
+      tourGrossCut: clamp(L.tourGrossCut - cutDiscount, 0, 0.30),
+      merchCut: clamp(L.merchCut - cutDiscount, 0, 0.25),
+      syncCut: clamp(L.syncCut - cutDiscount, 0, 0.30),
+      publishingCut: clamp(L.publishingCut - cutDiscount, 0, 0.25),
+      marketingCommitment: mkCommit,
+      marketingBoost: L.marketingBoost,
+      albumsCommitted: L.albumsCommitted,
+      options: L.options,
+      optionWeeks: L.optionWeeks,
+      termWeeks: L.termWeeks,
+      crossCollateralization: L.crossCollateralization,
+      controlledComposition: L.controlledComposition,
+      controlledCompositionCap: L.controlledCompositionCap,
+      suspensionRights: L.suspensionRights,
+      keyPersonClause: L.keyPersonClause,
+      creativeControl: L.creativeControl,
+      approvalRights: [...L.approvalRights],
+      fitNote: "",
+      riskLevel: "moderate",
+      dealScore: 0,
+      lawyerNote: "",
+    };
+
+    // Fit note
     const fitParts: string[] = [];
-    if (sig && L.themePrefs.includes(sig.themeId)) fitParts.push(`your ${sig.theme.name.toLowerCase()} songs`);
+    if (sig && L.themePrefs.includes(sig.themeId))
+      fitParts.push(`your ${sig.theme.name.toLowerCase()} catalog`);
     fitParts.push(`your ${s.genre.toLowerCase()} sound`);
     if (s.fame >= L.minFame + 12) fitParts.push("your visibility");
-    const fitNote = `They love ${fitParts.join(" and ")}.`;
-    return { labelId:L.id, advance:adv,
-      streamingCut:L.streamingCut, tourCut:L.tourCut,
-      marketingBoost:L.marketingBoost, contractWeeks:L.contractWeeks, fitNote };
+    offer.fitNote = `They love ${fitParts.join(" and ")}.`;
+
+    // Assessments
+    offer.riskLevel = assessRisk(offer);
+    offer.dealScore = Math.round(scoreDeal(offer));
+    offer.lawyerNote = generateLawyerNote(offer);
+
+    return offer;
   });
 }
 
-// Generate up to 3 ranked manager offers based on player's profile.
-export function generateManagerOffers(s: GameState): ManagerOffer[] {
+// ── RECOUPMENT & REVENUE MATH ─────────────────────────────
+
+export interface WeeklyLabelAccounting {
+  // Raw revenue that hit this week
+  streamingRevenue: number;
+  tourGrossRevenue: number;
+  merchRevenue: number;
+  syncRevenue: number;
+  publishingRevenue: number;
+
+  // Label's share (the 360 cuts)
+  labelStreamingShare: number;
+  labelTourShare: number;
+  labelMerchShare: number;
+  labelSyncShare: number;
+  labelPublishingShare: number;
+  totalLabelShare: number;
+
+  // Artist's immediate keep (revenue minus label cut)
+  artistStreamingKeep: number;
+  artistTourKeep: number;
+  artistMerchKeep: number;
+  artistSyncKeep: number;
+  artistPublishingKeep: number;
+  totalArtistKeep: number;
+
+  // Recoupment
+  advanceRemainingBefore: number;
+  recoupedThisWeek: number;
+  advanceRemainingAfter: number;
+  isRecouped: boolean;
+
+  // Royalty bonus (only if recouped)
+  royaltyBonus: number;
+
+  // Net to artist this week
+  artistNetThisWeek: number;
+}
+
+// Run weekly accounting for a signed label contract.
+// Returns how much the ARTIST actually gets paid this week.
+export function runLabelAccounting(
+  label: SignedLabel,
+  streamingRev: number,
+  tourGrossRev: number,
+  merchRev: number,
+  syncRev: number,
+  publishingRev: number
+): WeeklyLabelAccounting {
+  const lblStreaming = streamingRev * label.streamingCut;
+  const lblTour = tourGrossRev * label.tourGrossCut;
+  const lblMerch = merchRev * label.merchCut;
+  const lblSync = syncRev * label.syncCut;
+  const lblPublishing = publishingRev * label.publishingCut;
+  const totalLabelShare = lblStreaming + lblTour + lblMerch + lblSync + lblPublishing;
+
+  const artStreaming = streamingRev - lblStreaming;
+  const artTour = tourGrossRev - lblTour;
+  const artMerch = merchRev - lblMerch;
+  const artSync = syncRev - lblSync;
+  const artPublishing = publishingRev - lblPublishing;
+  const totalArtistKeep = artStreaming + artTour + artMerch + artSync + artPublishing;
+
+  const remainingBefore = label.advance - label.advanceRecouped;
+  const recoupThisWeek = Math.min(totalLabelShare * label.recoupRate, remainingBefore);
+  const remainingAfter = remainingBefore - recoupThisWeek;
+  const nowRecouped = remainingAfter <= 0;
+
+  // Royalty bonus: after recoupment, artist gets royaltyRate % of label's share
+  let royaltyBonus = 0;
+  if (nowRecouped) {
+    const excess = totalLabelShare - recoupThisWeek; // if label share > remaining balance
+    const royaltyBase = excess > 0 ? excess : totalLabelShare;
+    royaltyBonus = royaltyBase * label.royaltyRate;
+  }
+
+  return {
+    streamingRevenue: streamingRev,
+    tourGrossRevenue: tourGrossRev,
+    merchRevenue: merchRev,
+    syncRevenue: syncRev,
+    publishingRevenue: publishingRev,
+    labelStreamingShare: lblStreaming,
+    labelTourShare: lblTour,
+    labelMerchShare: lblMerch,
+    labelSyncShare: lblSync,
+    labelPublishingShare: lblPublishing,
+    totalLabelShare,
+    artistStreamingKeep: artStreaming,
+    artistTourKeep: artTour,
+    artistMerchKeep: artMerch,
+    artistSyncKeep: artSync,
+    artistPublishingKeep: artPublishing,
+    totalArtistKeep,
+    advanceRemainingBefore: remainingBefore,
+    recoupedThisWeek: recoupThisWeek,
+    advanceRemainingAfter: Math.max(0, remainingAfter),
+    isRecouped: nowRecouped,
+    royaltyBonus,
+    artistNetThisWeek: totalArtistKeep + royaltyBonus,
+  };
+}
+
+// Build a SignedLabel from an offer and the current game state.
+export function signLabel(offer: LabelOffer, state: GameState): SignedLabel {
+  const def = getLabel(offer.labelId)!;
+  return {
+    labelId: offer.labelId,
+    name: def.name,
+    exec: def.exec,
+    type: def.type,
+    advance: offer.advance,
+    advanceRecouped: 0,
+    recordingFund: offer.recordingFund,
+    recordingFundUsed: 0,
+    royaltyRate: offer.royaltyRate,
+    recoupRate: offer.recoupRate,
+    streamingCut: offer.streamingCut,
+    tourGrossCut: offer.tourGrossCut,
+    merchCut: offer.merchCut,
+    syncCut: offer.syncCut,
+    publishingCut: offer.publishingCut,
+    marketingCommitment: offer.marketingCommitment,
+    marketingBoost: offer.marketingBoost,
+    marketingSpendYTD: 0,
+    albumsCommitted: offer.albumsCommitted,
+    albumsDelivered: 0,
+    optionsRemaining: offer.options,
+    optionWeeks: offer.optionWeeks,
+    weeksLeft: offer.termWeeks,
+    totalWeeks: offer.termWeeks,
+    signedAtWeek: state.week,
+    crossCollateralization: offer.crossCollateralization,
+    controlledComposition: offer.controlledComposition,
+    controlledCompositionCap: offer.controlledCompositionCap,
+    suspensionRights: offer.suspensionRights,
+    keyPersonClause: offer.keyPersonClause,
+    creativeControl: offer.creativeControl,
+    approvalRights: [...offer.approvalRights],
+    isRecouped: false,
+    perks: [...def.perks],
+  };
+}
+
+// ── PRESENTATION HELPERS ─────────────────────────────────
+
+export function fmtPercent(n: number): string {
+  return Math.round(n * 100) + "%";
+}
+
+export function fmtDuration(weeks: number): string {
+  const years = weeks / 52;
+  if (years >= 1) return `${years.toFixed(1)} year${years >= 2 ? "s" : ""}`;
+  return `${weeks} weeks`;
+}
+
+export function recoupProgress(label: SignedLabel): {
+  pct: number;
+  formatted: string;
+  status: string;
+} {
+  const pct = clamp(label.advanceRecouped / label.advance, 0, 1);
+  const formatted = `${fmtMoney(label.advanceRecouped)} / ${fmtMoney(label.advance)}`;
+  const status = label.isRecouped
+    ? "✓ FULLY RECOUPED — royalties now paying"
+    : pct > 0.75
+    ? "Almost there"
+    : pct > 0.4
+    ? "Midway"
+    : pct > 0
+    ? "Just started"
+    : "Not yet recouped";
+  return { pct, formatted, status };
+}
+
+export function get360Summary(offer: LabelOffer | SignedLabel): {
+  totalCut: number;
+  severity: "light" | "moderate" | "heavy" | "crushing";
+  color: string;
+} {
+  const total = offer.streamingCut + offer.tourGrossCut + offer.merchCut + offer.syncCut + offer.publishingCut;
+  if (total < 0.15) return { totalCut: total, severity: "light", color: "var(--sage)" };
+  if (total < 0.35) return { totalCut: total, severity: "moderate", color: "var(--amber)" };
+  if (total < 0.60) return { totalCut: total, severity: "heavy", color: "var(--rust)" };
+  return { totalCut: total, severity: "crushing", color: "#c0392b" };
+}
+
   const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
   if (!eligible.length) return [];
   const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))

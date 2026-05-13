@@ -34,13 +34,13 @@ return (
 <div style={{ fontFamily: "var(–mono)", fontSize: 11, color: "var(–muted2)" }}>Wk {s.week} • {s.genre}</div>
 </div>
 <div style={{ padding: "14px 16px" }}>
-{tab === "dash" && <DashboardTab {…game} />}
-{tab === "record" && <RecordingTab {…game} />}
-{tab === "tour" && <TouringTab {…game} />}
-{tab === "stream" && <StreamingTab {…game} />}
-{tab === "grind" && <GrindTab {…game} />}
-{tab === "career" && <CareerTab {…game} />}
-{tab === "merch" && <MerchTab {…game} />}
+{tab === "dash" && <DashboardTab {...game} />}
+{tab === "record" && <RecordingTab {...game} />}
+{tab === "tour" && <TouringTab {...game} />}
+{tab === "stream" && <StreamingTab {...game} />}
+{tab === "grind" && <GrindTab {...game} />}
+{tab === "career" && <CareerTab {...game} />}
+{tab === "merch" && <MerchTab {...game} />}
 </div>
 <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 430, background: "var(–bg2)", borderTop: "1px solid var(–border2)", display: "flex", overflowX: "auto", zIndex: 100, padding: "6px 4px" }}>
 {TABS.map((t) => (
@@ -59,15 +59,15 @@ return (
 </div>
 </div>
 )}
-{s.pendingScenarioId && <ScenarioModal {…game} />}
-{s.pendingNewspaperJson && <NewspaperModal {…game} />}
-{s.releasePresentation && <ReleaseModal {…game} />}
-{s.tourWrapPresentation && <TourWrapModal {…game} />}
-{s.signingPresentation && <SigningModal {…game} />}
-{s.awardPresentation && <AwardModal {…game} />}
-{s.milestonePresentation && <MilestoneModal {…game} />}
-{s.pendingArcChoice && <ArcModal {…game} />}
-{s.pendingFeatureRequests?.length > 0 && <FeatureModal {…game} />}
+{s.pendingScenarioId && <ScenarioModal {...game} />}
+{s.pendingNewspaperJson && <NewspaperModal {...game} />}
+{s.releasePresentation && <ReleaseModal {...game} />}
+{s.tourWrapPresentation && <TourWrapModal {...game} />}
+{s.signingPresentation && <SigningModal {...game} />}
+{s.awardPresentation && <AwardModal {...game} />}
+{s.milestonePresentation && <MilestoneModal {...game} />}
+{s.pendingArcChoice && <ArcModal {...game} />}
+{s.pendingFeatureRequests?.length > 0 && <FeatureModal {...game} />}
 {s.pendingLabelOffers?.length > 0 && !game.viewingOffer && <div />}
 {game.viewingOffer && (
 <LabelOfferModal
@@ -78,8 +78,8 @@ onSign={(offer: any) => { game.doAcceptLabelOffer(offer.labelId); }}
 onClose={() => game.doViewLabelOffer(null as any)}
 />
 )}
-{s.pendingManagerOffers?.length > 0 && <ManagerOfferModal {…game} />}
-{s.pendingPressing && <PressingModal {…game} />}
+{s.pendingManagerOffers?.length > 0 && <ManagerOfferModal {...game} />}
+{s.pendingPressing && <PressingModal {...game} />}
 </div>
 );
 }

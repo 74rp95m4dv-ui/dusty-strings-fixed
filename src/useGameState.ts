@@ -270,7 +270,7 @@ for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k];
 // Burnout slowly recovers each week -- but only meaningfully when not actively
 // grinding (touring counters this in the show block below).
 s.burnout = Math.max(0, (s.burnout ?? 0) - (s.tourActive ? 0.5 : 2));
-if ((s.vacationCooldown ?? 0) > 0) s.vacationCooldown–;
+if ((s.vacationCooldown ?? 0) > 0) s.vacationCooldown;
 s.marketSaturation = Math.max(0, (s.marketSaturation??0) - 5);
 s.hype   = Math.max(0,   s.hype-5);
 if (s.weeksSinceRelease>6) { s.fame=Math.max(0,s.fame-0.6); s.rep=Math.max(0,s.rep-0.2); }

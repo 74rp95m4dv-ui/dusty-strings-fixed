@@ -266,7 +266,7 @@ function advance(prev:GameState): GameState {
 const s:GameState = JSON.parse(JSON.stringify(prev));
 s.pendingEvent = null; s.modal = null;
 s.week++; s.weeksSinceRelease++;
-for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k]–;
+for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k];
 // Burnout slowly recovers each week -- but only meaningfully when not actively
 // grinding (touring counters this in the show block below).
 s.burnout = Math.max(0, (s.burnout ?? 0) - (s.tourActive ? 0.5 : 2));

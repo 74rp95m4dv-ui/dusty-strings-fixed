@@ -37,7 +37,7 @@ return (
 {/* Header */}
 <div className="modal-header">
 <div className="deal-memo-stamp">DEAL MEMO</div>
-<button className="modal-close" onClick={onClose}>×</button>
+<button className="modal-close" onClick={onClose}>x</button>
 </div>
 
 ```
@@ -45,10 +45,10 @@ return (
     <div className="offer-letterhead">
       <div className="offer-letterhead-name">{def?.name}</div>
       <div className="offer-letterhead-meta">
-        {def?.exec}, A&R • {def?.city} • {def?.type.toUpperCase()} LABEL
+        {def?.exec}, A&R - {def?.city} - {def?.type.toUpperCase()} LABEL
       </div>
       <div className="offer-letterhead-date">
-        Re: {state.artistName || "Artist"} - {state.genre} • Week {state.week}
+        Re: {state.artistName || "Artist"} - {state.genre} - Week {state.week}
       </div>
     </div>
 
@@ -126,8 +126,8 @@ return (
         <CutBar label="Publishing" cut={offer.publishingCut} keep={1 - offer.publishingCut} />
       </div>
       <div className="cuts-legend">
-        <span className="legend-label">■ Label Share</span>
-        <span className="legend-keep">■ Your Share</span>
+        <span className="legend-label"> Label Share</span>
+        <span className="legend-keep"> Your Share</span>
       </div>
     </div>
 
@@ -209,7 +209,7 @@ return (
       <div className="offer-section-title">LABEL PERKS</div>
       <div className="perks-list">
         {def?.perks.map((p, i) => (
-          <div key={i} className="perk-item">• {p}</div>
+          <div key={i} className="perk-item">- {p}</div>
         ))}
       </div>
     </div>
@@ -217,7 +217,7 @@ return (
     {/* Actions */}
     <div className="offer-actions-footer">
       <button className="btn btn-lg btn-primary" onClick={() => onSign(offer)}>
-        ✍️ Sign This Contract
+         Sign This Contract
       </button>
       <button className="btn btn-lg btn-ghost" onClick={onClose}>
         Keep Shopping
@@ -230,7 +230,7 @@ return (
 );
 }
 
-// ── SUB-COMPONENTS ─────────────────────────────────────────
+// – SUB-COMPONENTS --------------------------–
 
 function OfferBlock({
 label,

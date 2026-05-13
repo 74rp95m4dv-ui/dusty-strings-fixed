@@ -445,7 +445,7 @@ export const LABELS: Label[] = [
   {
     id: "hard_country",
     name: "Hard Country Records",
-    exec: "Mitchell "Mitch" Lavoie",
+    exec: "Mitchell \"Mitch\" Lavoie",
     type: "major",
     city: "Nashville, TN",
     blurb: "Mid-major with arena ambitions. Polished. Aggressive. Cuts you a real check — then takes a real cut.",

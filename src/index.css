@@ -1056,3 +1056,1190 @@ hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 .btn-danger:hover {
   background: linear-gradient(180deg, #e74c3c, #c0392b);
 }
+/* ═══════════════════════════════════════════════════════════════
+   DUSTY STRINGS -- LABEL SYSTEM STYLES
+   Add these to your global CSS or App.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Career Tab Base ── */
+.career-tab {
+  padding-bottom: 80px;
+}
+
+/* ── Label Contract Card (Active) ── */
+.label-contract-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--card) 0%, rgba(138,109,58,0.04) 100%);
+}
+
+.contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+}
+
+.contract-letterhead {
+  flex: 1;
+}
+
+.contract-label-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+}
+
+.contract-exec {
+  font-size: 12px;
+  color: var(--muted2);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.contract-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.contract-section {
+  margin-bottom: 16px;
+}
+
+.contract-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* Recoupment Bar */
+.recoup-bar-bg {
+  height: 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.recoup-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.6s ease;
+}
+
+.recoup-numbers {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 360 Cuts Grid */
+.cuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 6px;
+}
+
+.cut-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--bg);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.cut-pill-label {
+  font-size: 10px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.cut-pill-value {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* Terms Grid */
+.terms-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.term-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.term-row-label {
+  color: var(--muted2);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.term-row-value {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.term-row-sub {
+  color: var(--muted);
+  font-size: 11px;
+  margin-left: auto;
+}
+
+/* Term Progress Bar */
+.term-bar-bg {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.term-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+.term-numbers {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* Clauses */
+.clauses-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.clause-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ── Label Offer Cards (Unsigned) ── */
+.label-offer-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.label-offer-card:hover {
+  border-color: var(--amber);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.offer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.offer-label-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.offer-exec {
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 2px;
+}
+
+.offer-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.badge-risk {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.badge-score {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.offer-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.quick-stat {
+  text-align: center;
+  padding: 6px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.quick-stat-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.quick-stat-value {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.offer-fit {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.offer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── LABEL OFFER MODAL ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.modal-panel {
+  background: var(--card);
+  border-radius: 12px;
+  max-width: 640px;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.label-offer-modal {
+  padding: 0;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--bg), var(--card));
+}
+
+.deal-memo-stamp {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--muted);
+  border: 2px solid var(--muted);
+  padding: 4px 12px;
+  border-radius: 4px;
+  transform: rotate(-2deg);
+  opacity: 0.6;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Letterhead */
+.offer-letterhead {
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(138,109,58,0.06), transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.offer-letterhead-name {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+
+.offer-letterhead-meta {
+  font-size: 12px;
+  color: var(--muted2);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.offer-letterhead-date {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  font-family: monospace;
+}
+
+/* Pitch */
+.offer-pitch {
+  padding: 16px 20px;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink);
+  line-height: 1.5;
+  background: var(--bg);
+  border-left: 3px solid var(--amber);
+  margin: 0 20px;
+  margin-top: 16px;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Banner */
+.offer-banner {
+  margin: 16px 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid;
+  background: var(--bg);
+}
+
+.offer-banner-risk {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.offer-banner-score {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.offer-banner-fit {
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Lawyer Box */
+.lawyer-box {
+  margin: 0 20px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(90,141,168,0.08);
+  border: 1px solid rgba(90,141,168,0.25);
+  border-radius: 8px;
+}
+
+.lawyer-header {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.lawyer-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* Sections */
+.offer-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.offer-section-title {
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.offer-severity {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+/* Offer Grid */
+.offer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.offer-block {
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.offer-block-highlight {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, var(--bg), rgba(212,168,32,0.06));
+}
+
+.offer-block-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+
+.offer-block-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.offer-block-sub {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Cut Visuals */
+.cuts-visual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cut-bar-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 80px;
+  align-items: center;
+  gap: 8px;
+}
+
+.cut-bar-label {
+  font-size: 11px;
+  color: var(--muted2);
+  font-weight: 600;
+}
+
+.cut-bar-track {
+  height: 18px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  border: 1px solid var(--border);
+}
+
+.cut-bar-label-share {
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.cut-bar-artist-share {
+  background: linear-gradient(90deg, var(--sage), #7ab87a);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.cut-bar-numbers {
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: right;
+  line-height: 1.3;
+}
+
+.cuts-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.legend-label::before {
+  content: "■";
+  color: #e74c3c;
+  margin-right: 4px;
+}
+
+.legend-keep::before {
+  content: "■";
+  color: var(--sage);
+  margin-right: 4px;
+}
+
+/* Terms Grid in Modal */
+.terms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.term-block {
+  padding: 10px;
+  background: var(--bg);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.term-block-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.term-block-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Clauses Grid */
+.clauses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.clause-block {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.clause-good {
+  border-color: var(--sage);
+  background: rgba(90,157,90,0.06);
+}
+
+.clause-bad {
+  border-color: var(--rust);
+  background: rgba(192,57,43,0.06);
+}
+
+.clause-neutral {
+  opacity: 0.5;
+}
+
+.clause-block-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.clause-block-icon {
+  font-size: 14px;
+}
+
+.clause-block-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.clause-block-desc {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Comparison Table */
+.comparison-table-wrapper {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.comparison-table th {
+  background: var(--bg);
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.comparison-table th.col-active {
+  background: rgba(212,168,32,0.12);
+  color: var(--ink);
+}
+
+.comparison-table td {
+  padding: 6px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.comparison-table td.row-label {
+  text-align: left;
+  font-weight: 700;
+  color: var(--muted2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg);
+  position: sticky;
+  left: 0;
+}
+
+.col-sub {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Perks */
+.perks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.perk-item {
+  font-size: 12px;
+  color: var(--ink);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+/* Footer Actions */
+.offer-actions-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px;
+  justify-content: center;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+/* Button sizes */
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #c0392b, #a93226);
+  color: #fff;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(180deg, #e74c3c, #c0392b);
+}
+/* ═══════════════════════════════════════════════════════════════
+   RECORDING FUND BANNER STYLES
+   Add to your global CSS alongside label-styles.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Full Banner ── */
+.fund-banner {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: var(--card);
+}
+
+.fund-banner.unsigned {
+  border-left: 3px solid var(--muted);
+}
+
+.fund-banner.signed {
+  border-left: 3px solid var(--amber);
+}
+
+.fund-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.fund-banner-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ink);
+}
+
+.fund-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.fund-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.fund-bar-label {
+  font-size: 10px;
+  color: var(--muted2);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fund-bar-track {
+  height: 10px;
+  background: var(--bg);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.fund-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+.fund-bar-numbers {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+}
+
+.fund-pocket-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+
+.fund-pocket-label {
+  font-size: 10px;
+  color: var(--muted2);
+  font-weight: 600;
+}
+
+.fund-pocket-amount {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.fund-warning {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.25);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--rust);
+  font-weight: 600;
+}
+
+.fund-banner-note {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Compact Banner ── */
+.fund-banner-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fund-banner-compact.unsigned {
+  color: var(--muted);
+}
+
+.fund-banner-compact.signed {
+  color: var(--ink);
+}
+
+.fund-icon {
+  font-size: 14px;
+}
+
+.fund-divider {
+  color: var(--muted);
+  font-weight: 400;
+}
+/* ═══════════════════════════════════════════════════════════════
+   SIGNING & DROP PRESENTATION STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Signing Panel ── */
+.signing-panel {
+  max-width: 480px;
+  text-align: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+.signing-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  padding: 28px 24px 20px;
+  position: relative;
+}
+
+.signing-stamp {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: 2px solid rgba(90,157,90,0.6);
+  color: var(--sage);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  transform: rotate(8deg);
+  opacity: 0.8;
+}
+
+.signing-label {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.signing-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
+
+.signing-moment {
+  padding: 24px;
+}
+
+.signing-emoji {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.signing-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.signing-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 340px;
+  margin: 0 auto;
+}
+
+/* Money block */
+.signing-money-block {
+  background: linear-gradient(180deg, rgba(212,168,32,0.08), transparent);
+  border-top: 2px solid var(--amber);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 24px;
+}
+
+.signing-money-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+
+.signing-money-amount {
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -1px;
+}
+
+.signing-money-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Terms */
+.signing-terms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.signing-term {
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.signing-term-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+
+.signing-term-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Warning / Good boxes */
+.signing-warning,
+.signing-good {
+  padding: 14px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.signing-warning {
+  background: rgba(192,57,43,0.06);
+  border-left: 3px solid var(--rust);
+}
+
+.signing-good {
+  background: rgba(90,157,90,0.06);
+  border-left: 3px solid var(--sage);
+}
+
+.signing-warning-title,
+.signing-good-title {
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.signing-warning-title {
+  color: var(--rust);
+}
+
+.signing-good-title {
+  color: var(--sage);
+}
+
+.signing-warning-body,
+.signing-good-body {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Perks */
+.signing-perks {
+  padding: 14px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.signing-perk {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 3px 0;
+}
+
+/* ── Drop Panel ── */
+.drop-panel {
+  max-width: 440px;
+  text-align: center;
+  padding: 0;
+}
+
+.drop-header {
+  padding: 28px 24px 20px;
+  position: relative;
+}
+
+.drop-header.dropped {
+  background: linear-gradient(135deg, #2c1a1a 0%, #1a1a2e 100%);
+}
+
+.drop-header.walked {
+  background: linear-gradient(135deg, #1a2c1a 0%, #1a1a2e 100%);
+}
+
+.drop-emoji {
+  font-size: 44px;
+  margin-bottom: 8px;
+}
+
+.drop-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.drop-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+
+.drop-body {
+  padding: 20px 24px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  border-bottom: 1px solid var(--border);
+}
+
+.drop-body p {
+  margin-bottom: 10px;
+}
+
+.drop-body p:last-child {
+  margin-bottom: 0;
+}
+
+.drop-burn {
+  color: var(--rust);
+  font-style: italic;
+}
+
+.drop-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.drop-stat {
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drop-stat-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+
+.drop-stat-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}

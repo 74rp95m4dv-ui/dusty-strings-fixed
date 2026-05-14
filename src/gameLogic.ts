@@ -1181,7 +1181,6 @@ export function get360Summary(offer: LabelOffer | SignedLabel): {
            : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
            :                            "He thinks you've got the makings of a real career.",
   }));
-}
 
 // ─── PRODUCER RELATIONSHIPS ───────────────────────────────
 // Repeated work with the same producer builds a relationship that

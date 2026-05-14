@@ -52,13 +52,7 @@ function calcFill(demand:number, cap:number, mult:number) {
 }
 function calcCrewCost(tier:number) { return ({1:120,2:180,3:280,4:450,5:750,6:1500,7:3500} as Record<number,number>)[tier]??120; }
 
-function calcStreamRevenue(
-  catalog:CatalogEntry[],
-  streamCut:number,
-  _platformMix?:Record<string,number>,
-  _geoDist?:Record<string,number>,
-  _premiumRatio?:number
-) {
+function calcStreamRevenue(catalog:CatalogEntry[], streamCut:number) {
   const total = catalog.reduce((s,t)=>s+t.weeklyStreams,0);
   // Real-world blended streaming rate: ~$0.0032/stream after platform variance
   // Distributor takes ~15% off the top, then label takes their cut
@@ -420,8 +414,8 @@ function advance(prev:GameState): GameState {
     t.streamStats.weeklyStreams = t.weeklyStreams;
     t.streamStats.peakStreams = t.peakStreams;
   }
-  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);
-  const streamInc = calcStreamRevenue(s.catalog, streamCutPct, s.platformMix, s.geoDist, s.premiumRatio);
+  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);  // streamingCut unchanged
+  const streamInc = calcStreamRevenue(s.catalog, streamCutPct, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee);
   s.money+=streamInc; s.totalEarned+=streamInc;
   const curWeekStreams = s.catalog.reduce((t,c)=>t+c.weeklyStreams,0);
   s.streamHistory = [...(s.streamHistory??[]), curWeekStreams].slice(-104);
@@ -516,7 +510,7 @@ function advance(prev:GameState): GameState {
     const mgrPct = s.currentManager?.showRevPct ?? (s.hasManager ? 0.15 : 0);
     const revMult=showRevBonus(s.archetype,mgrPct);
     const preCutNet = (totalGross - totalExpenses) * revMult;
-    const tourCutPct = s.currentLabel?.tourCut ?? (s.labelSigned ? 0.10 : 0);
+    const tourCutPct = s.currentLabel?.tourGrossCut ?? (s.labelSigned ? 0.10 : 0);
     const labelCut = tourCutPct > 0 ? Math.floor(preCutNet * tourCutPct) : 0;
     const net = Math.floor(preCutNet - labelCut);
     s.money+=net; s.totalEarned+=Math.max(0,net);
@@ -777,8 +771,15 @@ export function useGameState() {
       // Migrate older saves to the rich label/manager system.
       currentLabel: saved.currentLabel ?? (saved.labelSigned ? {
         labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-        streamingCut:0.18, tourCut:0.10, marketingBoost:1.3,
-        weeksLeft:104, signedAtWeek:saved.week ?? 0, totalAdvance:0,
+        streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
+        advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
+        royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
+        marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
+        optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
+        signedAtWeek:saved.week ?? 0, totalAdvance:0,
+        crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
+        suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
+        isRecouped:false, perks:[], type:"indie" as const,
       } : null),
       currentManager: saved.currentManager ?? (saved.hasManager ? {
         managerId:"legacy", name:"Your Manager",
@@ -803,10 +804,6 @@ export function useGameState() {
       activeArcs: saved.activeArcs ?? [],
       completedArcs: saved.completedArcs ?? [],
       pendingArcChoice: saved.pendingArcChoice ?? null,
-      // Streaming v2.0 migration
-      platformMix: saved.platformMix ?? { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
-      geoDist: saved.geoDist ?? DEFAULT_GEO_DIST,
-      premiumRatio: saved.premiumRatio ?? 0.45,
     };
     return {...INITIAL_STATE};
   });
@@ -826,8 +823,15 @@ export function useGameState() {
     producerWorkCounts: s.producerWorkCounts ?? {},
     currentLabel: s.currentLabel ?? (s.labelSigned ? {
       labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-      streamingCut:0.18, tourCut:0.10, marketingBoost:1.3,
-      weeksLeft:104, signedAtWeek:s.week ?? 0, totalAdvance:0,
+      streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
+      advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
+      royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
+      marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
+      optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
+      signedAtWeek:s.week ?? 0, totalAdvance:0,
+      crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
+      suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
+      isRecouped:false, perks:[], type:"indie" as const,
     } : null),
     currentManager: s.currentManager ?? (s.hasManager ? {
       managerId:"legacy", name:"Your Manager",
@@ -846,9 +850,6 @@ export function useGameState() {
     activeArcs: s.activeArcs ?? [],
     completedArcs: s.completedArcs ?? [],
     pendingArcChoice: s.pendingArcChoice ?? null,
-    platformMix: s.platformMix ?? { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
-    geoDist: s.geoDist ?? DEFAULT_GEO_DIST,
-    premiumRatio: s.premiumRatio ?? 0.45,
   }); },[]);
   const clearSave = useCallback(()=>{ try{localStorage.removeItem(SAVE_KEY);}catch{} setState({...INITIAL_STATE}); },[]);
 
@@ -860,9 +861,6 @@ export function useGameState() {
       currentTrendTheme: pickTrendTheme(null),
       producerWorkCounts:{},
       regional:{[city]:0},
-      platformMix: { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
-      geoDist: DEFAULT_GEO_DIST,
-      premiumRatio: 0.45,
       // Seed the scene with rival artists (#4) so the world feels populated
       // from week 1. They'll release, beef, and chart in parallel.
       rivals: seedRivals(0),
@@ -1358,9 +1356,22 @@ export function useGameState() {
     s.money += offer.advance;
     s.fame = clamp(s.fame + 10, 0, 100);
     s.currentLabel = {
-      labelId: L.id, name: L.name, exec: L.exec,
-      streamingCut: offer.streamingCut, tourCut: offer.tourCut, marketingBoost: offer.marketingBoost,
-      weeksLeft: offer.contractWeeks, signedAtWeek: s.week, totalAdvance: offer.advance,
+      labelId: L.id, name: L.name, exec: L.exec, type: L.type,
+      advance: offer.advance, advanceRecouped: 0,
+      recordingFund: offer.recordingFund, recordingFundUsed: 0,
+      royaltyRate: offer.royaltyRate, recoupRate: offer.recoupRate,
+      streamingCut: offer.streamingCut, tourGrossCut: offer.tourGrossCut,
+      merchCut: offer.merchCut, syncCut: offer.syncCut, publishingCut: offer.publishingCut,
+      marketingCommitment: offer.marketingCommitment, marketingBoost: offer.marketingBoost, marketingSpendYTD: 0,
+      albumsCommitted: offer.albumsCommitted, albumsDelivered: 0,
+      optionsRemaining: offer.options, optionWeeks: offer.optionWeeks,
+      weeksLeft: offer.termWeeks, totalWeeks: offer.termWeeks, signedAtWeek: s.week,
+      crossCollateralization: offer.crossCollateralization,
+      controlledComposition: offer.controlledComposition,
+      controlledCompositionCap: offer.controlledCompositionCap,
+      suspensionRights: offer.suspensionRights, keyPersonClause: offer.keyPersonClause,
+      creativeControl: offer.creativeControl, approvalRights: [...offer.approvalRights],
+      isRecouped: false, perks: [...(L.perks ?? [])],
     };
     s.labelSigned = true;
     s.pendingLabelOffers = [];
@@ -1378,9 +1389,9 @@ export function useGameState() {
       advance: offer.advance,
       terms: [
         { label: "Streaming cut", value: Math.round(offer.streamingCut * 100) + "%", isGood: false },
-        { label: "Tour cut", value: Math.round(offer.tourCut * 100) + "%", isGood: false },
+        { label: "Tour cut", value: Math.round(offer.tourGrossCut * 100) + "%", isGood: false },
         { label: "Marketing boost", value: "×" + offer.marketingBoost.toFixed(2), isGood: true },
-        { label: "Contract length", value: offer.contractWeeks + " wk", isGood: true },
+        { label: "Contract length", value: offer.termWeeks + " wk", isGood: true },
       ],
       perks: L.perks,
       quote: L.pitch,

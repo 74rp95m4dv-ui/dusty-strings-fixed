@@ -2775,6 +2775,28 @@ export interface CatalogEntry {
   comebackCooldown: number;
   tracks: TrackEntry[];
   hasMusicVideo: boolean;
+  // ── Streaming v2.0 tracking ──
+  platformMix?: Record<string, number>;
+  geoDist?: Record<string, number>;
+  premiumRatio?: number;
+  effectiveRate?: number;
+  lifetimeRevenue?: number;
+  weeklyRevenue?: number;
+  revenueHistory?: number[];
+  streamStats?: {
+    totalStreams: number;
+    weeklyStreams: number;
+    peakStreams: number;
+    totalRevenue: number;
+    weeklyRevenue: number;
+    platformBreakdown: Record<string, number>;
+    geoBreakdown: Record<string, number>;
+    effectiveRate: number;
+    premiumRatio: number;
+    usShare: number;
+    hitThreshold: boolean;
+    revenueHistory: number[];
+  };
 }
 
 export interface TourStop {
@@ -3309,6 +3331,10 @@ export interface GameState {
   pendingArcChoice: { arcId: string; stepIndex: number } | null;
   // game over
   gameOverReason?: string;
+  // ── Streaming v2.0 platform/geographic tracking ──
+  platformMix: Record<string, number>;
+  geoDist: Record<string, number>;
+  premiumRatio: number;
 }
 
 export const INITIAL_STATE: GameState = {
@@ -3389,6 +3415,10 @@ export const INITIAL_STATE: GameState = {
   activeArcs: [],
   completedArcs: [],
   pendingArcChoice: null,
+  // ── Streaming v2.0 defaults ──
+  platformMix: { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
+  geoDist: { US: 0.62, UK: 0.08, CA: 0.05, DE: 0.03, AU: 0.02, FR: 0.02, BR: 0.03, MX: 0.02, IN: 0.01, other: 0.12 },
+  premiumRatio: 0.45,
 };
 
 // ── CHART DATA (for StreamingTab) ──────────────────────────

@@ -699,7 +699,7 @@ export const LABELS: Label[] = [
 // ── HELPERS ────────────────────────────────────────────────
 
 export function getLabel(id: string): Label | undefined {
-export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
+function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
 
   return LABELS.find((l) => l.id === id);
 }

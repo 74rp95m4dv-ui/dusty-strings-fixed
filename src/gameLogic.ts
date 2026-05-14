@@ -699,6 +699,8 @@ export const LABELS: Label[] = [
 // ── HELPERS ────────────────────────────────────────────────
 
 export function getLabel(id: string): Label | undefined {
+export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
+
   return LABELS.find((l) => l.id === id);
 }
 
@@ -793,7 +795,7 @@ export function generateLabelOffers(s: GameState): LabelOffer[] {
       s.fame >= L.minFame &&
       s.rep >= L.minRep &&
       s.fans >= L.minFans &&
-      (L.genrePref.includes(s.genre as any) || L.genrePref.includes("Both" as any))
+      ((L.genrePref as string[]).includes(s.genre) || (L.genrePref as string[]).includes("Both"))
   );
   if (!eligible.length) return [];
 
@@ -801,7 +803,7 @@ export function generateLabelOffers(s: GameState): LabelOffer[] {
     .map((L) => {
       let score = 1;
       if (sig && L.themePrefs.includes(sig.themeId)) score += 1.5;
-      if (L.genrePref.includes(s.genre as any)) score += 0.5;
+      if ((L.genrePref as string[]).includes(s.genre)) score += 0.5;
       score += Math.max(0, 1 - Math.abs(L.minFame - s.fame) / 40);
       score += Math.random() * 0.7;
       return { L, score };
@@ -865,6 +867,116 @@ export function generateLabelOffers(s: GameState): LabelOffer[] {
     return offer;
   });
 }
+
+export function generateManagerOffers(s: GameState): ManagerOffer[] {
+  const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
+  if (!eligible.length) return [];
+  const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))
+    .sort((a,b)=>b.score-a.score);
+  const picks = scored.slice(0, Math.min(3, scored.length));
+  return picks.map(({m}) => ({
+    managerId: m.id,
+    weeklyFee: m.weeklyFee,
+    showRevPct: m.showRevPct,
+    brandDealBoost: m.brandDealBoost,
+    repPerWeek: m.repPerWeek,
+    fitNote: m.type === "legend"     ? "She's heard your material and is making an exception."
+           : m.type === "aggressive" ? "He's been watching your numbers and wants in."
+           : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
+           :                            "He thinks you've got the makings of a real career.",
+  }));
+}
+
+export interface Manager {
+  id: string;
+  name: string;
+  type: "old_school" | "aggressive" | "boutique" | "legend";
+  city: string;
+  blurb: string;
+  pitch: string;
+  minFame: number;
+  minRep: number;
+  weeklyFee: number;            // $ per week deducted from your account
+  showRevPct: number;           // bonus to show net (0..1)
+  brandDealBoost: number;       // multiplier on weekly brand deal income (1.0 = none)
+  repPerWeek: number;           // small rep accrual each week
+  perks: string[];              // Human-readable perks for the offer card
+}
+
+export const MANAGERS: Manager[] = [
+  { id:"earl_tex", name:"Earl 'Tex' McAllister", type:"old_school", city:"Nashville, TN",
+    minFame:5, minRep:8,
+    blurb:"Forty years in the business. Steady, conservative, doesn't suffer foolishness.",
+    pitch:"Look — I'm not flashy. I won't book you opening for some pop star. But I'll get you respectable shows and a real career.",
+    weeklyFee:75, showRevPct:0.15, brandDealBoost:1.0, repPerWeek:0.10,
+    perks:["+15% show net revenue","Steady venue booking","Respected industry network","Slow & steady rep growth"] },
+  { id:"june_b", name:"June Buchanan", type:"boutique", city:"Asheville, NC",
+    minFame:6, minRep:12,
+    blurb:"Manages four artists, two of them her cousins. Means it when she says she'll fight for you.",
+    pitch:"I take a small roster on purpose. If I sign you, you get my whole attention. Always.",
+    weeklyFee:90, showRevPct:0.18, brandDealBoost:1.0, repPerWeek:0.15,
+    perks:["+18% show net revenue","Personal attention","Songwriter circle access","+0.15 rep/week"] },
+  { id:"bobby2p", name:"Bobby 'Two-Phones' Crandall", type:"aggressive", city:"Nashville, TN",
+    minFame:12, minRep:5,
+    blurb:"Calls everyone 'pal'. Knows everyone. Probably owes them money. Gets it done anyway.",
+    pitch:"You don't need a saint, pal — you need somebody who answers when the phone rings at 2am. That's me.",
+    weeklyFee:120, showRevPct:0.22, brandDealBoost:1.10, repPerWeek:0,
+    perks:["+22% show net revenue","Aggressive label pitching","+10% brand deal income","Rumored shady connections"] },
+  { id:"marisol", name:"Marisol Quinn", type:"aggressive", city:"Nashville, TN",
+    minFame:18, minRep:10,
+    blurb:"Young, hungry, on every A&R rep's speed dial. Texts eighteen hours a day.",
+    pitch:"You're sitting on a moment and you're not pressing it. That changes today. I'll have brands calling by Friday.",
+    weeklyFee:200, showRevPct:0.20, brandDealBoost:1.25, repPerWeek:0.15,
+    perks:["+20% show net revenue","+25% brand deal income","Major label introductions","Aggressive press push"] },
+  { id:"patricia_v", name:"Patricia Vance", type:"legend", city:"Nashville, TN",
+    minFame:45, minRep:35,
+    blurb:"Three decades of country royalty on her client list. Charges accordingly.",
+    pitch:"I don't take new clients. Somebody played me your record and I made an exception. Let's discuss.",
+    weeklyFee:600, showRevPct:0.25, brandDealBoost:1.50, repPerWeek:0.40,
+    perks:["+25% show net revenue","+50% brand deal income","+0.4 rep/week","Open door to anyone in town"] },
+];
+
+// ─── OFFER + CONTRACT TYPES ───────────────────────────────
+export interface LabelOffer {
+  labelId: string;
+  advance: number;              // randomized within label.advanceMin..advanceMax
+  streamingCut: number;
+  tourCut: number;
+  marketingBoost: number;
+  contractWeeks: number;
+  fitNote: string;              // why they're interested in YOU specifically
+}
+export interface ManagerOffer {
+  managerId: string;
+  weeklyFee: number;
+  showRevPct: number;
+  brandDealBoost: number;
+  repPerWeek: number;
+  fitNote: string;
+}
+export interface SignedLabel {
+  labelId: string;
+  name: string;
+  exec: string;
+  streamingCut: number;
+  tourCut: number;
+  marketingBoost: number;
+  weeksLeft: number;
+  signedAtWeek: number;
+  totalAdvance: number;
+}
+export interface SignedManager {
+  managerId: string;
+  name: string;
+  weeklyFee: number;
+  showRevPct: number;
+  brandDealBoost: number;
+  repPerWeek: number;
+  signedAtWeek: number;
+}
+
+
+
 
 // ── RECOUPMENT & REVENUE MATH ─────────────────────────────
 
@@ -1069,6 +1181,7 @@ export function get360Summary(offer: LabelOffer | SignedLabel): {
            : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
            :                            "He thinks you've got the makings of a real career.",
   }));
+}
 
 // ─── PRODUCER RELATIONSHIPS ───────────────────────────────
 // Repeated work with the same producer builds a relationship that
@@ -1372,7 +1485,7 @@ export function generateFeatureRequest(s: GameState): FeatureRequest | null {
   const TIER_IDEAL = [0, 12, 28, 55, 75];         // Sweet spot — similar-tier artists collab
   const TIER_FEES  = [0, 350, 2200, 9000, 28000]; // What they pay you, base
   const eligible = FEATURES.filter(f =>
-    f.genres.includes(s.genre as any) &&
+    (f.genres as string[]).includes(s.genre) &&
     s.fame >= TIER_GATES[f.tier] &&
     s.totalReleases >= 1
   );

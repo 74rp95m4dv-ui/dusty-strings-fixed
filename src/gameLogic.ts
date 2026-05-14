@@ -699,10 +699,9 @@ export const LABELS: Label[] = [
 // ── HELPERS ────────────────────────────────────────────────
 
 export function getLabel(id: string): Label | undefined {
-function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
-
   return LABELS.find((l) => l.id === id);
 }
+export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
 
 export function getRiskLabel(risk: DealRisk): { text: string; color: string; icon: string } {
   switch (risk) {
@@ -936,16 +935,7 @@ export const MANAGERS: Manager[] = [
     perks:["+25% show net revenue","+50% brand deal income","+0.4 rep/week","Open door to anyone in town"] },
 ];
 
-// ─── OFFER + CONTRACT TYPES ───────────────────────────────
-export interface LabelOffer {
-  labelId: string;
-  advance: number;              // randomized within label.advanceMin..advanceMax
-  streamingCut: number;
-  tourCut: number;
-  marketingBoost: number;
-  contractWeeks: number;
-  fitNote: string;              // why they're interested in YOU specifically
-}
+// ─── OFFER + CONTRACT TYPES ─────────────────────────────── (defined above)
 export interface ManagerOffer {
   managerId: string;
   weeklyFee: number;
@@ -954,17 +944,7 @@ export interface ManagerOffer {
   repPerWeek: number;
   fitNote: string;
 }
-export interface SignedLabel {
-  labelId: string;
-  name: string;
-  exec: string;
-  streamingCut: number;
-  tourCut: number;
-  marketingBoost: number;
-  weeksLeft: number;
-  signedAtWeek: number;
-  totalAdvance: number;
-}
+
 export interface SignedManager {
   managerId: string;
   name: string;
@@ -1164,23 +1144,6 @@ export function get360Summary(offer: LabelOffer | SignedLabel): {
   if (total < 0.60) return { totalCut: total, severity: "heavy", color: "var(--rust)" };
   return { totalCut: total, severity: "crushing", color: "#c0392b" };
 }
-
-  const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
-  if (!eligible.length) return [];
-  const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))
-    .sort((a,b)=>b.score-a.score);
-  const picks = scored.slice(0, Math.min(3, scored.length));
-  return picks.map(({m}) => ({
-    managerId: m.id,
-    weeklyFee: m.weeklyFee,
-    showRevPct: m.showRevPct,
-    brandDealBoost: m.brandDealBoost,
-    repPerWeek: m.repPerWeek,
-    fitNote: m.type === "legend"     ? "She's heard your material and is making an exception."
-           : m.type === "aggressive" ? "He's been watching your numbers and wants in."
-           : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
-           :                            "He thinks you've got the makings of a real career.",
-  }));
 
 // ─── PRODUCER RELATIONSHIPS ───────────────────────────────
 // Repeated work with the same producer builds a relationship that

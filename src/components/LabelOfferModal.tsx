@@ -370,10 +370,14 @@ function CompRow({
   label,
   offers,
   fmt,
+  higherIsBetter: _higherIsBetter,
+  goodThreshold: _goodThreshold,
 }: {
   label: string;
   offers: LabelOffer[];
   fmt: (o: LabelOffer) => string;
+  higherIsBetter?: boolean;
+  goodThreshold?: number;
 }) {
   const values = offers.map(fmt);
 

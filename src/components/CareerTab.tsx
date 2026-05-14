@@ -12,6 +12,7 @@ import {
   fmtPercent,
   fmtDuration,
   getRiskLabel,
+  getLabel,
   type LabelOffer,
 } from "../gameLogic";
 

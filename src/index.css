@@ -8,6 +8,7 @@
   --bg3:  #221c12;
   --bg4:  #2c2416;
   --bg5:  #36301e;
+  --card: #1a160e;
   --border:  rgba(210,175,100,0.08);
   --border2: rgba(210,175,100,0.16);
   --border3: rgba(210,175,100,0.28);
@@ -20,7 +21,7 @@
   --sage-d:  rgba(122,158,110,0.10);
   --denim:   #4a7fa5;
   --denim-d: rgba(74,127,165,0.10);
-  --text:    #e8d8b0
+  --text:    #e8d8b0;
   --text2:   #c8b880;
   --muted:   #7a6840;
   --muted2:  #a08850;

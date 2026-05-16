@@ -6,6 +6,7 @@
 export type Genre = "Country" | "Blues";
 export type GameScreen = "menu" | "setup" | "game" | "gameover" | "victory";
 export type ReleaseType = "Single" | "EP" | "Album" | "Live Album";
+export type RecordingMode = "standard" | "rush" | "deliberate";
 export type ReleaseOutcome = "Flop" | "Moderate" | "Hit" | "Viral";
 export type SongLifecycle = "Normal" | "Hit" | "Evergreen";
 
@@ -1229,6 +1230,75 @@ export const STUDIOS: Studio[] = [
 export function getStudio(id?: string | null): Studio | undefined {
   return STUDIOS.find(st => st.id === (id ?? "home_studio"));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// RECORDING TIME SYSTEM — Dynamic weeks based on studio, producer, mode
+// ═══════════════════════════════════════════════════════════════
+
+export const STUDIO_TIME_MODIFIERS: Record<number, number> = {
+  0: 1.00, // Home Studio — baseline
+  1: 0.95, // Indie Room — 5% faster
+  2: 0.88, // Regional Pro — 12% faster
+  3: 0.80, // World-Famous — 20% faster
+  4: 0.72, // Legendary — 28% faster
+};
+
+export const PRODUCER_TIME_MODIFIERS: Record<number, number> = {
+  0: 1.00, // Self-Produced — baseline
+  1: 0.95, // Local — 5% faster
+  2: 0.90, // Mid-Level — 10% faster
+  3: 0.82, // Elite — 18% faster
+  4: 0.75, // Legend — 25% faster
+};
+
+export const RECORDING_MODE_CONFIG: Record<RecordingMode, { timeMult: number; costMult: number; qualityMod: number; burnoutMod: number; label: string }> = {
+  standard:   { timeMult: 1.00, costMult: 1.00, qualityMod: 0,  burnoutMod: 0,  label: "Standard" },
+  rush:       { timeMult: 0.50, costMult: 1.50, qualityMod: -5, burnoutMod: 8,  label: "Rush" },
+  deliberate: { timeMult: 1.50, costMult: 1.00, qualityMod: 4,  burnoutMod: 3,  label: "Deliberate" },
+};
+
+export const BASE_WEEKS_BY_FORMAT: Record<string, { base: number; perTrack: number }> = {
+  Single:      { base: 3,  perTrack: 0.8 },
+  EP:          { base: 6,  perTrack: 0.8 },
+  Album:       { base: 12, perTrack: 0.8 },
+  "Live Album": { base: 2,  perTrack: 0.3 },
+};
+
+// Calculate total recording weeks dynamically.
+// Formula: ceil((baseWeeks + tracks * perTrack) * studioMod * producerMod * modeMod)
+export function calculateRecordingWeeks(
+  type: ReleaseType,
+  trackCount: number,
+  studioId: string,
+  producerId: string,
+  mode: RecordingMode = "standard"
+): number {
+  const studio = STUDIOS.find(s => s.id === studioId);
+  const producer = PRODUCERS.find(p => p.id === producerId);
+  const studioTier = studio?.tier ?? 0;
+  const producerTier = producer?.tier ?? 0;
+
+  const config = BASE_WEEKS_BY_FORMAT[type] ?? { base: 3, perTrack: 0.8 };
+  const baseWeeks = config.base + (trackCount * config.perTrack);
+
+  const studioMod = STUDIO_TIME_MODIFIERS[studioTier] ?? 1.0;
+  const producerMod = PRODUCER_TIME_MODIFIERS[producerTier] ?? 1.0;
+  const modeMod = RECORDING_MODE_CONFIG[mode].timeMult;
+
+  const total = Math.ceil(baseWeeks * studioMod * producerMod * modeMod);
+  return Math.max(1, total);
+}
+
+// Compute the "standard" weeks for a project (used by Deliberate mode burnout calc)
+export function getStandardRecordingWeeks(
+  type: ReleaseType,
+  trackCount: number,
+  studioId: string,
+  producerId: string
+): number {
+  return calculateRecordingWeeks(type, trackCount, studioId, producerId, "standard");
+}
+
 
 // ── FEATURES ───────────────────────────────────────────────
 // Each feature artist has personality, a hometown, a vibe, theme preferences,
@@ -2845,6 +2915,7 @@ export interface RecordingProject {
   studioBreakThisWeek?: boolean;
   pushThroughThisWeek?: boolean;
   pushThroughCount?: number;
+  mode?: RecordingMode;
 }
 
 export interface UnreleasedProject {

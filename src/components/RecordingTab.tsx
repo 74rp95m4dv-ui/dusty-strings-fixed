@@ -5,16 +5,18 @@ import {
   getFeatureEffectiveCost, getHook, getLyric,
   computeAlbumWritingMix, genTrackName,
   type ReleaseType, type Genre, type HookStyle, type LyricStyle,
+  // Recording time system v2.0
+  calculateRecordingWeeks, getStandardRecordingWeeks,
+  RECORDING_MODE_CONFIG, STUDIO_TIME_MODIFIERS,
+  type RecordingMode,
 } from "../gameLogic";
 
 export default function RecordingTab(game: any) {
   const s = game.state;
   const [view, setView] = useState<"list" | "new" | "project" | "unreleased">("list");
-
   if (view === "new") return <NewProjectForm {...game} onBack={() => setView("list")} />;
   if (s.project && view === "project") return <ActiveProject {...game} onBack={() => setView("list")} />;
   if (view === "unreleased") return <UnreleasedList {...game} onBack={() => setView("list")} />;
-
   return (
     <div>
       <div className="pg-hd"><div className="pg-title">Studio</div></div>
@@ -59,11 +61,22 @@ export default function RecordingTab(game: any) {
   );
 }
 
-function NewProjectForm({ doStartProject, onBack }: any) {
+function NewProjectForm({ doStartProject, onBack, state }: any) {
   const [type, setType] = useState<ReleaseType>("Single");
+  const [mode, setMode] = useState<RecordingMode>("standard");
+
+  // Dynamic week preview based on current selections
+  const mint: Record<string, number> = { Single: 1, EP: 3, Album: 8, "Live Album": 4 };
+  const trackCount = mint[type] ?? 1;
+  const previewWeeks = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
+  const standardWeeks = getStandardRecordingWeeks(type, trackCount, "home_studio", "self");
+  const modeCfg = RECORDING_MODE_CONFIG[mode];
+
   return (
     <div>
       <div className="pg-title" style={{ marginBottom: 12 }}>New Project</div>
+
+      {/* Format selector */}
       <div className="g2" style={{ marginBottom: 16 }}>
         {(["Single", "EP", "Album", "Live Album"] as ReleaseType[]).map((t) => (
           <button
@@ -75,10 +88,49 @@ function NewProjectForm({ doStartProject, onBack }: any) {
           </button>
         ))}
       </div>
-      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type); }}>
+
+      {/* Recording Mode selector */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-title">Recording Mode</div>
+        <div className="g2" style={{ marginBottom: 8 }}>
+          {(["standard", "rush", "deliberate"] as RecordingMode[]).map((m) => (
+            <button
+              key={m}
+              className={`btn btn-sm ${mode === m ? "btn-lime" : ""}`}
+              onClick={() => setMode(m)}
+            >
+              {RECORDING_MODE_CONFIG[m].label}
+            </button>
+          ))}
+        </div>
+        <div className="tip-text" style={{ fontSize: 11, lineHeight: 1.5 }}>
+          {mode === "standard" && "Normal pace. Normal cost. Normal quality."}
+          {mode === "rush" && "⚡ 50% faster. 1.5× studio cost. −5 quality. +8 burnout."}
+          {mode === "deliberate" && "🎯 50% slower. Normal cost. +4 quality. +3 burnout per extra week."}
+        </div>
+      </div>
+
+      {/* Week preview */}
+      <div className="card-sm" style={{ marginBottom: 16, background: "var(--panel2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "var(--muted2)" }}>Estimated studio time</span>
+          <span style={{ fontSize: 18, fontWeight: 700, color: "var(--lime)" }}>
+            {previewWeeks} week{previewWeeks === 1 ? "" : "s"}
+          </span>
+        </div>
+        {mode !== "standard" && (
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+            Standard pace would be {standardWeeks} week{standardWeeks === 1 ? "" : "s"}
+          </div>
+        )}
+      </div>
+
+      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); }}>
         Start Recording
       </button>
-      <button className="btn btn-ghost btn-block" onClick={onBack}>Back</button>
+      <button className="btn btn-ghost btn-block" onClick={onBack}>
+        Back
+      </button>
     </div>
   );
 }
@@ -89,17 +141,16 @@ function ActiveProject(game: any) {
     doFinishProject, doScrubProject, doTakeStudioBreak,
     doPushThrough, doCancelStudioChoice, onBack,
   } = game;
-
   const p = state.project!;
   const [trackName, setTrackName] = useState("");
   const [featId, setFeatId] = useState("");
   const [cowriterId, setCowriterId] = useState("");
   const [hook, setHook] = useState<HookStyle>("safe");
   const [lyric, setLyric] = useState<LyricStyle>("heartfelt");
-
   const prod = PRODUCERS.find((pr: any) => pr.id === p.producerId);
   const studio = STUDIOS.find((st: any) => st.id === p.studioId);
   const rel = prod ? getProducerRelationship(prod.id, state.producerWorkCounts) : null;
+  const modeCfg = RECORDING_MODE_CONFIG[p.mode ?? "standard"];
 
   const addTrack = () => {
     if (!trackName.trim()) return;
@@ -110,7 +161,6 @@ function ActiveProject(game: any) {
     setHook("safe");
     setLyric("heartfelt");
   };
-
   const canFinish = p.tracks.length >= p.minTracks;
 
   return (
@@ -118,6 +168,40 @@ function ActiveProject(game: any) {
       <div className="pg-title" style={{ marginBottom: 4 }}>{p.title}</div>
       <div className="pg-sub" style={{ marginBottom: 12 }}>
         {p.type} • {p.weeksLeft}wk left • {p.tracks.length} track{p.tracks.length !== 1 ? "s" : ""}
+        {p.mode && p.mode !== "standard" && (
+          <span style={{ marginLeft: 8, color: p.mode === "rush" ? "var(--amber)" : "var(--sage)" }}>
+            • {modeCfg.label}
+          </span>
+        )}
+      </div>
+
+      {/* Timeline progress bar */}
+      <div className="card-sm" style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted2)", marginBottom: 4 }}>
+          <span>Progress</span>
+          <span>{p.totalWeeks - p.weeksLeft} / {p.totalWeeks} weeks</span>
+        </div>
+        <div style={{ width: "100%", height: 6, background: "var(--bg2)", borderRadius: 3, overflow: "hidden" }}>
+          <div
+            style={{
+              width: `${((p.totalWeeks - p.weeksLeft) / Math.max(1, p.totalWeeks)) * 100}%`,
+              height: "100%",
+              background: p.mode === "rush" ? "var(--amber)" : p.mode === "deliberate" ? "var(--sage)" : "var(--lime)",
+              borderRadius: 3,
+              transition: "width 0.3s ease",
+            }}
+          />
+        </div>
+        {p.mode === "rush" && (
+          <div className="tip-text" style={{ marginTop: 4, color: "var(--amber)" }}>
+            ⚡ Rush mode: 1.5× studio cost, −5 quality, +8 burnout on finish.
+          </div>
+        )}
+        {p.mode === "deliberate" && (
+          <div className="tip-text" style={{ marginTop: 4, color: "var(--sage)" }}>
+            🎯 Deliberate mode: +4 quality, +3 burnout per extra week.
+          </div>
+        )}
       </div>
 
       {/* Producer */}
@@ -158,6 +242,11 @@ function ActiveProject(game: any) {
           <div>
             <div className="pick-name">{studio?.name ?? "Home Studio"}</div>
             <div className="pick-bio">{studio?.bio ?? "Free, always."}</div>
+            {studio && studio.tier > 0 && (
+              <div className="pick-meta" style={{ color: "var(--sage)", fontSize: 11 }}>
+                {Math.round((1 - (STUDIO_TIME_MODIFIERS[studio.tier] ?? 1)) * 100)}% faster recording
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
@@ -201,7 +290,6 @@ function ActiveProject(game: any) {
             <button className="btn btn-sm btn-danger" onClick={() => doRemoveTrack(i)}>Remove</button>
           </div>
         ))}
-
         {p.tracks.length < p.maxTracks && (
           <div style={{ marginTop: 10 }}>
             {/* Track name input + random button */}
@@ -221,7 +309,6 @@ function ActiveProject(game: any) {
                 🎲
               </button>
             </div>
-
             {/* Hook style */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
               {(["safe", "catchy", "experimental"] as HookStyle[]).map((h) => (
@@ -234,7 +321,6 @@ function ActiveProject(game: any) {
                 </button>
               ))}
             </div>
-
             {/* Lyric style */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
               {(["party", "heartfelt", "literary"] as LyricStyle[]).map((l) => (
@@ -247,7 +333,6 @@ function ActiveProject(game: any) {
                 </button>
               ))}
             </div>
-
             {/* Feature */}
             <select
               value={featId}
@@ -261,7 +346,6 @@ function ActiveProject(game: any) {
                 </option>
               ))}
             </select>
-
             {/* Co-writer */}
             <select
               value={cowriterId}
@@ -275,7 +359,6 @@ function ActiveProject(game: any) {
                 </option>
               ))}
             </select>
-
             <button className="btn btn-sm btn-lime" onClick={addTrack}>Add Track</button>
           </div>
         )}

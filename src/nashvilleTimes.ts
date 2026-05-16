@@ -409,6 +409,35 @@ const NPC_ODD_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       body:`A mobile recording rig, two microphones, and a cooperative clerk in ${pick(CITIES)} produced what ${a} is calling "the only honest record I've made in years." Release date TBD; the artist says they're "still deciding if the world deserves it."`}; },
 ];
 
+// ── PLAYER RECORDING STORIES ───────────────────────────────
+function playerRecordingStories(s: GameState): NewspaperStory[] {
+  const out: NewspaperStory[] = [];
+  const me = s.artistName || "You";
+
+  // Active recording project
+  if (s.project && s.project.weeksLeft > 0) {
+    const p = s.project;
+    const studio = p.studioId === "home_studio" ? "a home setup" : "a proper studio";
+    const modeLabel = p.mode === "rush" ? "at a breakneck pace" : p.mode === "deliberate" ? "methodically, take by take" : "on schedule";
+    out.push({ section:"Scene", isPlayer:true,
+      headline:`${me.toUpperCase()} SPOTTED IN ${studio.toUpperCase()} — NEW MUSIC INCOMING`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`Sources close to the project say ${me} is cutting ${p.type.toLowerCase()} material ${modeLabel}. ${p.tracks.length} track${p.tracks.length===1?"":"s"} in the can so far. Expected to wrap in ${p.weeksLeft} week${p.weeksLeft===1?"":"s"}.`});
+  }
+
+  // Recently finished but unreleased
+  const recentUnreleased = (s.unreleased ?? []).filter(u => s.week - (u as any).recordedWeek < 4);
+  if (recentUnreleased.length > 0) {
+    const u = recentUnreleased[0];
+    out.push({ section:"Industry", isPlayer:true,
+      headline:`${me.toUpperCase()} HAS NEW MATERIAL IN THE CAN`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`A ${(u as any).type?.toLowerCase() ?? "project"} titled "${(u as any).title}" is finished and awaiting release. Insiders describe the quality as "${(u as any).avgQuality > 75 ? "career-best" : (u as any).avgQuality > 60 ? "solid" : "a grower"}."`});
+  }
+
+  return out;
+}
+
 // ── PLAYER STORIES ─────────────────────────────────────────
 function playerStories(s: GameState): NewspaperStory[] {
   const out: NewspaperStory[] = [];
@@ -591,9 +620,10 @@ export function generateNashvilleTimes(s: GameState): NewspaperIssue {
     return true;
   }
 
-  // Player stories (capped at 2 — the world doesn't revolve around you)
+  // Player stories (capped at 3 — recording, releases, milestones)
   const player = playerStories(s);
-  for (const st of player.slice(0, 2)) tryAdd(st);
+  const rec = playerRecordingStories(s);
+  for (const st of [...rec, ...player].slice(0, 3)) tryAdd(st);
 
   // Always one chart/trend story
   tryAdd(pick(CHART_STORIES)(s));

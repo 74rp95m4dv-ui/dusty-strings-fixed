@@ -21,6 +21,10 @@ import {
   generateLabelOffers, generateManagerOffers,
   rnd, roll, clamp, fmt, fmtMoney,
   genAlbumName, genFanReviews,
+  // Recording time system (v2.0)
+  RecordingMode, calculateRecordingWeeks, getStandardRecordingWeeks,
+  STUDIO_TIME_MODIFIERS, PRODUCER_TIME_MODIFIERS, RECORDING_MODE_CONFIG,
+  BASE_WEEKS_BY_FORMAT,
   // Streaming platform system (v2.0)
   STREAMING_PLATFORMS, BASE_STREAMING_RATE, GEO_RATE_MODIFIERS, PREMIUM_SPLIT, PREMIUM_MULTIPLIER,
   SPOTIFY_MIN_STREAMS, DEFAULT_GEO_DIST,
@@ -279,12 +283,18 @@ function advance(prev:GameState): GameState {
   if (s.project && s.project.weeksLeft > 0) {
     const recEnergy:Record<string,number>={Single:8,EP:10,Album:12,"Live Album":7};
     const drain = recEnergy[s.project.type] ?? 10;
+    const mode = s.project.mode ?? "standard";
+    const modeCfg = RECORDING_MODE_CONFIG[mode];
+
     // Studio fee is due regardless of whether the session makes progress
+    // Mode may modify cost (Rush = 1.5× studio cost)
     const recStudio = getStudio(s.project.studioId);
     if (recStudio && recStudio.perWeek > 0) {
-      s.money -= recStudio.perWeek;
-      s.log.unshift({week:s.week,msg:`Studio: ${recStudio.name} — ${fmtMoney(recStudio.perWeek)}/wk.`,type:"neutral"});
+      const weeklyCost = Math.floor(recStudio.perWeek * modeCfg.costMult);
+      s.money -= weeklyCost;
+      s.log.unshift({week:s.week,msg:`Studio: ${recStudio.name} — ${fmtMoney(weeklyCost)}/wk${mode !== "standard" ? ` (${mode})` : ""}.`,type:"neutral"});
     }
+
     if (s.project.studioBreakThisWeek) {
       s.project.studioBreakThisWeek = false;
       s.log.unshift({week:s.week,msg:"Took a studio break this week. Energy recovering.",type:"neutral"});
@@ -875,13 +885,13 @@ export function useGameState() {
   const openArchivedNewspaper = useCallback((json:string)=>upd(s=>{s.pendingNewspaperJson=json;return s;}),[upd]);
 
   // Project
-  const doStartProject = useCallback((type:ReleaseType)=>upd(s=>{
-    // Energy drain now happens weekly during recording — no upfront energy gate.
-    const weeks:Record<string,number>={Single:3,EP:8,Album:18,"Live Album":6};
+  const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard")=>upd(s=>{
+    // Dynamic recording time: base weeks + track count × studio × producer × mode
     const mint:Record<string,number>={Single:1,EP:3,Album:8,"Live Album":4};
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
-    const w = weeks[type] ?? 3;
-    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0};
+    const trackCount = mint[type] ?? 1;
+    const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", "standard");
+    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     return s;
   }),[upd]);
@@ -902,7 +912,7 @@ export function useGameState() {
       const newEff = newProd ? getProducerEffectiveCost(newProd, s.producerWorkCounts) : 0;
       delta += newEff - oldEff;
     }
-    // Studio fees are now paid weekly during recording — no upfront delta for studio swaps.
+    // Studio fees are paid weekly during recording — no upfront delta for studio swaps.
 
     if (delta > 0 && s.money < delta) {
       const newProd = ch.producerId ? PRODUCERS.find(pr => pr.id === ch.producerId) : null;
@@ -916,7 +926,25 @@ export function useGameState() {
       return s;
     }
     if (delta !== 0) s.money -= delta;
+
+    // Apply the partial update first
     s.project = { ...s.project, ...ch } as GameState["project"];
+
+    // ── Recalculate weeks if studio, producer, or mode changed ──
+    const needsRecalc = ch.studioId !== undefined || ch.producerId !== undefined || ch.mode !== undefined;
+    if (needsRecalc && s.project) {
+      const elapsed = s.project.totalWeeks - s.project.weeksLeft;
+      const newTotal = calculateRecordingWeeks(
+        s.project.type,
+        s.project.tracks.length,
+        s.project.studioId,
+        s.project.producerId,
+        s.project.mode ?? "standard"
+      );
+      s.project.totalWeeks = newTotal;
+      s.project.weeksLeft = Math.max(0, newTotal - elapsed);
+    }
+
     return s;
   }),[upd]);
 
@@ -937,11 +965,35 @@ export function useGameState() {
       hook: opts?.hook ?? "safe",
       lyric: opts?.lyric ?? "heartfelt",
     });
+    // Recalculate weeks when track count changes
+    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
+    const newTotal = calculateRecordingWeeks(
+      s.project.type,
+      s.project.tracks.length,
+      s.project.studioId,
+      s.project.producerId,
+      s.project.mode ?? "standard"
+    );
+    s.project.totalWeeks = newTotal;
+    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
     return s;
   }),[upd]);
 
   const doRemoveTrack = useCallback((i:number)=>upd(s=>{
-    if (!s.project) return s; s.project.tracks.splice(i,1); return s;
+    if (!s.project) return s;
+    s.project.tracks.splice(i,1);
+    // Recalculate weeks when track count changes
+    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
+    const newTotal = calculateRecordingWeeks(
+      s.project.type,
+      s.project.tracks.length,
+      s.project.studioId,
+      s.project.producerId,
+      s.project.mode ?? "standard"
+    );
+    s.project.totalWeeks = newTotal;
+    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
+    return s;
   }),[upd]);
 
   const doFinishProject = useCallback(()=>upd(s=>{
@@ -1008,13 +1060,32 @@ export function useGameState() {
     if (pushPenalty < 0) {
       s.log.unshift({ week:s.week, msg:`Grinding through exhaustion hurt the recording (${pushPenalty.toFixed(0)} quality).`, type:"bad" });
     }
-    const baseQ=s.qualityBase+(prod?.qB??0)+(studio?.qB??0)+relQ+specQ+writingAvgQ+burnPenalty+pushPenalty;
+
+    // ── Recording mode quality & burnout modifiers ──
+    const modeCfg = RECORDING_MODE_CONFIG[p.mode ?? "standard"];
+    const modeQualityMod = modeCfg.qualityMod;
+    let modeBurnoutAdd = 0;
+    if (p.mode === "rush") {
+      modeBurnoutAdd = 8; // One-time rush burnout hit
+    } else if (p.mode === "deliberate") {
+      const standardWeeks = getStandardRecordingWeeks(p.type, p.tracks.length, p.studioId, p.producerId);
+      const extraWeeks = Math.max(0, p.totalWeeks - standardWeeks);
+      modeBurnoutAdd = extraWeeks * 3; // +3 burnout per extra deliberate week
+    }
+
+    const baseQ=s.qualityBase+(prod?.qB??0)+(studio?.qB??0)+relQ+specQ+writingAvgQ+burnPenalty+pushPenalty+modeQualityMod;
     const adjQ=clamp(applyArchQuality(s.archetype,baseQ)+Math.random()*15-5,0,100);
     // Studio time itself accumulates burnout (longer formats = more burnout).
     const burnAdd = p.type==="Live Album"?8 : p.type==="Album"?18 : p.type==="EP"?10 : 5;
-    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd);
+    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd + modeBurnoutAdd);
     if (burnPenalty < 0) {
       s.log.unshift({ week:s.week, msg:`Recording while exhausted hurt the result (${burnPenalty.toFixed(0)} quality).`, type:"bad" });
+    }
+    if (modeQualityMod !== 0) {
+      s.log.unshift({ week:s.week, msg:`${modeCfg.label} mode: ${modeQualityMod > 0 ? "+" : ""}${modeQualityMod} quality.`, type: modeQualityMod > 0 ? "good" : "bad" });
+    }
+    if (modeBurnoutAdd > 0) {
+      s.log.unshift({ week:s.week, msg:`${modeCfg.label} mode added ${modeBurnoutAdd} burnout.`, type:"neutral" });
     }
     s.qualityBase=Math.min(95,s.qualityBase+roll(1,4));
     s.unreleased.push({id:"p"+Date.now(),type:p.type,genre:p.genre,title:p.title,producerId:p.producerId,studioId:p.studioId,themeId:p.themeId,tracks:p.tracks,avgQuality:adjQ,hypeSnapshot:s.hype,marketingBudget:p.marketingBudget});

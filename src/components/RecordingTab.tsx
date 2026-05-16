@@ -14,7 +14,7 @@ import {
 export default function RecordingTab(game: any) {
   const s = game.state;
   const [view, setView] = useState<"list" | "new" | "project" | "unreleased">("list");
-  if (view === "new") return <NewProjectForm {...game} onBack={() => setView("list")} />;
+  if (view === "new") return <NewProjectForm {...game} onBack={() => setView("list")} onProjectStarted={() => setView("project")} />;
   if (s.project && view === "project") return <ActiveProject {...game} onBack={() => setView("list")} />;
   if (view === "unreleased") return <UnreleasedList {...game} onBack={() => setView("list")} />;
   return (
@@ -61,7 +61,7 @@ export default function RecordingTab(game: any) {
   );
 }
 
-function NewProjectForm({ doStartProject, onBack, state }: any) {
+function NewProjectForm({ doStartProject, onBack, onProjectStarted, state }: any) {
   const [type, setType] = useState<ReleaseType>("Single");
   const [mode, setMode] = useState<RecordingMode>("standard");
 
@@ -125,7 +125,7 @@ function NewProjectForm({ doStartProject, onBack, state }: any) {
         )}
       </div>
 
-      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onBack(); }}>
+      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onProjectStarted(); }}>
         Start Recording
       </button>
       <button className="btn btn-ghost btn-block" onClick={onBack}>
@@ -436,4 +436,6 @@ function UnreleasedList(game: any) {
       <button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 12 }}>
         Back
       </button>
-    </di
+    </div>
+  );
+}

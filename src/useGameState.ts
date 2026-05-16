@@ -890,7 +890,7 @@ export function useGameState() {
     const mint:Record<string,number>={Single:1,EP:3,Album:8,"Live Album":4};
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
     const trackCount = mint[type] ?? 1;
-    const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", "standard");
+    const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
     s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     return s;

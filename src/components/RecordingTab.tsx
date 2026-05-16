@@ -125,7 +125,7 @@ function NewProjectForm({ doStartProject, onBack, state }: any) {
         )}
       </div>
 
-      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); }}>
+      <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onBack(); }}>
         Start Recording
       </button>
       <button className="btn btn-ghost btn-block" onClick={onBack}>
@@ -436,6 +436,4 @@ function UnreleasedList(game: any) {
       <button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 12 }}>
         Back
       </button>
-    </div>
-  );
-}
+    </di

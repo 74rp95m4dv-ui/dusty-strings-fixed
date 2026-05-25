@@ -161,7 +161,7 @@ function ActiveProject(game: any) {
     setHook("safe");
     setLyric("heartfelt");
   };
-  const canFinish = p.tracks.length >= p.minTracks;
+  const canFinish = p.tracks.length >= p.minTracks && p.weeksLeft <= 0;
 
   return (
     <div>

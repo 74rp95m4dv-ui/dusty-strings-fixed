@@ -999,6 +999,10 @@ export function useGameState() {
   const doFinishProject = useCallback(()=>upd(s=>{
     if (!s.project) return s;
     const p=s.project;
+    if (p.weeksLeft > 0) {
+      s.pendingEvent = { msg: `Recording still in progress — ${p.weeksLeft} week${p.weeksLeft === 1 ? "" : "s"} left.`, type: "bad" };
+      return s;
+    }
     const prod=PRODUCERS.find(pr=>pr.id===p.producerId);
     const studio=getStudio(p.studioId);
     // Studio fees paid weekly during recording. Producer fees paid upfront via doUpdateProject.

@@ -2825,7 +2825,6 @@ export function genThemedTrackName(themeId?: string): string {
   return rnd(pats)();
 }
 
-export function genAlbumName
 export function genAlbumName(artistName = ""): string {
   const pats = [
     () => rnd(ANAME.pre) + " " + rnd(ANAME.noun),

@@ -3,7 +3,7 @@ import {
   PRODUCERS, STUDIOS, THEMES, FEATURES, fmtMoney,
   getProducerEffectiveCost, getProducerRelationship,
   getFeatureEffectiveCost, getHook, getLyric,
-  computeAlbumWritingMix, genTrackName,
+  computeAlbumWritingMix, genTrackName, genThemedTrackName,
   type ReleaseType, type Genre, type HookStyle, type LyricStyle,
   // Recording time system v2.0
   calculateRecordingWeeks, getStandardRecordingWeeks,
@@ -139,7 +139,8 @@ function ActiveProject(game: any) {
   const {
     state, doUpdateProject, doAddTrack, doRemoveTrack,
     doFinishProject, doScrubProject, doTakeStudioBreak,
-    doPushThrough, doCancelStudioChoice, onBack,
+    doPushThrough, doCancelStudioChoice, doAutoGenerateTracks,
+    advance, onBack,
   } = game;
   const p = state.project!;
   const [trackName, setTrackName] = useState("");
@@ -262,9 +263,9 @@ function ActiveProject(game: any) {
         </div>
       </div>
 
-      {/* Theme */}
+      {/* Theme — applies to all tracks */}
       <div className="card">
-        <div className="card-title">Theme</div>
+        <div className="card-title">Album Theme</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {THEMES.map((t: any) => (
             <button
@@ -276,15 +277,30 @@ function ActiveProject(game: any) {
             </button>
           ))}
         </div>
+        {p.themeId && (
+          <div className="tip-text" style={{ marginTop: 6, fontSize: 11 }}>
+            🎵 Theme applies to all tracks. Auto-generated names will match this vibe.
+          </div>
+        )}
       </div>
 
       {/* Tracks */}
       <div className="card">
-        <div className="card-title">Tracks ({p.tracks.length}/{p.maxTracks})</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div className="card-title" style={{ margin: 0 }}>Tracks ({p.tracks.length}/{p.maxTracks})</div>
+          {p.tracks.length < p.maxTracks && (
+            <button className="btn btn-sm btn-amber" onClick={doAutoGenerateTracks}>
+              ✨ Auto-Generate All
+            </button>
+          )}
+        </div>
         {p.tracks.map((t: any, i: number) => (
-          <div className="track-row" key={i}>
-            <span className="t-num">{i + 1}</span>
-            <span className="t-name">{t.name}</span>
+          <div className="track-row" key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--bg2)" }}>
+            <span className="t-num" style={{ minWidth: 20 }}>{i + 1}</span>
+            <span className="t-name" style={{ flex: 1 }}>{t.name}</span>
+            <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase" }}>
+              {t.hook} • {t.lyric}
+            </span>
             {t.featId && <span className="t-tag">feat. {FEATURES.find((f: any) => f.id === t.featId)?.name}</span>}
             {t.cowriterId && <span className="t-tag">w/ {FEATURES.find((f: any) => f.id === t.cowriterId)?.name}</span>}
             <button className="btn btn-sm btn-danger" onClick={() => doRemoveTrack(i)}>Remove</button>
@@ -303,7 +319,7 @@ function ActiveProject(game: any) {
               />
               <button
                 className="btn btn-sm"
-                onClick={() => setTrackName(genTrackName())}
+                onClick={() => setTrackName(p.themeId ? genThemedTrackName(p.themeId) : genTrackName())}
                 title="Generate random track name"
               >
                 🎲
@@ -391,6 +407,16 @@ function ActiveProject(game: any) {
         </div>
         <div className="tip-text" style={{ marginTop: 6 }}>
           Break = recover energy, no progress. Push = record if exhausted (burnout penalty).
+        </div>
+      </div>
+
+      {/* End Week */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <button className="btn btn-lime btn-block" onClick={advance}>
+          ⏭️ End Week
+        </button>
+        <div className="tip-text" style={{ marginTop: 6 }}>
+          Advance time. Studio fees charged, recording progresses 1 week.
         </div>
       </div>
 

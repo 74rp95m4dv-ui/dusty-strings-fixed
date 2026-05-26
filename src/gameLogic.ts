@@ -2753,6 +2753,79 @@ const TPATS: (() => string)[] = [
 ];
 
 export function genTrackName(): string { return rnd(TPATS)(); }
+// Theme-specific track name generators
+const THEME_TRACK_WORDS: Record<string, { prefixes: string[]; nouns: string[]; suffixes: string[] }> = {
+  heartbreak: {
+    prefixes: ["Broken", "Empty", "Lonely", "Tears", "Goodbye", "Last", "Lost", "Hurting", "Cold", "Faded", "Gone", "Haunted", "Scarred", "Bitter", "Final"],
+    nouns: ["Heart", "Love", "Ring", "Letter", "Memory", "Whiskey", "Barstool", "Goodbye", "Shadow", "Ghost", "Rain", "Storm", "Wound", "Promise", "Regret"],
+    suffixes: ["Blues", "Song", "Ballad", "Lament", "Goodbye", "Again", "Tonight", "Forever", "Away", "Down"],
+  },
+  whiskey: {
+    prefixes: ["Drunk", "Neon", "Midnight", "Empty", "Last", "Double", "Cheap", "Burning", "Wicked", "Old", "Dirty", "Red", "Smoky", "Slow", "Hard"],
+    nouns: ["Bottle", "Glass", "Bar", "Stool", "Whiskey", "Bourbon", "Shot", "Tavern", "Neon", "Hangover", "Pour", "Drink", "Devil", "Angel", "Memory"],
+    suffixes: ["Blues", "Song", "Again", "Tonight", "Down", "Away", "Morning", "Night", "Hour", "Rain"],
+  },
+  hometown: {
+    prefixes: ["Old", "Small", "Dusty", "Backroads", "Cotton", "Mama's", "Daddy's", "Grandpa's", "Home", "Porch", "Front", "Sunday", "Summer", "Southern", "Country"],
+    nouns: ["Home", "Town", "Porch", "Road", "Dirt", "Field", "River", "Church", "Mama", "Daddy", "Dog", "Truck", "House", "Swing", "Memory"],
+    suffixes: ["Road", "Blues", "Song", "Home", "Again", "Boy", "Girl", "Dream", "Days", "Night"],
+  },
+  road: {
+    prefixes: ["Long", "Open", "Endless", "Dusty", "Lonely", "Midnight", "Highway", "Back", "Wandering", "Leaving", "Running", "Rambling", "Miles", "Wheels", "Freeway"],
+    nouns: ["Road", "Highway", "Motel", "Mile", "Horizon", "Wheels", "Gas", "Station", "Map", "Sign", "Border", "State", "Line", "Sunset", "Dawn"],
+    suffixes: ["Ahead", "Behind", "Blues", "Song", "Again", "Home", "Away", "Down", "Line", "Ride"],
+  },
+  faith: {
+    prefixes: ["Amazing", "Blessed", "Holy", "Sunday", "Gospel", "Sinner's", "Redeemed", "Saved", "Heavenly", "Golden", "Angel", "Glory", "Mercy", "Grace", "Prayer"],
+    nouns: ["Grace", "Mercy", "Prayer", "Hymn", "Glory", "Heaven", "Angel", "Church", "Steeple", "Bible", "Cross", "Jordan", "River", "Glory", "Light"],
+    suffixes: ["Hymn", "Song", "Glory", "Amen", "Home", "Bound", "Blues", "Light", "Way", "Call"],
+  },
+  rebellion: {
+    prefixes: ["Wild", "Reckless", "Burning", "Rebel", "Outlaw", "Wanted", "Dangerous", "Fighting", "Running", "Free", "Broken", "Chains", "Loud", "Young", "Fast"],
+    nouns: ["Rebel", "Outlaw", "Gun", "Horse", "Law", "Sheriff", "Jail", "Train", "Robber", "Bandit", "Fist", "Fight", "Fire", "Storm", "Thunder"],
+    suffixes: ["Run", "Blues", "Song", "Down", "Away", "Free", "Forever", "Night", "Ride", "Wind"],
+  },
+  redemption: {
+    prefixes: ["Saved", "Redeemed", "Washed", "New", "Clean", "Forgiven", "Found", "Healed", "Rising", "Second", "Born", "Bright", "Golden", "Morning", "Mercy"],
+    nouns: ["Grace", "Chance", "Life", "Day", "Dawn", "Light", "Road", "Home", "Heart", "Soul", "Hand", "Way", "Path", "River", "Mountain"],
+    suffixes: ["Again", "Home", "Blues", "Song", "Free", "Rising", "Up", "On", "Way", "Dawn"],
+  },
+  nature: {
+    prefixes: ["Wild", "Mountain", "River", "Summer", "Autumn", "Winter", "Spring", "Thunder", "Lightning", "Morning", "Golden", "Dusty", "Green", "Old", "Ancient"],
+    nouns: ["Mountain", "River", "Wind", "Rain", "Storm", "Tree", "Field", "Meadow", "Creek", "Lake", "Forest", "Trail", "Sunset", "Moon", "Star"],
+    suffixes: ["Song", "Blues", "Wind", "Rain", "Light", "Night", "Dawn", "Call", "Home", "Way"],
+  },
+  outlaw: {
+    prefixes: ["Wanted", "Dead", "Lone", "Midnight", "Riding", "Running", "Six", "Hanging", "Desert", "Dusty", "Blood", "Cold", "Steel", "Iron", "Wicked"],
+    nouns: ["Gun", "Horse", "Saddle", "Spur", "Badge", "Sheriff", "Posse", "Jail", "Noose", "Desert", "Sun", "Trail", "Dust", "Wind", "Ghost"],
+    suffixes: ["Run", "Blues", "Song", "Down", "Ride", "Wind", "Sun", "Dawn", "Night", "Trail"],
+  },
+  party: {
+    prefixes: ["Friday", "Saturday", "Neon", "Loud", "Crazy", "Wild", "Drunk", "Dancing", "Backroad", "Tailgate", "Bonfire", "Beer", "Good", "Hot", "Summer"],
+    nouns: ["Night", "Party", "Time", "Beer", "Truck", "Radio", "Song", "Dance", "Girl", "Boy", "Crowd", "Band", "Stage", "Light", "Moon"],
+    suffixes: ["Again", "Tonight", "Down", "Up", "Blues", "Song", "Time", "Night", "Party", "On"],
+  },
+};
+
+export function genThemedTrackName(themeId?: string): string {
+  if (!themeId || !THEME_TRACK_WORDS[themeId]) {
+    return genTrackName();
+  }
+  const words = THEME_TRACK_WORDS[themeId];
+  const pats = [
+    () => rnd(words.prefixes) + " " + rnd(words.nouns),
+    () => "The " + rnd(words.prefixes) + " " + rnd(words.nouns),
+    () => rnd(words.nouns) + " " + rnd(words.suffixes),
+    () => rnd(words.prefixes) + " " + rnd(words.nouns) + " " + rnd(words.suffixes),
+    () => "My " + rnd(words.prefixes) + " " + rnd(words.nouns),
+    () => rnd(words.nouns) + " of " + rnd(words.nouns),
+    () => "Old " + rnd(words.nouns),
+    () => rnd(words.prefixes) + " " + rnd(words.nouns) + " Blues",
+  ];
+  return rnd(pats)();
+}
+
+export function genAlbumName
 export function genAlbumName(artistName = ""): string {
   const pats = [
     () => rnd(ANAME.pre) + " " + rnd(ANAME.noun),

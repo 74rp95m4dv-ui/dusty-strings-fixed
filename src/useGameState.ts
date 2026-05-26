@@ -20,7 +20,7 @@ import {
   LABELS, MANAGERS, getLabel, getManager,
   generateLabelOffers, generateManagerOffers,
   rnd, roll, clamp, fmt, fmtMoney,
-  genAlbumName, genFanReviews,
+  genAlbumName, genFanReviews, genThemedTrackName,
   // Recording time system (v2.0)
   RecordingMode, calculateRecordingWeeks, getStandardRecordingWeeks,
   STUDIO_TIME_MODIFIERS, PRODUCER_TIME_MODIFIERS, RECORDING_MODE_CONFIG,
@@ -996,6 +996,33 @@ export function useGameState() {
     return s;
   }),[upd]);
 
+  const doAutoGenerateTracks = useCallback(()=>upd(s=>{
+    if (!s.project) return s;
+    const p = s.project;
+    const remaining = p.maxTracks - p.tracks.length;
+    if (remaining <= 0) return s;
+    for (let i = 0; i < remaining; i++) {
+      p.tracks.push({
+        name: genThemedTrackName(p.themeId),
+        hook: rnd(["safe","catchy","experimental"]) as import("./gameLogic").HookStyle,
+        lyric: rnd(["party","heartfelt","literary"]) as import("./gameLogic").LyricStyle,
+      });
+    }
+    // Recalculate weeks after adding all tracks
+    const elapsed = p.totalWeeks - p.weeksLeft;
+    const newTotal = calculateRecordingWeeks(
+      p.type,
+      p.tracks.length,
+      p.studioId,
+      p.producerId,
+      p.mode ?? "standard"
+    );
+    p.totalWeeks = newTotal;
+    p.weeksLeft = Math.max(0, newTotal - elapsed);
+    s.log.unshift({week:s.week,msg:`Auto-generated ${remaining} track${remaining===1?"":"s"} for "${p.title}".`,type:"neutral"});
+    return s;
+  }),[upd]);
+
   const doFinishProject = useCallback(()=>upd(s=>{
     if (!s.project) return s;
     const p=s.project;
@@ -1935,6 +1962,7 @@ export function useGameState() {
     doAddMerchItem, doToggleMerchItem, doRemoveMerchItem,
     doDismissPressing, doQuickPress,
     doTakeVacation, doResolveArcChoice, doAbortTour,
+    doAutoGenerateTracks,
     doTakeStudioBreak, doPushThrough, doCancelStudioChoice,
     doCloseTourWrapPresentation, doCloseSigningPresentation,
     doCloseAwardPresentation, doCloseMilestonePresentation,

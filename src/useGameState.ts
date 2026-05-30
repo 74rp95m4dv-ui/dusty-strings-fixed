@@ -28,6 +28,24 @@ import {
   // Streaming platform system (v2.0)
   STREAMING_PLATFORMS, BASE_STREAMING_RATE, GEO_RATE_MODIFIERS, PREMIUM_SPLIT, PREMIUM_MULTIPLIER,
   SPOTIFY_MIN_STREAMS, DEFAULT_GEO_DIST,
+  // Touring Features v2.0
+  calculateSetlistSatisfaction,
+  getVenueReputation,
+  getVenuePerkForVenue,
+  getVenuePerkDisplay,
+  generateOpeningActOffer,
+  generateFestivalOffers,
+  rollBusBreakdown,
+  type SetlistConfig,
+  type SetlistSatisfaction,
+  type VenueReputation,
+  type OpeningActOffer,
+  type FestivalBooking,
+  type BusBreakdownEvent,
+  BUS_BREAKDOWN_EVENTS,
+  VENUE_PERKS,
+  FESTIVALS,
+  OPENING_ACT_HEADLINERS,
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
 
@@ -464,6 +482,51 @@ function advance(prev:GameState): GameState {
 
   // Tour show
   let notifMsg:string|null=null, notifType="norm";
+
+  // ── Bus Breakdown Check ──
+  if (s.tourActive && s.tourActive.progress < s.tourActive.shows.length && s.week > s.lastBusBreakdownWeek + 2) {
+    const breakdown = rollBusBreakdown(s.tourActive.progress, s.tourActive.shows.length);
+    if (breakdown) {
+      s.lastBusBreakdownWeek = s.week;
+      const eff = breakdown.effect;
+
+      // Apply breakdown effects
+      if (eff.showsCancelled && eff.showsCancelled > 0) {
+        s.tourActive.progress += eff.showsCancelled;
+        s.log.unshift({ week: s.week, msg: `${breakdown.emoji} ${breakdown.title}: ${eff.showsCancelled} show(s) cancelled.`, type: "bad" });
+      }
+      if (eff.moneyCost) {
+        s.money -= eff.moneyCost;
+        s.log.unshift({ week: s.week, msg: `${breakdown.emoji} ${breakdown.title}: -${fmtMoney(eff.moneyCost)} in repairs.`, type: "bad" });
+      }
+      if (eff.moraleHit) {
+        s.tourMorale = Math.max(0, s.tourMorale - eff.moraleHit);
+        s.log.unshift({ week: s.week, msg: `${breakdown.emoji} ${breakdown.title}: Band morale dropped ${eff.moraleHit}%.`, type: "bad" });
+      }
+      if (eff.localFansGain) {
+        s.fans += eff.localFansGain;
+        s.log.unshift({ week: s.week, msg: `${breakdown.emoji} ${breakdown.title}: +${fmt(eff.localFansGain)} local fans!`, type: "good" });
+      }
+      if (eff.repLoss) {
+        s.rep = clamp(s.rep - eff.repLoss, 0, 100);
+      }
+
+      s.pendingEvent = { msg: `${breakdown.emoji} ${breakdown.title}: ${breakdown.description}`, type: eff.showsCancelled ? "bad" : "neutral" };
+
+      // Check if tour ended due to cancellations
+      if (s.tourActive.progress >= s.tourActive.shows.length) {
+        s.tourActive = null;
+        s.log.unshift({ week: s.week, msg: "Tour ended early due to breakdowns.", type: "bad" });
+      }
+    }
+  }
+
+  // ── Setlist Satisfaction ──
+  let setlistSatisfaction: SetlistSatisfaction | null = null;
+  if (s.tourActive && s.tourActive.progress < s.tourActive.shows.length && s.catalog.length > 0) {
+    setlistSatisfaction = calculateSetlistSatisfaction(s.setlistConfig, s.catalog, s.tourActive.shows.length > 5 ? 22 : 6);
+  }
+
   if (s.tourActive && s.tourActive.progress<s.tourActive.shows.length) {
     const show=s.tourActive.shows[s.tourActive.progress];
     // ── #3 Burnout: high tiers can force cancellations on the road ──
@@ -488,14 +551,39 @@ function advance(prev:GameState): GameState {
     } else {
     const demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
     const burnoutMult = burnoutShowMult(s.burnout ?? 0);
-    const fill=calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult;
+
+    // ── Venue Reputation Bonus ──
+    const venueRep = getVenueReputation(show.venueName, s.venueReputations);
+    const venuePerk = getVenuePerkForVenue(show.venueName, venueRep.playCount);
+    let venueTicketMod = 1.0;
+    let venueRepMod = 0;
+    let venueFanMod = 1.0;
+    let venueCostMod = 1.0;
+    if (venuePerk) {
+      venueTicketMod = venuePerk.effect.ticketMod ?? 1.0;
+      venueRepMod = venuePerk.effect.repMod ?? 0;
+      venueFanMod = venuePerk.effect.fanMod ?? 1.0;
+      venueCostMod = venuePerk.effect.moneyMod ?? 1.0;
+    }
+
+    // ── Setlist Satisfaction Modifier ──
+    let setlistFillMod = 1.0;
+    let setlistFanBonus = 0;
+    let setlistRepBonus = 0;
+    if (setlistSatisfaction) {
+      setlistFillMod = 0.7 + (setlistSatisfaction.score / 100) * 0.6; // 0.7 to 1.3
+      setlistFanBonus = setlistSatisfaction.hitBonus + setlistSatisfaction.newMaterialBonus;
+      setlistRepBonus = setlistSatisfaction.deepCutBonus;
+    }
+
+    const fill=calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult * setlistFillMod;
     const seats=Math.floor(fill*show.venueCap);
     // Realistic indie ticket pricing by venue tier + fame premium
     const baseTicketByTier = [8, 12, 18, 25, 35, 55, 85];
     const tierBase = baseTicketByTier[Math.min(show.venueTier-1, 6)] || 10;
     const famePrem = Math.floor(s.fame * 0.8);
     const repPrem = Math.floor(s.rep * 0.15);
-    const ticket = Math.max(tierBase, Math.floor((tierBase + famePrem + repPrem) * s.tourActive.ticketMult));
+    const ticket = Math.max(tierBase, Math.floor((tierBase + famePrem + repPrem) * s.tourActive.ticketMult * venueTicketMod));
     // Door gross
     const doorGross = seats * ticket;
     // Merch per head: superfans spend 3-6x more than casuals
@@ -505,7 +593,7 @@ function advance(prev:GameState): GameState {
     // Venue guarantee (small rooms pay YOU, big rooms you pay or split door)
     const venueGuarantee = show.venueTier <= 2 ? Math.floor(roll(120, 350))
                          : show.venueTier === 3 ? Math.floor(roll(200, 600))
-                         : -Math.floor(show.venueTier * 180);
+                         : -Math.floor(show.venueTier * 180 * venueCostMod);
     const totalGross = doorGross + merchGross + venueGuarantee;
     // Expenses: travel, lodging, food, vehicle, crew
     const people = 1 + 2; // artist + 2 crew minimum
@@ -524,7 +612,7 @@ function advance(prev:GameState): GameState {
     const labelCut = tourCutPct > 0 ? Math.floor(preCutNet * tourCutPct) : 0;
     const net = Math.floor(preCutNet - labelCut);
     s.money+=net; s.totalEarned+=Math.max(0,net);
-    const fG=Math.floor(seats*0.3*((show.genreMod[s.genre]??1)>1.2?1.2:1));
+    const fG=Math.floor(seats*0.3*((show.genreMod[s.genre]??1)>1.2?1.2:1) * venueFanMod) + setlistFanBonus;
     s.fans+=fG;
     // Live shows convert casuals → superfans (in-person bond). ~8% of attending
     // seats become superfans, scaled by fill (a packed room makes more loyalists).
@@ -534,7 +622,24 @@ function advance(prev:GameState): GameState {
     s.totalShows++; s.tourFatigue=Math.min(100,s.tourFatigue+10);
     s.tourActive.demandDecayIndex++;
     const repG=fill>=0.7?(archHas(s.archetype,"showRepBonus")?archVal(s.archetype)*3:3):fill>=0.4?1:-2;
-    s.rep=clamp(s.rep+repG,0,100);
+    s.rep=clamp(s.rep+repG+venueRepMod+setlistRepBonus,0,100);
+
+    // ── Update Venue Reputation ──
+    if (!s.venueReputations) s.venueReputations = {};
+    const existingRep = s.venueReputations[show.venueName] ?? { venueName: show.venueName, playCount: 0, lastPlayedWeek: 0, perkUnlocked: null, perkTier: 0 };
+    existingRep.playCount++;
+    existingRep.lastPlayedWeek = s.week;
+    const newPerk = getVenuePerkForVenue(show.venueName, existingRep.playCount);
+    if (newPerk && newPerk.id !== existingRep.perkUnlocked) {
+      existingRep.perkUnlocked = newPerk.id;
+      existingRep.perkTier = newPerk.tier;
+      s.log.unshift({ week: s.week, msg: `🏆 Perk unlocked at ${show.venueName}: ${newPerk.label}! ${newPerk.bonus}`, type: "great" });
+    }
+    s.venueReputations[show.venueName] = existingRep;
+
+    // ── Tour Morale ──
+    s.tourMorale = Math.min(100, Math.max(0, s.tourMorale + (fill >= 0.7 ? 3 : fill >= 0.4 ? 1 : -2)));
+
     if (!s.regional[show.region]) s.regional[show.region]=0;
     s.regional[show.region]++;
     if (!s.tourHistory) s.tourHistory=[];
@@ -546,9 +651,10 @@ function advance(prev:GameState): GameState {
     });
     if (s.tourHistory.length>50) s.tourHistory.length=50;
     const sfNote = sfG > 0 ? ` · +${fmt(sfG)} superfans` : "";
-    s.log.unshift({week:s.week,msg:`Show: ${show.cityName} @ ${show.venueName} — ${Math.floor(fill*100)}% full, ${fmtMoney(net)} net${sfNote}`,type:net>0?"good":"bad"});
+    const setlistNote = setlistSatisfaction ? ` · Setlist: ${setlistSatisfaction.label}` : "";
+    s.log.unshift({week:s.week,msg:`Show: ${show.cityName} @ ${show.venueName} — ${Math.floor(fill*100)}% full, ${fmtMoney(net)} net${sfNote}${setlistNote}`,type:net>0?"good":"bad"});
     s.tourActive.progress++;
-    notifMsg=`${show.cityName}: ${seats} fans · ${fmtMoney(net)} net`;
+    notifMsg=`${show.cityName}: ${seats} fans · ${fmtMoney(net)} net${setlistNote}`;
     notifType=net>0?"great":"bad";
     if (s.tourActive.progress>=s.tourActive.shows.length) {
       // Build tour wrap presentation before clearing tourActive
@@ -587,7 +693,69 @@ function advance(prev:GameState): GameState {
     } // end else (cancellation branch closed)
   }
 
-  // Merch shop weekly sales
+  // ── Opening Act Progress ──
+  if (s.activeOpeningAct && s.activeOpeningAct.expiresWeek <= s.week) {
+    s.activeOpeningAct = null;
+    s.openingActProgress = 0;
+    s.log.unshift({ week: s.week, msg: "Opening act slot expired.", type: "neutral" });
+  }
+
+  // ── Festival Performance Check ──
+  if (s.festivalBookings) {
+    for (const booking of s.festivalBookings) {
+      if (!booking.completed && booking.performanceWeek === s.week) {
+        // Perform at festival!
+        const fest = FESTIVALS.find(f => f.id === booking.festivalId);
+        if (fest) {
+          s.money += booking.pay;
+          s.totalEarned += booking.pay;
+          const fanGain = Math.floor(booking.fanExposure * (1 + s.fame / 100));
+          s.fans += fanGain;
+          s.fame = clamp(s.fame + 3, 0, 100);
+          s.rep = clamp(s.rep + 2, 0, 100);
+          booking.completed = true;
+          if (!s.completedFestivals) s.completedFestivals = [];
+          s.completedFestivals.push(fest.id);
+          s.log.unshift({ week: s.week, msg: `🎪 ${fest.name}: Performed on the ${booking.stage} stage! +${fmtMoney(booking.pay)} · +${fmt(fanGain)} fans`, type: "great" });
+          s.pendingEvent = { msg: `Played ${fest.name}! ${fmtMoney(booking.pay)} payday.`, type: "gold" };
+        }
+      }
+    }
+    // Clean up completed bookings older than 4 weeks
+    s.festivalBookings = s.festivalBookings.filter(b => !b.completed || s.week - b.bookedWeek < 4);
+  }
+
+  // ── Generate Opening Act Offers ──
+  if (!s.pendingOpeningActOffers) s.pendingOpeningActOffers = [];
+  // Clean expired offers
+  s.pendingOpeningActOffers = s.pendingOpeningActOffers.filter(o => o.expiresWeek > s.week);
+  // Generate new offers (max 2 pending)
+  if (s.pendingOpeningActOffers.length < 2 && !s.activeOpeningAct && Math.random() < 0.12) {
+    const offer = generateOpeningActOffer(s);
+    if (offer) {
+      s.pendingOpeningActOffers.push(offer);
+      s.log.unshift({ week: s.week, msg: `📨 Opening act offer from ${offer.headlinerName}: ${offer.showsCount} shows, ${fmtMoney(offer.payPerShow)}/show`, type: "good" });
+    }
+  }
+
+  // ── Generate Festival Offers ──
+  if (!s.pendingFestivalOffers) s.pendingFestivalOffers = [];
+  const newFestivals = generateFestivalOffers(s);
+  if (newFestivals.length > 0) {
+    s.pendingFestivalOffers = [...s.pendingFestivalOffers, ...newFestivals];
+    for (const fest of newFestivals) {
+      s.log.unshift({ week: s.week, msg: `🎪 Festival booking offer: ${fest.festivalName} (${fest.stage} stage) — ${fmtMoney(fest.pay)}`, type: "good" });
+    }
+  }
+  // Clean old festival offers
+  s.pendingFestivalOffers = s.pendingFestivalOffers.filter(f => f.performanceWeek > s.week && !f.completed);
+
+  // ── Tour Morale Recovery (when not on tour) ──
+  if (!s.tourActive) {
+    s.tourMorale = Math.min(100, s.tourMorale + 5);
+  }
+
+// Merch shop weekly sales
   if (!s.merchShop) s.merchShop = [];
   if (s.totalMerchRevenue === undefined) s.totalMerchRevenue = 0;
   let merchProfitWeek = 0;
@@ -860,6 +1028,17 @@ export function useGameState() {
     activeArcs: s.activeArcs ?? [],
     completedArcs: s.completedArcs ?? [],
     pendingArcChoice: s.pendingArcChoice ?? null,
+      // ── Touring Features v2.0 migration ──
+      setlistConfig: s.setlistConfig ?? { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
+      venueReputations: s.venueReputations ?? {},
+      tourMorale: s.tourMorale ?? 100,
+      pendingOpeningActOffers: s.pendingOpeningActOffers ?? [],
+      activeOpeningAct: s.activeOpeningAct ?? null,
+      openingActProgress: s.openingActProgress ?? 0,
+      festivalBookings: s.festivalBookings ?? [],
+      pendingFestivalOffers: s.pendingFestivalOffers ?? [],
+      completedFestivals: s.completedFestivals ?? [],
+      lastBusBreakdownWeek: s.lastBusBreakdownWeek ?? 0,
   }); },[]);
   const clearSave = useCallback(()=>{ try{localStorage.removeItem(SAVE_KEY);}catch{} setState({...INITIAL_STATE}); },[]);
 
@@ -1686,6 +1865,66 @@ export function useGameState() {
     return s;
   }), [upd]);
 
+
+  // ── Setlist Builder ──
+  const doSetSetlist = useCallback((config: SetlistConfig) => upd(s => {
+    s.setlistConfig = config;
+    const total = config.deepCutCount + config.hitCount + config.newMaterialCount;
+    const slots = s.tourActive && s.tourActive.shows.length > 5 ? 22 : 6;
+    if (total !== slots) {
+      s.pendingEvent = { msg: `Setlist must have exactly ${slots} songs. You have ${total}.`, type: "bad" };
+    } else {
+      const sat = calculateSetlistSatisfaction(config, s.catalog, slots);
+      s.pendingEvent = { msg: `Setlist updated: ${sat.label} (${sat.score}/100). ${sat.feedback}`, type: sat.score >= 75 ? "good" : "neutral" };
+    }
+    return s;
+  }), [upd]);
+
+  // ── Opening Act Offers ──
+  const doAcceptOpeningAct = useCallback((offerId: string) => upd(s => {
+    const offer = s.pendingOpeningActOffers.find(o => o.id === offerId);
+    if (!offer) return s;
+    if (s.tourActive) {
+      s.pendingEvent = { msg: "Can't take an opening act while on your own tour.", type: "bad" };
+      return s;
+    }
+    s.activeOpeningAct = offer;
+    s.openingActProgress = 0;
+    s.pendingOpeningActOffers = [];
+    s.log.unshift({ week: s.week, msg: `Accepted opening act for ${offer.headlinerName}: ${offer.showsCount} shows`, type: "good" });
+    s.pendingEvent = { msg: `Opening for ${offer.headlinerName}! Low pay, massive exposure.`, type: "great" };
+    return s;
+  }), [upd]);
+
+  const doDismissOpeningActOffers = useCallback(() => upd(s => {
+    if (s.pendingOpeningActOffers.length) {
+      s.log.unshift({ week: s.week, msg: "Passed on opening act offers.", type: "neutral" });
+    }
+    s.pendingOpeningActOffers = [];
+    return s;
+  }), [upd]);
+
+  // ── Festival Offers ──
+  const doAcceptFestival = useCallback((festivalId: string) => upd(s => {
+    const offer = s.pendingFestivalOffers.find(f => f.festivalId === festivalId);
+    if (!offer) return s;
+    if (!s.festivalBookings) s.festivalBookings = [];
+    s.festivalBookings.push({ ...offer, completed: false });
+    s.pendingFestivalOffers = s.pendingFestivalOffers.filter(f => f.festivalId !== festivalId);
+    s.log.unshift({ week: s.week, msg: `Booked ${offer.festivalName}! Performing week ${offer.performanceWeek}.`, type: "great" });
+    s.pendingEvent = { msg: `Festival locked: ${offer.festivalName} on the ${offer.stage} stage!`, type: "gold" };
+    return s;
+  }), [upd]);
+
+  const doDismissFestivalOffers = useCallback(() => upd(s => {
+    if (s.pendingFestivalOffers.length) {
+      s.log.unshift({ week: s.week, msg: "Passed on festival offers.", type: "neutral" });
+    }
+    s.pendingFestivalOffers = [];
+    return s;
+  }), [upd]);
+
+
   // ── #3 Burnout: Vacation action ─────────────────────────
   // A real reset — clears most burnout, restores energy, but costs cash + time
   // off (cooldown gates spam-vacationing). Strong but not free.
@@ -1966,5 +2205,8 @@ export function useGameState() {
     doTakeStudioBreak, doPushThrough, doCancelStudioChoice,
     doCloseTourWrapPresentation, doCloseSigningPresentation,
     doCloseAwardPresentation, doCloseMilestonePresentation,
+    doSetSetlist,
+    doAcceptOpeningAct, doDismissOpeningActOffers,
+    doAcceptFestival, doDismissFestivalOffers,
   };
 }

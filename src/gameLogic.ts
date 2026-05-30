@@ -1548,6 +1548,625 @@ export function generateFeatureRequest(s: GameState): FeatureRequest | null {
   };
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// TOURING FEATURES v2.0 — Setlist, Venue Rep, Bus Breakdowns,
+// Opening Acts, Festival Bookings
+// ═══════════════════════════════════════════════════════════════
+
+// ── SETLIST BUILDER ──────────────────────────────────────────
+export type SetlistSlotType = "deep_cut" | "hit" | "new_material";
+export interface SetlistConfig {
+  deepCutCount: number;    // 0-6 for opening, 0-22 for headliner
+  hitCount: number;
+  newMaterialCount: number;
+  totalSlots: number;      // 6 for opening, 22 for headliner
+}
+
+export interface SetlistSatisfaction {
+  score: number;           // 0-100
+  label: string;           // "Ecstatic", "Happy", "Satisfied", "Bored", "Disappointed"
+  deepCutBonus: number;    // rep gain from deep cuts
+  hitBonus: number;        // fan gain from hits
+  newMaterialBonus: number; // hype gain from new material
+  feedback: string;        // fan quote
+}
+
+// ── VENUE REPUTATION ─────────────────────────────────────────
+export interface VenueReputation {
+  venueName: string;
+  playCount: number;
+  lastPlayedWeek: number;
+  perkUnlocked: string | null;
+  perkTier: number;        // 0=none, 1=bronze, 2=silver, 3=gold
+}
+
+export interface VenuePerk {
+  id: string;
+  venueName: string;
+  tier: number;            // plays required
+  label: string;
+  bonus: string;
+  effect: { moneyMod?: number; repMod?: number; fanMod?: number; ticketMod?: number };
+}
+
+export const VENUE_PERKS: VenuePerk[] = [
+  // Ryman Auditorium perks
+  { id: "ryman_regular", venueName: "Ryman Auditorium", tier: 5, label: "Ryman Regular",
+    bonus: "+15% ticket price, +2 rep per show", effect: { ticketMod: 1.15, repMod: 2 } },
+  { id: "ryman_legend", venueName: "Ryman Auditorium", tier: 15, label: "Ryman Legend",
+    bonus: "+25% ticket price, +5 rep per show, guaranteed sellout boost", effect: { ticketMod: 1.25, repMod: 5, fanMod: 1.1 } },
+  // Dive bar perks (generic)
+  { id: "dive_authentic", venueName: "Dive Bar", tier: 10, label: "Dive Bar Authentic",
+    bonus: "+8 rep per show, -20% venue cost", effect: { repMod: 8, moneyMod: 0.8 } },
+  { id: "dive_legend", venueName: "Dive Bar", tier: 25, label: "Dive Bar Legend",
+    bonus: "+15 rep per show, -30% venue cost, fans love the 'real' cred", effect: { repMod: 15, moneyMod: 0.7, fanMod: 1.05 } },
+  // Marathon Music Works
+  { id: "marathon_regular", venueName: "Marathon Music Works", tier: 5, label: "Marathon Runner",
+    bonus: "+10% ticket price, +1 rep per show", effect: { ticketMod: 1.10, repMod: 1 } },
+  // The Bluebird Cafe
+  { id: "bluebird_regular", venueName: "The Bluebird Cafe", tier: 5, label: "Bluebird Regular",
+    bonus: "+12% ticket price, +3 rep per show", effect: { ticketMod: 1.12, repMod: 3 } },
+  { id: "bluebird_legend", venueName: "The Bluebird Cafe", tier: 15, label: "Bluebird Legend",
+    bonus: "+20% ticket price, +6 rep per show, songwriter circle access", effect: { ticketMod: 1.20, repMod: 6 } },
+];
+
+// ── TOUR BUS BREAKDOWNS ────────────────────────────────────
+export interface BusBreakdownEvent {
+  id: string;
+  emoji: string;
+  title: string;
+  description: string;
+  effect: {
+    showsCancelled?: number;
+    moraleHit?: number;
+    moneyCost?: number;
+    fanLoss?: number;
+    repLoss?: number;
+    localFansGain?: number;
+  };
+  weight: number;
+  minTourProgress?: number;  // only after N shows
+}
+
+export const BUS_BREAKDOWN_EVENTS: BusBreakdownEvent[] = [
+  {
+    id: "transmission_dies",
+    emoji: "🔧",
+    title: "Transmission Dies",
+    description: "The tour bus transmission gave out on I-40. You're stranded for 2 weeks. Two shows cancelled.",
+    effect: { showsCancelled: 2, moneyCost: 800, moraleHit: 15 },
+    weight: 3,
+    minTourProgress: 2,
+  },
+  {
+    id: "band_fight",
+    emoji: "😤",
+    title: "Band Fight",
+    description: "The drummer and lead guitarist had it out after last night's show. Morale is in the gutter.",
+    effect: { moraleHit: 25, repLoss: 3 },
+    weight: 4,
+    minTourProgress: 1,
+  },
+  {
+    id: "radio_station_visit",
+    emoji: "📻",
+    title: "Radio Station Visit",
+    description: "A local station heard you were in town and invited the whole band for a live session. The locals are buzzing.",
+    effect: { localFansGain: 400, repLoss: 0 },
+    weight: 5,
+    minTourProgress: 1,
+  },
+  {
+    id: "flat_tires",
+    emoji: "🛞",
+    title: "Four Flat Tires",
+    description: "Someone left nails on the venue loading dock. All four tires are flat. One show delayed, $600 in repairs.",
+    effect: { showsCancelled: 1, moneyCost: 600, moraleHit: 8 },
+    weight: 3,
+    minTourProgress: 1,
+  },
+  {
+    id: "food_poisoning",
+    emoji: "🤢",
+    title: "Food Poisoning",
+    description: "The whole crew ate at the same roadside diner. Everyone's sick. One show cancelled, medical costs.",
+    effect: { showsCancelled: 1, moneyCost: 400, moraleHit: 20 },
+    weight: 2,
+    minTourProgress: 2,
+  },
+  {
+    id: "fan_encounter",
+    emoji: "🎸",
+    title: "Impromptu Fan Jam",
+    description: "A local fan with a home studio offered their space for a free rehearsal. The band's spirits lifted.",
+    effect: { localFansGain: 200, moraleHit: -10 },  // negative moraleHit = boost
+    weight: 4,
+    minTourProgress: 1,
+  },
+  {
+    id: "stolen_gear",
+    emoji: "🦹",
+    title: "Stolen Gear",
+    description: "Someone broke into the bus at the motel. Pedalboard and mic stolen. $1,200 to replace, morale crushed.",
+    effect: { moneyCost: 1200, moraleHit: 18, repLoss: 2 },
+    weight: 2,
+    minTourProgress: 3,
+  },
+  {
+    id: "local_hero",
+    emoji: "🏆",
+    title: "Hometown Hero Welcome",
+    description: "The mayor of a small town declared it 'Your Name Day.' Unexpected parade, massive local goodwill.",
+    effect: { localFansGain: 800, repLoss: 0 },
+    weight: 2,
+    minTourProgress: 1,
+  },
+];
+
+// ── OPENING ACT SLOTS ──────────────────────────────────────
+export interface OpeningActOffer {
+  id: string;
+  headlinerName: string;
+  headlinerFame: number;
+  headlinerFans: number;
+  genre: Genre;
+  cities: string[];
+  showsCount: number;
+  payPerShow: number;
+  exposureMultiplier: number;  // fan gain multiplier
+  weeksDuration: number;
+  offeredWeek: number;
+  expiresWeek: number;
+  description: string;
+}
+
+export const OPENING_ACT_HEADLINERS = [
+  // ── COUNTRY HEADLINERS ───────────────────────────────────
+  { name: "Jolene Marie", fame: 65, fans: 140000, genre: "Country" as Genre, minPlayerFame: 15 },
+  { name: "Cole Whitaker", fame: 55, fans: 95000, genre: "Country" as Genre, minPlayerFame: 12 },
+  { name: "Lila Dawn", fame: 70, fans: 180000, genre: "Country" as Genre, minPlayerFame: 20 },
+  { name: "Scarlett Mae", fame: 75, fans: 220000, genre: "Country" as Genre, minPlayerFame: 25 },
+  { name: "Hank Calloway", fame: 68, fans: 160000, genre: "Country" as Genre, minPlayerFame: 22 },
+  { name: "Wyatt McCall", fame: 58, fans: 105000, genre: "Country" as Genre, minPlayerFame: 14 },
+  { name: "Dusty Hollow", fame: 72, fans: 195000, genre: "Country" as Genre, minPlayerFame: 23 },
+  { name: "Ruby Hartwell", fame: 60, fans: 115000, genre: "Country" as Genre, minPlayerFame: 16 },
+  { name: "Jake Tanner", fame: 52, fans: 88000, genre: "Country" as Genre, minPlayerFame: 13 },
+  { name: "Maggie-Lynn Boone", fame: 78, fans: 250000, genre: "Country" as Genre, minPlayerFame: 28 },
+  { name: "Colton Ridge", fame: 56, fans: 98000, genre: "Country" as Genre, minPlayerFame: 13 },
+  { name: "Sunny Rae", fame: 63, fans: 130000, genre: "Country" as Genre, minPlayerFame: 18 },
+  { name: "Bobby-Joe Turner", fame: 50, fans: 82000, genre: "Country" as Genre, minPlayerFame: 12 },
+  { name: "Kelsey Monroe", fame: 66, fans: 145000, genre: "Country" as Genre, minPlayerFame: 19 },
+  { name: "Travis Cole", fame: 54, fans: 92000, genre: "Country" as Genre, minPlayerFame: 13 },
+  { name: "Annie Oak", fame: 61, fans: 120000, genre: "Country" as Genre, minPlayerFame: 17 },
+  { name: "Dallas Stone", fame: 73, fans: 200000, genre: "Country" as Genre, minPlayerFame: 24 },
+  { name: "Faith Prescott", fame: 57, fans: 100000, genre: "Country" as Genre, minPlayerFame: 14 },
+  { name: "Garrett Brooks", fame: 64, fans: 135000, genre: "Country" as Genre, minPlayerFame: 18 },
+  { name: "Loretta-June", fame: 80, fans: 280000, genre: "Country" as Genre, minPlayerFame: 30 },
+  // ── BLUES HEADLINERS ───────────────────────────────────────
+  { name: "Mama Cora", fame: 48, fans: 72000, genre: "Blues" as Genre, minPlayerFame: 10 },
+  { name: "Duke Rivers", fame: 62, fans: 110000, genre: "Blues" as Genre, minPlayerFame: 18 },
+  { name: "Blind Sam Tatum", fame: 52, fans: 85000, genre: "Blues" as Genre, minPlayerFame: 15 },
+  { name: "Slim Harlan", fame: 45, fans: 65000, genre: "Blues" as Genre, minPlayerFame: 9 },
+  { name: "Big Mama Thornton", fame: 58, fans: 95000, genre: "Blues" as Genre, minPlayerFame: 14 },
+  { name: "Lightning Wade", fame: 55, fans: 88000, genre: "Blues" as Genre, minPlayerFame: 13 },
+  { name: "Reverend Clay", fame: 50, fans: 78000, genre: "Blues" as Genre, minPlayerFame: 11 },
+  { name: "Mississippi Jack", fame: 65, fans: 120000, genre: "Blues" as Genre, minPlayerFame: 17 },
+  { name: "Sister Rosetta", fame: 60, fans: 105000, genre: "Blues" as Genre, minPlayerFame: 15 },
+  { name: "Howlin' Hank", fame: 53, fans: 82000, genre: "Blues" as Genre, minPlayerFame: 12 },
+  { name: "Etta-Rose", fame: 67, fans: 140000, genre: "Blues" as Genre, minPlayerFame: 19 },
+  { name: "Muddy Waters Jr.", fame: 70, fans: 155000, genre: "Blues" as Genre, minPlayerFame: 21 },
+  { name: "B.B. Kingstone", fame: 75, fans: 190000, genre: "Blues" as Genre, minPlayerFame: 25 },
+  { name: "Little Jimmy", fame: 48, fans: 70000, genre: "Blues" as Genre, minPlayerFame: 10 },
+  { name: "Alberta Cross", fame: 56, fans: 92000, genre: "Blues" as Genre, minPlayerFame: 13 },
+  { name: "Freddie Kingman", fame: 63, fans: 115000, genre: "Blues" as Genre, minPlayerFame: 17 },
+  { name: "Koko LaRoux", fame: 59, fans: 100000, genre: "Blues" as Genre, minPlayerFame: 15 },
+  { name: "Buddy Guyton", fame: 72, fans: 170000, genre: "Blues" as Genre, minPlayerFame: 23 },
+  { name: "John Lee Hookman", fame: 68, fans: 150000, genre: "Blues" as Genre, minPlayerFame: 20 },
+  { name: "Stevie Ray Vaughn II", fame: 74, fans: 185000, genre: "Blues" as Genre, minPlayerFame: 24 },
+];
+
+// ── FESTIVAL BOOKINGS ───────────────────────────────────────
+export interface Festival {
+  id: string;
+  name: string;
+  emoji: string;
+  city: string;
+  state: string;
+  month: number;           // 1-12, when it happens
+  weekWindow: [number, number]; // week range it can occur
+  stage: "main" | "secondary" | "tent";
+  basePay: number;
+  fameReq: number;
+  repReq: number;
+  fanExposure: number;
+  description: string;
+}
+
+export const FESTIVALS: Festival[] = [
+  // ── MAJOR FESTIVALS ───────────────────────────────────────
+  { id: "bonnaroo", name: "Bonnaroo", emoji: "🌈", city: "Manchester", state: "TN",
+    month: 6, weekWindow: [20, 28], stage: "main", basePay: 25000, fameReq: 35, repReq: 30,
+    fanExposure: 8000, description: "The farm. 80,000 people. A career-defining slot." },
+  { id: "stagecoach", name: "Stagecoach", emoji: "🤠", city: "Indio", state: "CA",
+    month: 4, weekWindow: [12, 18], stage: "main", basePay: 35000, fameReq: 40, repReq: 35,
+    fanExposure: 12000, description: "California's country megafest. Big money, big crowd." },
+  { id: "austin_city_limits", name: "Austin City Limits", emoji: "🎸", city: "Austin", state: "TX",
+    month: 10, weekWindow: [38, 44], stage: "main", basePay: 30000, fameReq: 38, repReq: 32,
+    fanExposure: 10000, description: "Zilker Park. Two weekends. The Texas crown jewel." },
+  { id: "cma_fest", name: "CMA Fest", emoji: "🏙", city: "Nashville", state: "TN",
+    month: 6, weekWindow: [22, 28], stage: "main", basePay: 45000, fameReq: 45, repReq: 40,
+    fanExposure: 15000, description: "Nashville's biggest weekend. The industry is watching." },
+  // ── REGIONAL ROOTS FESTIVALS ─────────────────────────────
+  { id: "memphis_in_may", name: "Memphis in May", emoji: "🎷", city: "Memphis", state: "TN",
+    month: 5, weekWindow: [16, 22], stage: "secondary", basePay: 12000, fameReq: 20, repReq: 18,
+    fanExposure: 3500, description: "BBQ, blues, and Beale Street. The soul of the river." },
+  { id: "new_orleans_jazz", name: "New Orleans Jazz & Heritage", emoji: "🎺", city: "New Orleans", state: "LA",
+    month: 4, weekWindow: [14, 20], stage: "secondary", basePay: 15000, fameReq: 22, repReq: 20,
+    fanExposure: 4500, description: "Jazz, blues, and crawfish. A cultural institution." },
+  { id: "shaky_knees", name: "Shaky Knees", emoji: "🎵", city: "Atlanta", state: "GA",
+    month: 5, weekWindow: [16, 22], stage: "tent", basePay: 8000, fameReq: 15, repReq: 12,
+    fanExposure: 2500, description: "Atlanta's indie-rock-meets-roots festival. Great for discovery." },
+  { id: "pilgrimage", name: "Pilgrimage", emoji: "⛪", city: "Franklin", state: "TN",
+    month: 9, weekWindow: [32, 38], stage: "secondary", basePay: 10000, fameReq: 18, repReq: 15,
+    fanExposure: 3000, description: "Right outside Nashville. Industry-heavy crowd." },
+  { id: "railbird", name: "Railbird", emoji: "🐎", city: "Lexington", state: "KY",
+    month: 6, weekWindow: [20, 26], stage: "tent", basePay: 7000, fameReq: 14, repReq: 10,
+    fanExposure: 2000, description: "Horses, bourbon, and bluegrass. Kentucky charm." },
+  { id: "beale_street", name: "Beale Street Music Festival", emoji: "🎶", city: "Memphis", state: "TN",
+    month: 5, weekWindow: [16, 22], stage: "secondary", basePay: 11000, fameReq: 18, repReq: 16,
+    fanExposure: 3200, description: "Tom Lee Park. The Mississippi backdrop. Blues heaven." },
+  // ── COUNTRY-SPECIFIC FESTIVALS ───────────────────────────
+  { id: "country_thunder", name: "Country Thunder", emoji: "⚡", city: "Florence", state: "AZ",
+    month: 4, weekWindow: [12, 18], stage: "main", basePay: 20000, fameReq: 30, repReq: 25,
+    fanExposure: 7000, description: "Arizona desert. Four days of country under the stars." },
+  { id: "tortuga", name: "Tortuga Music Festival", emoji: "🐢", city: "Fort Lauderdale", state: "FL",
+    month: 4, weekWindow: [12, 18], stage: "secondary", basePay: 14000, fameReq: 24, repReq: 20,
+    fanExposure: 5000, description: "Beachside country. Sun, sand, and steel guitar." },
+  { id: "watershed", name: "Watershed", emoji: "🏔", city: "George", state: "WA",
+    month: 7, weekWindow: [26, 32], stage: "main", basePay: 22000, fameReq: 32, repReq: 28,
+    fanExposure: 7500, description: "The Gorge Amphitheatre. The most beautiful venue in America." },
+  { id: " faster_horses", name: "Faster Horses", emoji: "🐴", city: "Brooklyn", state: "MI",
+    month: 7, weekWindow: [26, 32], stage: "main", basePay: 18000, fameReq: 28, repReq: 24,
+    fanExposure: 6000, description: "Michigan's country campout. Three days of music and mud." },
+  { id: "louder_than_life", name: "Louder Than Life", emoji: "🔥", city: "Louisville", state: "KY",
+    month: 9, weekWindow: [34, 40], stage: "secondary", basePay: 13000, fameReq: 25, repReq: 22,
+    fanExposure: 4500, description: "Bourbon, BBQ, and rock-tinged country. A rowdy crowd." },
+  { id: "rock_the_south", name: "Rock the South", emoji: "🤘", city: "Cullman", state: "AL",
+    month: 6, weekWindow: [22, 28], stage: "main", basePay: 16000, fameReq: 26, repReq: 22,
+    fanExposure: 5500, description: "Alabama's biggest country throwdown. Red dirt and rebellion." },
+  { id: "twin_lakes", name: "Twin Lakes Country Fest", emoji: "🌾", city: "Twin Lakes", state: "WI",
+    month: 7, weekWindow: [26, 32], stage: "tent", basePay: 6000, fameReq: 12, repReq: 10,
+    fanExposure: 1800, description: "Small-town Wisconsin. Intimate, loyal crowds." },
+  { id: "we_fest", name: "WE Fest", emoji: "🚜", city: "Detroit Lakes", state: "MN",
+    month: 8, weekWindow: [30, 36], stage: "main", basePay: 19000, fameReq: 29, repReq: 25,
+    fanExposure: 6500, description: "Minnesota's country campout. Lakeside stages." },
+  { id: "country_fan_fest", name: "Country Fan Fest", emoji: "🎤", city: "Nashville", state: "TN",
+    month: 8, weekWindow: [30, 36], stage: "secondary", basePay: 9000, fameReq: 16, repReq: 14,
+    fanExposure: 2800, description: "Fan-driven event in Music City. Close artist-fan connection." },
+  // ── BLUES-SPECIFIC FESTIVALS ───────────────────────────────
+  { id: "chicago_blues", name: "Chicago Blues Festival", emoji: "🎹", city: "Chicago", state: "IL",
+    month: 6, weekWindow: [20, 26], stage: "main", basePay: 14000, fameReq: 24, repReq: 22,
+    fanExposure: 5000, description: "The world's largest free blues festival. Grant Park." },
+  { id: "king_biscuit", name: "King Biscuit Blues Festival", emoji: "🍪", city: "Helena", state: "AR",
+    month: 10, weekWindow: [40, 46], stage: "secondary", basePay: 8000, fameReq: 15, repReq: 18,
+    fanExposure: 2500, description: "The Delta's crown jewel. Where Sonny Boy walked." },
+  { id: "mississippi_delta", name: "Mississippi Delta Blues Festival", emoji: "🌊", city: "Greenville", state: "MS",
+    month: 9, weekWindow: [34, 40], stage: "tent", basePay: 5500, fameReq: 12, repReq: 14,
+    fanExposure: 1500, description: "The birthplace of the blues. Ground zero for the real thing." },
+  { id: "clarksdale_juke", name: "Clarksdale Juke Joint Festival", emoji: "🍺", city: "Clarksdale", state: "MS",
+    month: 4, weekWindow: [14, 20], stage: "tent", basePay: 4000, fameReq: 8, repReq: 10,
+    fanExposure: 1000, description: "Juke joints up and down the street. The real Delta experience." },
+  { id: "memphis_blues_week", name: "Memphis Blues Week", emoji: "🎸", city: "Memphis", state: "TN",
+    month: 5, weekWindow: [18, 24], stage: "secondary", basePay: 9500, fameReq: 17, repReq: 16,
+    fanExposure: 3000, description: "A week-long blues takeover of Memphis. Beale Street never sleeps." },
+  { id: "cincinnati_blues", name: "Cincinnati Blues Festival", emoji: "🌉", city: "Cincinnati", state: "OH",
+    month: 7, weekWindow: [26, 32], stage: "tent", basePay: 6000, fameReq: 13, repReq: 12,
+    fanExposure: 1800, description: "Ohio River blues. A hidden gem on the circuit." },
+  { id: "doheny_blues", name: "Doheny Blues Festival", emoji: "🌊", city: "Dana Point", state: "CA",
+    month: 5, weekWindow: [18, 24], stage: "secondary", basePay: 10000, fameReq: 19, repReq: 17,
+    fanExposure: 3200, description: "Oceanfront blues in California. Surf and soul." },
+  { id: "blues_from_the_top", name: "Blues From the Top", emoji: "🏔", city: "Winter Park", state: "CO",
+    month: 8, weekWindow: [30, 36], stage: "tent", basePay: 5000, fameReq: 10, repReq: 11,
+    fanExposure: 1200, description: "Rocky Mountain blues. Thin air, thick grooves." },
+  { id: "porcupine_mountain", name: "Porcupine Mountain Blues Festival", emoji: "🌲", city: "Ontonagon", state: "MI",
+    month: 8, weekWindow: [30, 36], stage: "tent", basePay: 4500, fameReq: 9, repReq: 10,
+    fanExposure: 1000, description: "Deep in the Upper Peninsula woods. A true escape." },
+  // ── AMERICANA / ROOTS FESTIVALS ────────────────────────────
+  { id: "merle_fest", name: "MerleFest", emoji: "🪕", city: "Wilkesboro", state: "NC",
+    month: 4, weekWindow: [14, 20], stage: "secondary", basePay: 11000, fameReq: 20, repReq: 18,
+    fanExposure: 3500, description: "Doc Watson's legacy. Bluegrass, folk, and Americana." },
+  { id: "telluride_bluegrass", name: "Telluride Bluegrass Festival", emoji: "🏔", city: "Telluride", state: "CO",
+    month: 6, weekWindow: [22, 28], stage: "main", basePay: 17000, fameReq: 27, repReq: 24,
+    fanExposure: 5500, description: "7,000 feet up in the San Juans. The most beautiful stage in America." },
+  { id: "newport_folk", name: "Newport Folk Festival", emoji: "⛵", city: "Newport", state: "RI",
+    month: 7, weekWindow: [26, 32], stage: "main", basePay: 21000, fameReq: 31, repReq: 28,
+    fanExposure: 7000, description: "Where Dylan went electric. Folk history lives here." },
+  { id: "hardly_strictly", name: "Hardly Strictly Bluegrass", emoji: "🌉", city: "San Francisco", state: "CA",
+    month: 10, weekWindow: [38, 44], stage: "main", basePay: 12000, fameReq: 21, repReq: 19,
+    fanExposure: 4000, description: "Free festival in Golden Gate Park. Massive, eclectic crowd." },
+  { id: "americana_fest", name: "AmericanaFest", emoji: "🎻", city: "Nashville", state: "TN",
+    month: 9, weekWindow: [34, 40], stage: "secondary", basePay: 8500, fameReq: 16, repReq: 20,
+    fanExposure: 2200, description: "The industry conference. A&R reps in every corner." },
+  { id: "bristol_rhythm", name: "Bristol Rhythm & Roots", emoji: "🎙", city: "Bristol", state: "TN/VA",
+    month: 9, weekWindow: [34, 40], stage: "secondary", basePay: 7500, fameReq: 14, repReq: 13,
+    fanExposure: 2000, description: "The birthplace of country music. State Street straddles two states." },
+  { id: "roots_n_blues", name: "Roots N Blues N BBQ", emoji: "🍖", city: "Columbia", state: "MO",
+    month: 10, weekWindow: [40, 46], stage: "tent", basePay: 6500, fameReq: 13, repReq: 12,
+    fanExposure: 1700, description: "Missouri's roots music feast. BBQ competition on the side." },
+  { id: "old_settlers", name: "Old Settler's Music Festival", emoji: "🌵", city: "Tilmon", state: "TX",
+    month: 4, weekWindow: [14, 20], stage: "tent", basePay: 5500, fameReq: 11, repReq: 10,
+    fanExposure: 1400, description: "Texas hill country camping. Pickin' circles till dawn." },
+  { id: "johnny_cash", name: "Johnny Cash Heritage Festival", emoji: "🖤", city: "Dyess", state: "AR",
+    month: 10, weekWindow: [40, 46], stage: "tent", basePay: 5000, fameReq: 10, repReq: 12,
+    fanExposure: 1200, description: "At the Cash family farm. Intimate, reverent, unforgettable." },
+  { id: "mountain_stage", name: "Mountain Stage", emoji: "📻", city: "Charleston", state: "WV",
+    month: 5, weekWindow: [18, 24], stage: "tent", basePay: 4800, fameReq: 9, repReq: 11,
+    fanExposure: 1100, description: "NPR's legendary live broadcast. One song can change everything." },
+  // ── NICHÉ / SPECIALTY FESTIVALS ──────────────────────────
+  { id: "mudbug_madness", name: "Mudbug Madness", emoji: "🦞", city: "Shreveport", state: "LA",
+    month: 5, weekWindow: [18, 24], stage: "tent", basePay: 3500, fameReq: 7, repReq: 8,
+    fanExposure: 800, description: "Crawfish, zydeco, and swamp blues. Louisiana at its loudest." },
+  { id: "smithsonian_folk", name: "Smithsonian Folklife Festival", emoji: "🏛", city: "Washington", state: "DC",
+    month: 6, weekWindow: [22, 28], stage: "tent", basePay: 6000, fameReq: 12, repReq: 15,
+    fanExposure: 1500, description: "The National Mall. Prestige, not paycheck." },
+  { id: "kentucky_derby", name: "Kentucky Derby Festival", emoji: "🌹", city: "Louisville", state: "KY",
+    month: 4, weekWindow: [14, 20], stage: "secondary", basePay: 9000, fameReq: 15, repReq: 14,
+    fanExposure: 2500, description: "Two weeks of Derby parties. The infield is a different world." },
+  { id: "mardi_gras", name: "Mardi Gras Music Festival", emoji: "🎭", city: "New Orleans", state: "LA",
+    month: 2, weekWindow: [6, 12], stage: "main", basePay: 16000, fameReq: 25, repReq: 22,
+    fanExposure: 5000, description: "Fat Tuesday in New Orleans. The wildest crowd you'll ever play." },
+  { id: "sxsw", name: "SXSW", emoji: "🤠", city: "Austin", state: "TX",
+    month: 3, weekWindow: [10, 16], stage: "secondary", basePay: 7000, fameReq: 14, repReq: 16,
+    fanExposure: 2200, description: "Austin's industry showcase. The whole music world descends." },
+  { id: "farm_aid", name: "Farm Aid", emoji: "🚜", city: "Hartford", state: "CT",
+    month: 9, weekWindow: [34, 40], stage: "main", basePay: 15000, fameReq: 23, repReq: 20,
+    fanExposure: 4500, description: "Willie Nelson's annual benefit. The cause is the headliner." },
+  { id: "appaloosa", name: "Appaloosa Music Festival", emoji: "🎻", city: "Front Royal", state: "VA",
+    month: 8, weekWindow: [30, 36], stage: "tent", basePay: 5200, fameReq: 10, repReq: 9,
+    fanExposure: 1300, description: "Shenandoah Valley bluegrass. Family-friendly, fiercely loyal." },
+  { id: "grey_fox", name: "Grey Fox Bluegrass Festival", emoji: "🦊", city: "Oak Hill", state: "NY",
+    month: 7, weekWindow: [26, 32], stage: "tent", basePay: 4800, fameReq: 9, repReq: 10,
+    fanExposure: 1100, description: "The Northeast's bluegrass mecca. Jam camps and main stage." },
+  { id: "ryman_bluegrass", name: "Ryman Bluegrass Nights", emoji: "🪕", city: "Nashville", state: "TN",
+    month: 6, weekWindow: [22, 28], stage: "secondary", basePay: 10000, fameReq: 18, repReq: 20,
+    fanExposure: 2800, description: "Inside the Mother Church. Bluegrass in the pews." },
+  { id: "station_inn", name: "Station Inn Bluegrass Festival", emoji: "🚂", city: "Nashville", state: "TN",
+    month: 8, weekWindow: [30, 36], stage: "tent", basePay: 4200, fameReq: 8, repReq: 12,
+    fanExposure: 900, description: "The Station Inn's annual throwdown. Pickers only." },
+];
+
+export interface FestivalBooking {
+  festivalId: string;
+  festivalName: string;
+  stage: string;
+  pay: number;
+  fanExposure: number;
+  bookedWeek: number;
+  performanceWeek: number;
+  completed: boolean;
+}
+
+// ── SETLIST SATISFACTION CALCULATOR ────────────────────────
+export function calculateSetlistSatisfaction(
+  config: SetlistConfig,
+  catalog: CatalogEntry[],
+  totalSlots: number
+): SetlistSatisfaction {
+  const total = config.deepCutCount + config.hitCount + config.newMaterialCount;
+
+  // Ideal ratios for maximum satisfaction
+  const idealDeepCut = Math.floor(totalSlots * 0.25);  // 25% deep cuts
+  const idealHit = Math.floor(totalSlots * 0.50);       // 50% hits
+  const idealNew = Math.floor(totalSlots * 0.25);       // 25% new material
+
+  // Calculate how close we are to ideal
+  const deepCutDiff = Math.abs(config.deepCutCount - idealDeepCut);
+  const hitDiff = Math.abs(config.hitCount - idealHit);
+  const newDiff = Math.abs(config.newMaterialCount - idealNew);
+
+  // Base score (100 - penalties)
+  let score = 100 - (deepCutDiff * 4) - (hitDiff * 3) - (newDiff * 4);
+
+  // Bonus: having at least SOME of each category
+  if (config.deepCutCount > 0) score += 5;
+  if (config.hitCount > 0) score += 5;
+  if (config.newMaterialCount > 0) score += 5;
+
+  // Penalty: too many new songs (fans want familiarity)
+  if (config.newMaterialCount > idealNew + 3) score -= 10;
+
+  // Penalty: no hits (fans will be disappointed)
+  if (config.hitCount === 0) score -= 20;
+
+  // Bonus: catalog variety
+  const hitTracks = catalog.filter(c => c.lifecycle === "Hit" || c.lifecycle === "Evergreen");
+  const deepTracks = catalog.filter(c => c.lifecycle === "Normal" && c.outcome !== "Flop");
+  if (config.deepCutCount > 0 && deepTracks.length < config.deepCutCount) score -= 5;
+  if (config.hitCount > 0 && hitTracks.length < config.hitCount) score -= 5;
+
+  score = clamp(score, 0, 100);
+
+  // Determine label and bonuses
+  let label: string;
+  let feedback: string;
+  let deepCutBonus = 0;
+  let hitBonus = 0;
+  let newMaterialBonus = 0;
+
+  if (score >= 90) {
+    label = "Ecstatic";
+    feedback = "Best setlist I've ever heard! They played EVERYTHING!";
+    deepCutBonus = 3;
+    hitBonus = Math.floor(config.hitCount * 1.5);
+    newMaterialBonus = 2;
+  } else if (score >= 75) {
+    label = "Happy";
+    feedback = "Great show! Knew all the words to the hits.";
+    deepCutBonus = 2;
+    hitBonus = Math.floor(config.hitCount * 1.0);
+    newMaterialBonus = 1;
+  } else if (score >= 60) {
+    label = "Satisfied";
+    feedback = "Solid set. A few too many new songs maybe, but good energy.";
+    deepCutBonus = 1;
+    hitBonus = Math.floor(config.hitCount * 0.5);
+    newMaterialBonus = 0;
+  } else if (score >= 40) {
+    label = "Bored";
+    feedback = "Where were the hits? Felt like a rehearsal.";
+    deepCutBonus = 0;
+    hitBonus = 0;
+    newMaterialBonus = -1;
+  } else {
+    label = "Disappointed";
+    feedback = "Waited all night for [hit song] and never got it. Leaving early.";
+    deepCutBonus = -1;
+    hitBonus = -Math.floor(config.hitCount * 0.5);
+    newMaterialBonus = -2;
+  }
+
+  return { score, label, deepCutBonus, hitBonus, newMaterialBonus, feedback };
+}
+
+// ── VENUE REPUTATION HELPERS ───────────────────────────────
+export function getVenueReputation(
+  venueName: string,
+  venueReps: Record<string, VenueReputation>
+): VenueReputation {
+  return venueReps[venueName] ?? {
+    venueName,
+    playCount: 0,
+    lastPlayedWeek: 0,
+    perkUnlocked: null,
+    perkTier: 0,
+  };
+}
+
+export function getVenuePerkForVenue(venueName: string, playCount: number): VenuePerk | null {
+  const perks = VENUE_PERKS.filter(p => p.venueName === venueName || p.venueName === "Dive Bar");
+  // Sort by tier descending, find first that matches
+  const sorted = perks.sort((a, b) => b.tier - a.tier);
+  return sorted.find(p => playCount >= p.tier) ?? null;
+}
+
+export function getVenuePerkDisplay(venueName: string, playCount: number): { label: string; nextTier: string; progress: string } {
+  const perk = getVenuePerkForVenue(venueName, playCount);
+  const nextPerk = VENUE_PERKS
+    .filter(p => (p.venueName === venueName || p.venueName === "Dive Bar") && p.tier > playCount)
+    .sort((a, b) => a.tier - b.tier)[0];
+
+  if (perk) {
+    const nextLabel = nextPerk ? `${nextPerk.tier - playCount} more for ${nextPerk.label}` : "Max tier reached";
+    return { label: perk.label, nextTier: nextLabel, progress: `${playCount} plays` };
+  }
+
+  const firstPerk = VENUE_PERKS
+    .filter(p => p.venueName === venueName || p.venueName === "Dive Bar")
+    .sort((a, b) => a.tier - b.tier)[0];
+
+  if (firstPerk) {
+    return { label: "No perk yet", nextTier: `${firstPerk.tier - playCount} more for ${firstPerk.label}`, progress: `${playCount} plays` };
+  }
+
+  return { label: "No perks", nextTier: "", progress: `${playCount} plays` };
+}
+
+// ── OPENING ACT GENERATOR ──────────────────────────────────
+export function generateOpeningActOffer(s: GameState): OpeningActOffer | null {
+  const eligible = OPENING_ACT_HEADLINERS.filter(h =>
+    h.genre === s.genre && s.fame >= h.minPlayerFame && s.fame < h.fame - 10
+  );
+  if (!eligible.length) return null;
+
+  const headliner = eligible[Math.floor(Math.random() * eligible.length)];
+  const cities = CITIES
+    .filter(c => c.genreMod[s.genre] && c.genreMod[s.genre] > 1.0)
+    .slice(0, 3 + Math.floor(Math.random() * 4))
+    .map(c => c.name);
+
+  const showsCount = 3 + Math.floor(Math.random() * 5);
+  const payPerShow = Math.floor(200 + s.fame * 8 + Math.random() * 300);
+  const exposureMult = 1.5 + (headliner.fame / 100);
+
+  return {
+    id: "oa_" + Date.now(),
+    headlinerName: headliner.name,
+    headlinerFame: headliner.fame,
+    headlinerFans: headliner.fans,
+    genre: headliner.genre,
+    cities,
+    showsCount,
+    payPerShow,
+    exposureMultiplier: exposureMult,
+    weeksDuration: showsCount + 1, // +1 for travel
+    offeredWeek: s.week,
+    expiresWeek: s.week + 3,
+    description: `${headliner.name} is looking for an opener on their ${cities.length}-city run. Low pay, but their ${fmt(headliner.fans)} fans will hear your name.`,
+  };
+}
+
+// ── FESTIVAL GENERATOR ─────────────────────────────────────
+export function generateFestivalOffers(s: GameState): FestivalBooking[] {
+  const bookings: FestivalBooking[] = [];
+  for (const fest of FESTIVALS) {
+    if (s.fame >= fest.fameReq && s.rep >= fest.repReq) {
+      // Check if already booked this festival this year
+      const alreadyBooked = s.festivalBookings?.some(b => b.festivalId === fest.id && !b.completed);
+      if (alreadyBooked) continue;
+
+      // 30% chance per eligible festival per week window
+      if (s.week >= fest.weekWindow[0] && s.week <= fest.weekWindow[1] && Math.random() < 0.30) {
+        // Stage assignment based on fame
+        let stage = fest.stage;
+        let pay = fest.basePay;
+        if (s.fame >= fest.fameReq + 15) {
+          stage = "main";
+          pay = Math.floor(pay * 1.5);
+        } else if (s.fame >= fest.fameReq + 8) {
+          stage = "secondary";
+          pay = Math.floor(pay * 1.2);
+        } else {
+          stage = "tent";
+          pay = Math.floor(pay * 0.7);
+        }
+
+        bookings.push({
+          festivalId: fest.id,
+          festivalName: fest.name,
+          stage,
+          pay,
+          fanExposure: fest.fanExposure,
+          bookedWeek: s.week,
+          performanceWeek: fest.weekWindow[0] + Math.floor(Math.random() * (fest.weekWindow[1] - fest.weekWindow[0])),
+          completed: false,
+        });
+      }
+    }
+  }
+  return bookings;
+}
+
+// ── BUS BREAKDOWN ROLLER ───────────────────────────────────
+export function rollBusBreakdown(tourProgress: number, totalShows: number): BusBreakdownEvent | null {
+  const eligible = BUS_BREAKDOWN_EVENTS.filter(e =>
+    (e.minTourProgress ?? 0) <= tourProgress && tourProgress < totalShows - 1
+  );
+  if (!eligible.length) return null;
+
+  // Base chance: 15% per show after the first few
+  if (Math.random() > 0.15) return null;
+
+  const totalWeight = eligible.reduce((sum, e) => sum + e.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const event of eligible) {
+    roll -= event.weight;
+    if (roll <= 0) return event;
+  }
+  return eligible[eligible.length - 1];
+}
+
+
 // ── GRIND ACTIONS ──────────────────────────────────────────
 export interface GrindEffect {
   fame?: number; rep?: number; hype?: number; fans?: number;
@@ -3676,6 +4295,19 @@ export interface GameState {
   platformMix: Record<string, number>;
   geoDist: Record<string, number>;
   premiumRatio: number;
+
+  // ── Touring Features v2.0 ──
+  setlistConfig: SetlistConfig;
+  venueReputations: Record<string, VenueReputation>;
+  tourMorale: number;           // 0-100, band morale on tour
+  pendingOpeningActOffers: OpeningActOffer[];
+  activeOpeningAct: OpeningActOffer | null;
+  openingActProgress: number;    // shows completed on current opening act
+  festivalBookings: FestivalBooking[];
+  pendingFestivalOffers: FestivalBooking[];
+  completedFestivals: string[];
+  lastBusBreakdownWeek: number;
+
 }
 
 export const INITIAL_STATE: GameState = {
@@ -3760,6 +4392,19 @@ export const INITIAL_STATE: GameState = {
   platformMix: { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
   geoDist: { US: 0.62, UK: 0.08, CA: 0.05, DE: 0.03, AU: 0.02, FR: 0.02, BR: 0.03, MX: 0.02, IN: 0.01, other: 0.12 },
   premiumRatio: 0.45,
+
+  // ── Touring Features v2.0 defaults ──
+  setlistConfig: { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
+  venueReputations: {},
+  tourMorale: 100,
+  pendingOpeningActOffers: [],
+  activeOpeningAct: null,
+  openingActProgress: 0,
+  festivalBookings: [],
+  pendingFestivalOffers: [],
+  completedFestivals: [],
+  lastBusBreakdownWeek: 0,
+
 };
 
 // ── CHART DATA (for StreamingTab) ──────────────────────────

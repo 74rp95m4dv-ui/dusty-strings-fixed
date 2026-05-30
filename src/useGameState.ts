@@ -20,14 +20,10 @@ import {
   LABELS, MANAGERS, getLabel, getManager,
   generateLabelOffers, generateManagerOffers,
   rnd, roll, clamp, fmt, fmtMoney,
-  genAlbumName, genFanReviews, genThemedTrackName,
-  // Recording time system (v2.0)
-  RecordingMode, calculateRecordingWeeks, getStandardRecordingWeeks,
-  STUDIO_TIME_MODIFIERS, PRODUCER_TIME_MODIFIERS, RECORDING_MODE_CONFIG,
-  BASE_WEEKS_BY_FORMAT,
-  // Streaming platform system (v2.0)
-  STREAMING_PLATFORMS, BASE_STREAMING_RATE, GEO_RATE_MODIFIERS, PREMIUM_SPLIT, PREMIUM_MULTIPLIER,
-  SPOTIFY_MIN_STREAMS, DEFAULT_GEO_DIST,
+  genAlbumName, genFanReviews,
+  ArtworkBudget, StageDesign, WardrobeStyle,
+  getArtworkTier, getStageDesign, getWardrobe, evaluateWardrobeChange,
+  ARTWORK_TIERS, STAGE_DESIGNS,
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
 
@@ -54,16 +50,12 @@ function calcTourDemand(fans:number, fame:number, rep:number, genreMod:Record<st
 function calcFill(demand:number, cap:number, mult:number) {
   return Math.min(1, (demand/cap) * (mult<=0.7?1.15 : 1.0 - Math.max(0,mult-1.0)*0.2));
 }
-function calcCrewCost(tier:number) { return ({1:120,2:180,3:280,4:450,5:750,6:1500,7:3500} as Record<number,number>)[tier]??120; }
+function calcCrewCost(tier:number) { return ({1:200,2:500,3:1200,4:2500,5:5000,6:12000,7:30000} as Record<number,number>)[tier]??200; }
 
 function calcStreamRevenue(catalog:CatalogEntry[], streamCut:number) {
   const total = catalog.reduce((s,t)=>s+t.weeklyStreams,0);
-  // Real-world blended streaming rate: ~$0.0032/stream after platform variance
-  // Distributor takes ~15% off the top, then label takes their cut
-  const blendedRate = 0.0032;
-  const grossRevenue = total * blendedRate;
-  const afterDistro = grossRevenue * 0.85; // 15% distributor fee
-  return Math.floor(afterDistro * (1 - streamCut));
+  const raw = total*0.0038;
+  return Math.floor(Math.min(raw,200+Math.sqrt(raw)*20) * (1 - streamCut));
 }
 
 function classifyLifecycle(quality:number, outcome:string, mkt:number, score:number, arch:string): SongLifecycle {
@@ -283,18 +275,12 @@ function advance(prev:GameState): GameState {
   if (s.project && s.project.weeksLeft > 0) {
     const recEnergy:Record<string,number>={Single:8,EP:10,Album:12,"Live Album":7};
     const drain = recEnergy[s.project.type] ?? 10;
-    const mode = s.project.mode ?? "standard";
-    const modeCfg = RECORDING_MODE_CONFIG[mode];
-
     // Studio fee is due regardless of whether the session makes progress
-    // Mode may modify cost (Rush = 1.5× studio cost)
     const recStudio = getStudio(s.project.studioId);
     if (recStudio && recStudio.perWeek > 0) {
-      const weeklyCost = Math.floor(recStudio.perWeek * modeCfg.costMult);
-      s.money -= weeklyCost;
-      s.log.unshift({week:s.week,msg:`Studio: ${recStudio.name} — ${fmtMoney(weeklyCost)}/wk${mode !== "standard" ? ` (${mode})` : ""}.`,type:"neutral"});
+      s.money -= recStudio.perWeek;
+      s.log.unshift({week:s.week,msg:`Studio: ${recStudio.name} — ${fmtMoney(recStudio.perWeek)}/wk.`,type:"neutral"});
     }
-
     if (s.project.studioBreakThisWeek) {
       s.project.studioBreakThisWeek = false;
       s.log.unshift({week:s.week,msg:"Took a studio break this week. Energy recovering.",type:"neutral"});
@@ -344,88 +330,13 @@ function advance(prev:GameState): GameState {
     const age=Math.max(0.6,1-t.weeksActive*0.005);
     t.weeklyStreams=Math.max(t.streamFloor,Math.floor(t.weeklyStreams*t.decayRate*age));
     t.totalStreams+=t.weeklyStreams; s.totalStreams+=t.weeklyStreams;
-
-    // ── Platform mix evolution ──
-    // As fame grows, Apple Music share increases (older, wealthier demo)
-    // YouTube share grows with viral hits (younger demo)
-    const baseMix = s.platformMix;
-    const fameBonus = Math.min(0.15, s.fame * 0.002);
-    t.platformMix = {
-      spotify: Math.max(0.35, (baseMix.spotify ?? 0.52) - fameBonus * 0.4),
-      apple: Math.min(0.35, (baseMix.apple ?? 0.22) + fameBonus * 0.6),
-      amazon: Math.max(0.03, (baseMix.amazon ?? 0.12) - fameBonus * 0.1),
-      youtube: Math.min(0.20, (baseMix.youtube ?? 0.09) + fameBonus * 0.3),
-      tidal: baseMix.tidal ?? 0.02,
-      deezer: baseMix.deezer ?? 0.02,
-      pandora: baseMix.pandora ?? 0.01,
-    };
-    // Normalize to sum to 1
-    const mixSum = Object.values(t.platformMix).reduce((a,b)=>a+b,0);
-    if (mixSum > 0) {
-      for (const k of Object.keys(t.platformMix)) {
-        t.platformMix[k] = t.platformMix[k] / mixSum;
-      }
-    }
-
-    // ── Geographic distribution evolution ──
-    // Touring in a region boosts that region's share
-    const tourRegionBoost = s.regional ?? {};
-    t.geoDist = {...(s.geoDist ?? DEFAULT_GEO_DIST)};
-    let geoTotal = Object.values(t.geoDist).reduce((a,b)=>a+b,0);
-    for (const [region, count] of Object.entries(tourRegionBoost)) {
-      if (count > 0) {
-        const boost = Math.min(0.08, count * 0.015);
-        // Find matching country code for region
-        const regionMap: Record<string, string> = {
-          "South": "US", "Deep South": "US", "Southeast": "US",
-          "Southwest": "US", "Midwest": "US", "Midwest-South": "US",
-        };
-        const country = regionMap[region] ?? "US";
-        if (t.geoDist[country] !== undefined) {
-          t.geoDist[country] = Math.min(0.85, t.geoDist[country] + boost);
-          // Reduce "other" to compensate
-          t.geoDist["other"] = Math.max(0.02, t.geoDist["other"] - boost * 0.5);
-        }
-      }
-    }
-    // Normalize
-    geoTotal = Object.values(t.geoDist).reduce((a,b)=>a+b,0);
-    if (geoTotal > 0) {
-      for (const k of Object.keys(t.geoDist)) {
-        t.geoDist[k] = t.geoDist[k] / geoTotal;
-      }
-    }
-
-    // ── Premium ratio evolution ──
-    // Superfans = premium subscribers. More superfans = higher premium ratio.
-    const sfRatio = s.fans > 0 ? (s.superfans ?? 0) / s.fans : 0;
-    t.premiumRatio = Math.min(0.85, Math.max(0.35, 0.45 + sfRatio * 0.4));
-
-    // Initialize streamStats if missing (legacy save compatibility)
-    if (!t.streamStats) {
-      t.streamStats = {
-        totalStreams: t.totalStreams,
-        weeklyStreams: t.weeklyStreams,
-        peakStreams: t.peakStreams,
-        totalRevenue: 0,
-        weeklyRevenue: 0,
-        platformBreakdown: {},
-        geoBreakdown: {},
-        effectiveRate: BASE_STREAMING_RATE,
-        premiumRatio: t.premiumRatio,
-        usShare: t.geoDist?.US ?? 0.6,
-        hitThreshold: t.totalStreams >= SPOTIFY_MIN_STREAMS,
-        revenueHistory: [],
-      };
-    }
-
-    // Update streamStats totals
-    t.streamStats.totalStreams = t.totalStreams;
-    t.streamStats.weeklyStreams = t.weeklyStreams;
-    t.streamStats.peakStreams = t.peakStreams;
+    const inc=Math.floor(t.weeklyStreams*0.0038);
+    if (!s.revenueHistory[t.id]) s.revenueHistory[t.id]=[];
+    s.revenueHistory[t.id].push({week:s.week,streams:t.weeklyStreams,income:inc});
+    if (s.revenueHistory[t.id].length>20) s.revenueHistory[t.id].shift();
   }
-  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);  // streamingCut unchanged
-  const streamInc = calcStreamRevenue(s.catalog, streamCutPct, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee);
+  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);
+  const streamInc = calcStreamRevenue(s.catalog, streamCutPct);
   s.money+=streamInc; s.totalEarned+=streamInc;
   const curWeekStreams = s.catalog.reduce((t,c)=>t+c.weeklyStreams,0);
   s.streamHistory = [...(s.streamHistory??[]), curWeekStreams].slice(-104);
@@ -490,41 +401,19 @@ function advance(prev:GameState): GameState {
     const burnoutMult = burnoutShowMult(s.burnout ?? 0);
     const fill=calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult;
     const seats=Math.floor(fill*show.venueCap);
-    // Realistic indie ticket pricing by venue tier + fame premium
-    const baseTicketByTier = [8, 12, 18, 25, 35, 55, 85];
-    const tierBase = baseTicketByTier[Math.min(show.venueTier-1, 6)] || 10;
-    const famePrem = Math.floor(s.fame * 0.8);
-    const repPrem = Math.floor(s.rep * 0.15);
-    const ticket = Math.max(tierBase, Math.floor((tierBase + famePrem + repPrem) * s.tourActive.ticketMult));
-    // Door gross
-    const doorGross = seats * ticket;
-    // Merch per head: superfans spend 3-6x more than casuals
-    const sfRatio = s.fans > 0 ? (s.superfans ?? 0) / s.fans : 0;
-    const merchPerHead = Math.floor((3.50 + s.fame*0.08) * (1 + sfRatio*4) * ((show.genreMod[s.genre]??1)>1.2?1.15:1.0));
-    const merchGross = seats * merchPerHead;
-    // Venue guarantee (small rooms pay YOU, big rooms you pay or split door)
-    const venueGuarantee = show.venueTier <= 2 ? Math.floor(roll(120, 350))
-                         : show.venueTier === 3 ? Math.floor(roll(200, 600))
-                         : -Math.floor(show.venueTier * 180);
-    const totalGross = doorGross + merchGross + venueGuarantee;
-    // Expenses: travel, lodging, food, vehicle, crew
-    const people = 1 + 2; // artist + 2 crew minimum
-    const lodgingPerPerson = show.venueTier <= 2 ? 55 : show.venueTier <= 4 ? 85 : 120;
-    const lodging = lodgingPerPerson * people;
-    const food = 28 * people;
-    const travel = show.travelCost; // gas, tolls, van wear for this leg
-    const vehicleFixed = 26; // van payment/insurance/maintenance per day
-    const crewDayRate = [120, 180, 280, 450, 750, 1500, 3500][Math.min(show.venueTier-1, 6)] || 120;
-    const crew = crewDayRate * 2;
-    const totalExpenses = travel + lodging + food + vehicleFixed + crew;
+    const ticket=Math.floor((4+s.fame*1.05+s.rep*0.35)*s.tourActive.ticketMult);
+    const gross=seats*ticket + seats*5;
+    const crew=calcCrewCost(show.venueTier);
+    const stageDef = getStageDesign(s.currentStageDesign);
+    const stageCost = stageDef ? stageDef.costPerShow : 0;
     const mgrPct = s.currentManager?.showRevPct ?? (s.hasManager ? 0.15 : 0);
     const revMult=showRevBonus(s.archetype,mgrPct);
-    const preCutNet = (totalGross - totalExpenses) * revMult;
-    const tourCutPct = s.currentLabel?.tourGrossCut ?? (s.labelSigned ? 0.10 : 0);
-    const labelCut = tourCutPct > 0 ? Math.floor(preCutNet * tourCutPct) : 0;
-    const net = Math.floor(preCutNet - labelCut);
+    const tourCutPct = s.currentLabel?.tourCut ?? (s.labelSigned ? 0.10 : 0);
+    const labelCut=tourCutPct>0?Math.floor(gross*tourCutPct):0;
+    const net=Math.floor((gross-crew-stageCost)*revMult)-labelCut;
     s.money+=net; s.totalEarned+=Math.max(0,net);
-    const fG=Math.floor(seats*0.3*((show.genreMod[s.genre]??1)>1.2?1.2:1));
+    const stageFanMult = stageDef ? stageDef.fanMult : 1;
+    const fG=Math.floor(seats*0.3*((show.genreMod[s.genre]??1)>1.2?1.2:1)*stageFanMult);
     s.fans+=fG;
     // Live shows convert casuals → superfans (in-person bond). ~8% of attending
     // seats become superfans, scaled by fill (a packed room makes more loyalists).
@@ -534,7 +423,12 @@ function advance(prev:GameState): GameState {
     s.totalShows++; s.tourFatigue=Math.min(100,s.tourFatigue+10);
     s.tourActive.demandDecayIndex++;
     const repG=fill>=0.7?(archHas(s.archetype,"showRepBonus")?archVal(s.archetype)*3:3):fill>=0.4?1:-2;
-    s.rep=clamp(s.rep+repG,0,100);
+    const stageRep = stageDef ? Math.floor(stageDef.reviewBonus * (fill >= 0.6 ? 1 : 0.3)) : 0;
+    s.rep=clamp(s.rep+repG+stageRep,0,100);
+    if (stageDef && stageDef.repRisk > 0 && Math.random() * 100 < stageDef.repRisk) {
+      s.rep = clamp(s.rep - 2, 0, 100);
+      s.log.unshift({ week:s.week, msg:`${stageDef.name} felt gimmicky tonight. -2 rep.`, type:"bad" });
+    }
     if (!s.regional[show.region]) s.regional[show.region]=0;
     s.regional[show.region]++;
     if (!s.tourHistory) s.tourHistory=[];
@@ -542,11 +436,11 @@ function advance(prev:GameState): GameState {
       week:s.week, cityName:show.cityName, venueName:show.venueName,
       venueCap:show.venueCap, seats, attendancePct:Math.floor(fill*100),
       ticket, gross, crew, travelCost:show.travelCost, labelCut, net,
-      totalExpenses,
     });
     if (s.tourHistory.length>50) s.tourHistory.length=50;
     const sfNote = sfG > 0 ? ` · +${fmt(sfG)} superfans` : "";
-    s.log.unshift({week:s.week,msg:`Show: ${show.cityName} @ ${show.venueName} — ${Math.floor(fill*100)}% full, ${fmtMoney(net)} net${sfNote}`,type:net>0?"good":"bad"});
+    const stageNote = stageCost > 0 ? ` · ${stageDef?.name}` : "";
+    s.log.unshift({week:s.week,msg:`Show: ${show.cityName} @ ${show.venueName} — ${Math.floor(fill*100)}% full, ${fmtMoney(net)} net${sfNote}${stageNote}`,type:net>0?"good":"bad"});
     s.tourActive.progress++;
     notifMsg=`${show.cityName}: ${seats} fans · ${fmtMoney(net)} net`;
     notifType=net>0?"great":"bad";
@@ -556,7 +450,7 @@ function advance(prev:GameState): GameState {
       const completedCount = s.tourActive.progress;
       const recentHistory = (s.tourHistory ?? []).slice(0, completedCount);
       const totalGross = recentHistory.reduce((a, h) => a + h.gross, 0);
-      const totalExp   = recentHistory.reduce((a, h) => a + h.totalExpenses + h.labelCut, 0);
+      const totalExp   = recentHistory.reduce((a, h) => a + h.crew + h.travelCost + h.labelCut, 0);
       const totalNet   = recentHistory.reduce((a, h) => a + h.net, 0);
       const avgFill    = recentHistory.length > 0 ? recentHistory.reduce((a, h) => a + h.attendancePct, 0) / recentHistory.length : 0;
       const bestH  = recentHistory.length > 0 ? recentHistory.reduce((a, b) => b.net > a.net ? b : a) : null;
@@ -612,6 +506,13 @@ function advance(prev:GameState): GameState {
         if (weeksSince <= 6) mult *= 1.6;
         else if (weeksSince <= 16) mult *= 1.2;
         mult *= 1 + Math.min(0.5, rel.weeklyStreams / 50000);
+        if (rel.artworkBudget) {
+          const artTier = getArtworkTier(rel.artworkBudget);
+          if (artTier) {
+            mult *= artTier.physicalSalesMult;
+            if (item.type === "Vinyl") mult *= artTier.vinylBoost;
+          }
+        }
       }
     }
     const merchAge = s.week - item.releasedWeek;
@@ -751,7 +652,7 @@ function advance(prev:GameState): GameState {
   // have reduced s.fans below s.superfans).
   s.superfans = Math.max(0, Math.min(s.superfans ?? 0, s.fans));
 
-  s.weeklyExpenses = Math.max(380, 340 + s.fans*0.008 + s.fame*6 + (s.totalShows*0.12));
+  s.weeklyExpenses = Math.max(100, 80+s.fans*0.003+s.fame*5);
 
   // ── #4 Rivals + #5 Story Arcs (tick after all base sim updates) ──
   // Order matters: tick rivals first (may add log entries), then arcs (may
@@ -781,15 +682,8 @@ export function useGameState() {
       // Migrate older saves to the rich label/manager system.
       currentLabel: saved.currentLabel ?? (saved.labelSigned ? {
         labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-        streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
-        advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
-        royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
-        marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
-        optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
-        signedAtWeek:saved.week ?? 0, totalAdvance:0,
-        crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
-        suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
-        isRecouped:false, perks:[], type:"indie" as const,
+        streamingCut:0.18, tourCut:0.10, marketingBoost:1.3,
+        weeksLeft:104, signedAtWeek:saved.week ?? 0, totalAdvance:0,
       } : null),
       currentManager: saved.currentManager ?? (saved.hasManager ? {
         managerId:"legacy", name:"Your Manager",
@@ -814,6 +708,9 @@ export function useGameState() {
       activeArcs: saved.activeArcs ?? [],
       completedArcs: saved.completedArcs ?? [],
       pendingArcChoice: saved.pendingArcChoice ?? null,
+      currentStageDesign: saved.currentStageDesign ?? null,
+      currentWardrobe: saved.currentWardrobe ?? null,
+      wardrobeHistory: saved.wardrobeHistory ?? [],
     };
     return {...INITIAL_STATE};
   });
@@ -833,15 +730,8 @@ export function useGameState() {
     producerWorkCounts: s.producerWorkCounts ?? {},
     currentLabel: s.currentLabel ?? (s.labelSigned ? {
       labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-      streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
-      advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
-      royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
-      marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
-      optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
-      signedAtWeek:s.week ?? 0, totalAdvance:0,
-      crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
-      suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
-      isRecouped:false, perks:[], type:"indie" as const,
+      streamingCut:0.18, tourCut:0.10, marketingBoost:1.3,
+      weeksLeft:104, signedAtWeek:s.week ?? 0, totalAdvance:0,
     } : null),
     currentManager: s.currentManager ?? (s.hasManager ? {
       managerId:"legacy", name:"Your Manager",
@@ -860,6 +750,9 @@ export function useGameState() {
     activeArcs: s.activeArcs ?? [],
     completedArcs: s.completedArcs ?? [],
     pendingArcChoice: s.pendingArcChoice ?? null,
+    currentStageDesign: s.currentStageDesign ?? null,
+    currentWardrobe: s.currentWardrobe ?? null,
+    wardrobeHistory: s.wardrobeHistory ?? [],
   }); },[]);
   const clearSave = useCallback(()=>{ try{localStorage.removeItem(SAVE_KEY);}catch{} setState({...INITIAL_STATE}); },[]);
 
@@ -874,6 +767,9 @@ export function useGameState() {
       // Seed the scene with rival artists (#4) so the world feels populated
       // from week 1. They'll release, beef, and chart in parallel.
       rivals: seedRivals(0),
+      currentStageDesign: null,
+      currentWardrobe: null,
+      wardrobeHistory: [],
     };
     saveToDisk(s); setState(s);
   },[]);
@@ -885,13 +781,13 @@ export function useGameState() {
   const openArchivedNewspaper = useCallback((json:string)=>upd(s=>{s.pendingNewspaperJson=json;return s;}),[upd]);
 
   // Project
-  const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard")=>upd(s=>{
-    // Dynamic recording time: base weeks + track count × studio × producer × mode
+  const doStartProject = useCallback((type:ReleaseType)=>upd(s=>{
+    // Energy drain now happens weekly during recording — no upfront energy gate.
+    const weeks:Record<string,number>={Single:3,EP:8,Album:18,"Live Album":6};
     const mint:Record<string,number>={Single:1,EP:3,Album:8,"Live Album":4};
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
-    const trackCount = mint[type] ?? 1;
-    const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
-    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode};
+    const w = weeks[type] ?? 3;
+    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,artworkBudget:"diy"};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     return s;
   }),[upd]);
@@ -912,12 +808,18 @@ export function useGameState() {
       const newEff = newProd ? getProducerEffectiveCost(newProd, s.producerWorkCounts) : 0;
       delta += newEff - oldEff;
     }
-    // Studio fees are paid weekly during recording — no upfront delta for studio swaps.
+    if (ch.artworkBudget && ch.artworkBudget !== p.artworkBudget) {
+      const art = getArtworkTier(ch.artworkBudget);
+      const oldArt = getArtworkTier(p.artworkBudget);
+      delta += (art?.cost ?? 0) - (oldArt?.cost ?? 0);
+    }
+    // Studio fees are now paid weekly during recording — no upfront delta for studio swaps.
 
     if (delta > 0 && s.money < delta) {
       const newProd = ch.producerId ? PRODUCERS.find(pr => pr.id === ch.producerId) : null;
       const newStudio = ch.studioId ? getStudio(ch.studioId) : null;
-      const target = newProd?.name ?? newStudio?.name ?? "this upgrade";
+      const newArt = ch.artworkBudget ? getArtworkTier(ch.artworkBudget) : null;
+      const target = newProd?.name ?? newStudio?.name ?? newArt?.name ?? "this upgrade";
       blockMsg = `Need ${fmtMoney(delta)} more to book ${target}.`;
     }
 
@@ -926,25 +828,7 @@ export function useGameState() {
       return s;
     }
     if (delta !== 0) s.money -= delta;
-
-    // Apply the partial update first
     s.project = { ...s.project, ...ch } as GameState["project"];
-
-    // ── Recalculate weeks if studio, producer, or mode changed ──
-    const needsRecalc = ch.studioId !== undefined || ch.producerId !== undefined || ch.mode !== undefined;
-    if (needsRecalc && s.project) {
-      const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-      const newTotal = calculateRecordingWeeks(
-        s.project.type,
-        s.project.tracks.length,
-        s.project.studioId,
-        s.project.producerId,
-        s.project.mode ?? "standard"
-      );
-      s.project.totalWeeks = newTotal;
-      s.project.weeksLeft = Math.max(0, newTotal - elapsed);
-    }
-
     return s;
   }),[upd]);
 
@@ -965,71 +849,16 @@ export function useGameState() {
       hook: opts?.hook ?? "safe",
       lyric: opts?.lyric ?? "heartfelt",
     });
-    // Recalculate weeks when track count changes
-    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      s.project.type,
-      s.project.tracks.length,
-      s.project.studioId,
-      s.project.producerId,
-      s.project.mode ?? "standard"
-    );
-    s.project.totalWeeks = newTotal;
-    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
     return s;
   }),[upd]);
 
   const doRemoveTrack = useCallback((i:number)=>upd(s=>{
-    if (!s.project) return s;
-    s.project.tracks.splice(i,1);
-    // Recalculate weeks when track count changes
-    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      s.project.type,
-      s.project.tracks.length,
-      s.project.studioId,
-      s.project.producerId,
-      s.project.mode ?? "standard"
-    );
-    s.project.totalWeeks = newTotal;
-    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
-    return s;
-  }),[upd]);
-
-  const doAutoGenerateTracks = useCallback(()=>upd(s=>{
-    if (!s.project) return s;
-    const p = s.project;
-    const remaining = p.maxTracks - p.tracks.length;
-    if (remaining <= 0) return s;
-    for (let i = 0; i < remaining; i++) {
-      p.tracks.push({
-        name: genThemedTrackName(p.themeId),
-        hook: rnd(["safe","catchy","experimental"]) as import("./gameLogic").HookStyle,
-        lyric: rnd(["party","heartfelt","literary"]) as import("./gameLogic").LyricStyle,
-      });
-    }
-    // Recalculate weeks after adding all tracks
-    const elapsed = p.totalWeeks - p.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      p.type,
-      p.tracks.length,
-      p.studioId,
-      p.producerId,
-      p.mode ?? "standard"
-    );
-    p.totalWeeks = newTotal;
-    p.weeksLeft = Math.max(0, newTotal - elapsed);
-    s.log.unshift({week:s.week,msg:`Auto-generated ${remaining} track${remaining===1?"":"s"} for "${p.title}".`,type:"neutral"});
-    return s;
+    if (!s.project) return s; s.project.tracks.splice(i,1); return s;
   }),[upd]);
 
   const doFinishProject = useCallback(()=>upd(s=>{
     if (!s.project) return s;
     const p=s.project;
-    if (p.weeksLeft > 0) {
-      s.pendingEvent = { msg: `Recording still in progress — ${p.weeksLeft} week${p.weeksLeft === 1 ? "" : "s"} left.`, type: "bad" };
-      return s;
-    }
     const prod=PRODUCERS.find(pr=>pr.id===p.producerId);
     const studio=getStudio(p.studioId);
     // Studio fees paid weekly during recording. Producer fees paid upfront via doUpdateProject.
@@ -1091,35 +920,16 @@ export function useGameState() {
     if (pushPenalty < 0) {
       s.log.unshift({ week:s.week, msg:`Grinding through exhaustion hurt the recording (${pushPenalty.toFixed(0)} quality).`, type:"bad" });
     }
-
-    // ── Recording mode quality & burnout modifiers ──
-    const modeCfg = RECORDING_MODE_CONFIG[p.mode ?? "standard"];
-    const modeQualityMod = modeCfg.qualityMod;
-    let modeBurnoutAdd = 0;
-    if (p.mode === "rush") {
-      modeBurnoutAdd = 8; // One-time rush burnout hit
-    } else if (p.mode === "deliberate") {
-      const standardWeeks = getStandardRecordingWeeks(p.type, p.tracks.length, p.studioId, p.producerId);
-      const extraWeeks = Math.max(0, p.totalWeeks - standardWeeks);
-      modeBurnoutAdd = extraWeeks * 3; // +3 burnout per extra deliberate week
-    }
-
-    const baseQ=s.qualityBase+(prod?.qB??0)+(studio?.qB??0)+relQ+specQ+writingAvgQ+burnPenalty+pushPenalty+modeQualityMod;
+    const baseQ=s.qualityBase+(prod?.qB??0)+(studio?.qB??0)+relQ+specQ+writingAvgQ+burnPenalty+pushPenalty+(artTier?.qualityBonus??0);
     const adjQ=clamp(applyArchQuality(s.archetype,baseQ)+Math.random()*15-5,0,100);
     // Studio time itself accumulates burnout (longer formats = more burnout).
     const burnAdd = p.type==="Live Album"?8 : p.type==="Album"?18 : p.type==="EP"?10 : 5;
-    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd + modeBurnoutAdd);
+    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd);
     if (burnPenalty < 0) {
       s.log.unshift({ week:s.week, msg:`Recording while exhausted hurt the result (${burnPenalty.toFixed(0)} quality).`, type:"bad" });
     }
-    if (modeQualityMod !== 0) {
-      s.log.unshift({ week:s.week, msg:`${modeCfg.label} mode: ${modeQualityMod > 0 ? "+" : ""}${modeQualityMod} quality.`, type: modeQualityMod > 0 ? "good" : "bad" });
-    }
-    if (modeBurnoutAdd > 0) {
-      s.log.unshift({ week:s.week, msg:`${modeCfg.label} mode added ${modeBurnoutAdd} burnout.`, type:"neutral" });
-    }
     s.qualityBase=Math.min(95,s.qualityBase+roll(1,4));
-    s.unreleased.push({id:"p"+Date.now(),type:p.type,genre:p.genre,title:p.title,producerId:p.producerId,studioId:p.studioId,themeId:p.themeId,tracks:p.tracks,avgQuality:adjQ,hypeSnapshot:s.hype,marketingBudget:p.marketingBudget});
+    s.unreleased.push({id:"p"+Date.now(),type:p.type,genre:p.genre,title:p.title,producerId:p.producerId,studioId:p.studioId,themeId:p.themeId,tracks:p.tracks,avgQuality:adjQ,hypeSnapshot:s.hype,marketingBudget:p.marketingBudget,artworkBudget:p.artworkBudget});
 
     // Bump the relationship counter (Home Studio doesn't count).
     if (prod && prod.id !== "self") {
@@ -1151,6 +961,8 @@ export function useGameState() {
   const doReleaseProject = useCallback((id:string)=>upd(s=>{
     const idx=s.unreleased.findIndex(p=>p.id===id); if(idx<0) return s;
     const p=s.unreleased[idx];
+    const artTier = getArtworkTier(p.artworkBudget);
+    const artQBonus = artTier?.qualityBonus ?? 0;
 
     // ── Market Saturation gate ──
     const sat = s.marketSaturation ?? 0;
@@ -1205,8 +1017,8 @@ export function useGameState() {
     const fm={Flop:0.2,Moderate:0.6,Hit:1,Viral:3.5};
     const famD={Flop:-2,Moderate:2,Hit:6,Viral:15}[outcome];
     const repD={Flop:-4,Moderate:1,Hit:4,Viral:3}[outcome];
-    const bRev={Single:450,EP:1200,Album:3500,"Live Album":800}[p.type]??450;
-    const bFan={Single:350,EP:1000,Album:4200,"Live Album":650}[p.type]??350;
+    const bRev={Single:3000,EP:8000,Album:25000,"Live Album":6000}[p.type]??3000;
+    const bFan={Single:400,EP:1200,Album:5000,"Live Album":800}[p.type]??400;
     // ── ALBUM WRITING MIX ──
     // Aggregate the hook/lyric palette across tracks to flavor the release:
     // party-heavy = more streams + fans, literary-heavy = critic rep but slower
@@ -1232,6 +1044,23 @@ export function useGameState() {
     const peakStr=Math.floor(bStr*(score/50)*roll(0.8,1.3)*labelMktBoost*radioMult*fanMult*writingMix.streamMult);
     const lifecycle=classifyLifecycle(q,outcome,p.marketingBudget,score,s.archetype);
 
+    // Wardrobe / Era reaction — fans judge the visual shift album-to-album
+    const prevWardrobe = s.discography.length > 0 ? s.discography[s.discography.length - 1].wardrobeStyle : null;
+    const wardEval = evaluateWardrobeChange(prevWardrobe, s.currentWardrobe ?? "raw", s.wardrobeHistory, s.fame);
+    if (wardEval.reaction === "selling_out") {
+      const casuals = Math.max(0, s.fans - (s.superfans ?? 0));
+      const loss = Math.floor(casuals * (getWardrobe(s.currentWardrobe ?? "raw")?.selloutRisk ?? 0) * (1 + s.fame / 100));
+      if (loss > 0) {
+        s.fans = Math.max(s.superfans ?? 0, s.fans - loss);
+        s.log.unshift({ week: s.week, msg: `Wardrobe reaction: ${wardEval.msg} -${fmt(loss)} fans.`, type: "bad" });
+      }
+    } else if (wardEval.reaction === "evolution") {
+      s.rep = clamp(s.rep + wardEval.repDelta, 0, 100);
+      s.log.unshift({ week: s.week, msg: `Wardrobe reaction: ${wardEval.msg}`, type: "good" });
+    } else if (wardEval.reaction === "consistency") {
+      s.rep = clamp(s.rep + wardEval.repDelta, 0, 100);
+    }
+
     // Increase saturation after release
     s.marketSaturation = Math.min(100, sat + satAdd);
     const LC={Normal:{decayRate:0.92,floorPct:0.00},Hit:{decayRate:0.96,floorPct:0.03},Evergreen:{decayRate:0.985,floorPct:0.12}};
@@ -1244,35 +1073,7 @@ export function useGameState() {
     const repFromCritic=criticBand.rep + writingMix.critRepBonus;
     const headline=rnd(criticBand.headlines);
     const cid="r"+Date.now()+Math.random().toString(36).slice(2,6);
-    s.catalog.push({
-    id:cid,title:p.title,type:p.type,genre:p.genre,quality:q,outcome,lifecycle,
-    decayRate:lcP.decayRate,streamFloor:Math.floor(peakStr*lcP.floorPct),
-    weeklyStreams:peakStr,peakStreams:peakStr,totalStreams:0,
-    releasedWeek:s.week,weeksActive:0,promoted:false,comebackCooldown:0,
-    tracks:p.tracks,hasMusicVideo:false,
-    // Realistic streaming tracking (v2.0)
-    streamStats: {
-      totalStreams: 0,
-      weeklyStreams: peakStr,
-      peakStreams: peakStr,
-      totalRevenue: 0,
-      weeklyRevenue: 0,
-      platformBreakdown: {},
-      geoBreakdown: {},
-      effectiveRate: BASE_STREAMING_RATE,
-      premiumRatio: 0.45,
-      usShare: 0.62,
-      hitThreshold: false,
-      revenueHistory: [],
-    },
-    platformMix: {...s.platformMix},
-    geoDist: {...s.geoDist},
-    premiumRatio: 0.45,
-    effectiveRate: BASE_STREAMING_RATE,
-    lifetimeRevenue: 0,
-    weeklyRevenue: 0,
-    revenueHistory: [],
-  });
+    s.catalog.push({id:cid,title:p.title,type:p.type,genre:p.genre,quality:q,outcome,lifecycle,decayRate:lcP.decayRate,streamFloor:Math.floor(peakStr*lcP.floorPct),weeklyStreams:peakStr,peakStreams:peakStr,totalStreams:0,releasedWeek:s.week,weeksActive:0,promoted:false,comebackCooldown:0,tracks:p.tracks,hasMusicVideo:false,artworkBudget:p.artworkBudget,wardrobeStyle:s.currentWardrobe ?? undefined});
     s.money+=revenue; s.fans+=fansG;
     // Releases convert casuals → superfans based on outcome. A masterpiece
     // (q >= 85) converts an extra slice on top of the outcome bonus.
@@ -1286,7 +1087,7 @@ export function useGameState() {
     }
     s.fame=clamp(s.fame+famD,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
     s.hype=Math.max(0,s.hype-15); s.weeksSinceRelease=0; s.totalReleases++;
-    s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false});
+    s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false,artworkBudget:p.artworkBudget,wardrobeStyle:s.currentWardrobe ?? undefined});
     // Record this release toward the player's theme identity.
     if (p.themeId) {
       if (!s.themeCounts) s.themeCounts = {};
@@ -1295,7 +1096,8 @@ export function useGameState() {
     s.criticReviews.push({week:s.week,headline,title:p.title,score:Math.floor(q)});
     s.unreleased.splice(idx,1);
     const msg={Flop:`"${p.title}" flopped. Brutal.`,Moderate:`"${p.title}" did okay.`,Hit:`"${p.title}" is a HIT!`,Viral:`"${p.title}" went VIRAL!`}[outcome];
-    s.log.unshift({week:s.week,msg:`${msg} ${fmtMoney(revenue)} · +${fmt(fansG)} fans · ${lifecycle}${satNote}${themeNote}`,type:outcome==="Flop"?"bad":outcome==="Viral"?"great":"good"});
+    const wardNote = s.currentWardrobe ? ` · ${getWardrobe(s.currentWardrobe)?.icon} ${getWardrobe(s.currentWardrobe)?.name}` : "";
+    s.log.unshift({week:s.week,msg:`${msg} ${fmtMoney(revenue)} · +${fmt(fansG)} fans · ${lifecycle}${satNote}${themeNote}${wardNote}`,type:outcome==="Flop"?"bad":outcome==="Viral"?"great":"good"});
     s.pendingEvent = null;
     s.releasePresentation = {
       title: p.title, type: p.type, outcome, quality: q, revenue,
@@ -1303,6 +1105,9 @@ export function useGameState() {
       peakStreams: peakStr, criticHeadline: headline, lifecycle,
       week: s.week, genre: p.genre, tracks: p.tracks,
       fanReviews: genFanReviews(outcome),
+      artworkBudget: p.artworkBudget,
+      wardrobeStyle: s.currentWardrobe ?? undefined,
+      wardrobeReaction: wardEval.reaction !== "fresh" ? wardEval : undefined,
     };
     s.weeklyExpenses=Math.max(100,80+s.fans*0.003+s.fame*5);
     s.pendingPressing = { releaseId: cid, releaseTitle: p.title, releaseType: p.type };
@@ -1316,10 +1121,12 @@ export function useGameState() {
     const p = s.project;
     const prod = PRODUCERS.find(pr => pr.id === p.producerId);
     const prodRefund = prod ? getProducerEffectiveCost(prod, s.producerWorkCounts) : 0;
+    const artRefund = getArtworkTier(p.artworkBudget)?.cost ?? 0;
     if (prodRefund > 0) s.money += prodRefund;
+    if (artRefund > 0) s.money += artRefund;
     s.project = null;
-    if (prodRefund > 0) {
-      s.pendingEvent = { msg:`Project scrapped. ${fmtMoney(prodRefund)} producer fee refunded.`, type:"good" };
+    if (prodRefund > 0 || artRefund > 0) {
+      s.pendingEvent = { msg:`Project scrapped. ${fmtMoney(prodRefund)} producer + ${fmtMoney(artRefund)} artwork refunded.`, type:"good" };
     }
     return s;
   }),[upd]);
@@ -1340,8 +1147,8 @@ export function useGameState() {
     if(ef.rep){const v=ef.rep*roll(0.7,1.4);s.rep=clamp(s.rep+v,0,100);msgs.push(`rep+${v.toFixed(1)}`);}
     if(ef.hype){const v=ef.hype*roll(0.7,1.3);s.hype=clamp(s.hype+v,0,100);msgs.push(`hype+${v.toFixed(1)}`);}
     if(ef.fans){const v=Math.floor(ef.fans*roll(0.5,1.6));s.fans+=v;msgs.push(`fans+${fmt(v)}`);}
-    if(ef.money){const v=Math.floor(ef.money*roll(0.85,1.15));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
-    if(ef.money_pct&&s.fans>0){const v=Math.floor(s.fans*ef.money_pct*roll(0.8,1.2));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
+    if(ef.money){const v=Math.floor(ef.money*roll(0.8,1.3));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
+    if(ef.money_pct&&s.fans>0){const v=Math.floor(s.fans*ef.money_pct*roll(0.7,1.3));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
     if(ef.satReduce){s.marketSaturation=Math.max(0,(s.marketSaturation??0)-ef.satReduce);msgs.push(`sat-${ef.satReduce}`);}
     if(ef.radio&&s.totalReleases>0&&Math.random()<0.4){const rm2=archHas(s.archetype,"radioBonus")?archVal(s.archetype):1;const fG=Math.floor(roll(400,1200)*rm2);s.fans+=fG;s.fame=clamp(s.fame+Math.max(1,Math.floor(2*rm2)),0,100);s.rep=clamp(s.rep+2,0,100);msgs.push(`RADIO! +${fmt(fG)} fans`);s.pendingEvent={msg:`Radio spin! +${fmt(fG)} fans`,type:"great"};}
     if(ef.playlist&&s.totalReleases>0&&Math.random()<0.35){s.hype=clamp(s.hype+18,0,100);s.fans+=Math.floor(roll(200,800));s.catalog.forEach(t=>{t.weeklyStreams=Math.min(t.peakStreams,Math.floor(t.weeklyStreams*1.3));});s.pendingEvent={msg:"Playlist secured! Streams boosted.",type:"great"};}
@@ -1378,13 +1185,7 @@ export function useGameState() {
   const doStartTour = useCallback(()=>upd(s=>{
     if(!s.tourQueue.length) return s;
     const mult=tourCostMult(s.archetype);
-    // Upfront tour costs: travel + venue deposit + crew advance
-    const upfront=s.tourQueue.reduce((sum,q)=>{
-      const travel = q.travelCost; // gas, tolls, van wear for the leg
-      const venueDeposit = Math.floor(q.venueCost * 0.3); // 30% deposit
-      const crewAdvance = Math.floor(calcCrewCost(q.venueTier) * 0.5); // half crew pay upfront
-      return sum + Math.floor((travel + venueDeposit + crewAdvance) * mult);
-    },0);
+    const upfront=s.tourQueue.reduce((sum,q)=>sum+Math.floor((q.travelCost+q.venueCost)*mult),0);
     if(s.money<upfront){s.pendingEvent={msg:`Need ${fmtMoney(upfront)} upfront.`,type:"bad"};return s;}
     s.money-=upfront;
     s.tourActive={shows:[...s.tourQueue],progress:0,ticketMult:s.tourTicketMult,demandDecayIndex:0};
@@ -1396,46 +1197,28 @@ export function useGameState() {
 
   // Streaming
   const doPromoteTrack = useCallback((id:string)=>upd(s=>{
-    if(s.money<350){s.pendingEvent={msg:"Need $350 to promote.",type:"bad"};return s;}
+    if(s.money<500){s.pendingEvent={msg:"Need $500 to promote.",type:"bad"};return s;}
     const t=s.catalog.find(x=>x.id===id); if(!t) return s;
-    s.money-=350;
+    s.money-=500;
     const pct={Normal:0.50,Hit:0.65,Evergreen:0.80}[t.lifecycle]??0.50;
     t.weeklyStreams=Math.max(t.weeklyStreams,Math.floor(t.peakStreams*pct));
     t.promoted=true;
-    // Promotion boosts Spotify/YouTube discovery algorithm placement
-    if (t.platformMix) {
-      t.platformMix.spotify = Math.min(0.65, (t.platformMix.spotify ?? 0.5) + 0.08);
-      t.platformMix.youtube = Math.min(0.15, (t.platformMix.youtube ?? 0.08) + 0.04);
-      // Normalize
-      const sum = Object.values(t.platformMix).reduce((a,b)=>a+b,0);
-      for (const k of Object.keys(t.platformMix)) t.platformMix[k] /= sum;
-    }
-    s.pendingEvent={msg:`"${t.title}" streams restored to ${Math.floor(pct*100)}% of peak. Spotify algorithm boost active.`,type:"great"};
+    s.pendingEvent={msg:`"${t.title}" streams restored to ${Math.floor(pct*100)}% of peak.`,type:"great"};
     return s;
   }),[upd]);
 
   const doShootMusicVideo = useCallback((id:string)=>upd(s=>{
-    if(s.money<1200){s.pendingEvent={msg:"Need $1,200 for music video.",type:"bad"};return s;}
-    s.money-=1200; s.fame=clamp(s.fame+3,0,100); s.rep=clamp(s.rep+2,0,100); s.hype=clamp(s.hype+22,0,100); s.fans+=900;
+    if(s.money<2000){s.pendingEvent={msg:"Need $2,000 for music video.",type:"bad"};return s;}
+    s.money-=2000; s.fame=clamp(s.fame+3,0,100); s.rep=clamp(s.rep+2,0,100); s.hype=clamp(s.hype+22,0,100); s.fans+=900;
     // Music videos deepen engagement — convert ~2% of casuals into superfans.
     const sfPrior = s.superfans ?? 0;
     const casualsAvail = Math.max(0, s.fans - sfPrior);
     const sfBump = Math.min(casualsAvail, 50 + Math.floor(casualsAvail * 0.02));
     if (sfBump > 0) s.superfans = sfPrior + sfBump;
     const cat=s.catalog.find(x=>x.id===id); const disc=s.discography.find(x=>x.id===id);
-    if(cat){
-      cat.hasMusicVideo=true;
-      cat.weeklyStreams=Math.min(cat.peakStreams,Math.floor(cat.weeklyStreams*1.35));
-      // Music videos boost YouTube Music and Spotify (video integration)
-      if (cat.platformMix) {
-        cat.platformMix.youtube = Math.min(0.18, (cat.platformMix.youtube ?? 0.08) + 0.06);
-        cat.platformMix.spotify = Math.min(0.60, (cat.platformMix.spotify ?? 0.52) + 0.03);
-        const sum = Object.values(cat.platformMix).reduce((a,b)=>a+b,0);
-        for (const k of Object.keys(cat.platformMix)) cat.platformMix[k] /= sum;
-      }
-    }
+    if(cat){cat.hasMusicVideo=true;cat.weeklyStreams=Math.min(cat.peakStreams,Math.floor(cat.weeklyStreams*1.35));}
     if(disc)disc.hasMusicVideo=true;
-    s.pendingEvent={msg:"Music video done! YouTube Music + Spotify video boost active. Streams and hype up.",type:"great"};
+    s.pendingEvent={msg:"Music video done! Streams and hype boosted.",type:"great"};
     return s;
   }),[upd]);
 
@@ -1458,22 +1241,9 @@ export function useGameState() {
     s.money += offer.advance;
     s.fame = clamp(s.fame + 10, 0, 100);
     s.currentLabel = {
-      labelId: L.id, name: L.name, exec: L.exec, type: L.type,
-      advance: offer.advance, advanceRecouped: 0,
-      recordingFund: offer.recordingFund, recordingFundUsed: 0,
-      royaltyRate: offer.royaltyRate, recoupRate: offer.recoupRate,
-      streamingCut: offer.streamingCut, tourGrossCut: offer.tourGrossCut,
-      merchCut: offer.merchCut, syncCut: offer.syncCut, publishingCut: offer.publishingCut,
-      marketingCommitment: offer.marketingCommitment, marketingBoost: offer.marketingBoost, marketingSpendYTD: 0,
-      albumsCommitted: offer.albumsCommitted, albumsDelivered: 0,
-      optionsRemaining: offer.options, optionWeeks: offer.optionWeeks,
-      weeksLeft: offer.termWeeks, totalWeeks: offer.termWeeks, signedAtWeek: s.week,
-      crossCollateralization: offer.crossCollateralization,
-      controlledComposition: offer.controlledComposition,
-      controlledCompositionCap: offer.controlledCompositionCap,
-      suspensionRights: offer.suspensionRights, keyPersonClause: offer.keyPersonClause,
-      creativeControl: offer.creativeControl, approvalRights: [...offer.approvalRights],
-      isRecouped: false, perks: [...(L.perks ?? [])],
+      labelId: L.id, name: L.name, exec: L.exec,
+      streamingCut: offer.streamingCut, tourCut: offer.tourCut, marketingBoost: offer.marketingBoost,
+      weeksLeft: offer.contractWeeks, signedAtWeek: s.week, totalAdvance: offer.advance,
     };
     s.labelSigned = true;
     s.pendingLabelOffers = [];
@@ -1491,9 +1261,9 @@ export function useGameState() {
       advance: offer.advance,
       terms: [
         { label: "Streaming cut", value: Math.round(offer.streamingCut * 100) + "%", isGood: false },
-        { label: "Tour cut", value: Math.round(offer.tourGrossCut * 100) + "%", isGood: false },
+        { label: "Tour cut", value: Math.round(offer.tourCut * 100) + "%", isGood: false },
         { label: "Marketing boost", value: "×" + offer.marketingBoost.toFixed(2), isGood: true },
-        { label: "Contract length", value: offer.termWeeks + " wk", isGood: true },
+        { label: "Contract length", value: offer.contractWeeks + " wk", isGood: true },
       ],
       perks: L.perks,
       quote: L.pitch,
@@ -1694,7 +1464,7 @@ export function useGameState() {
       s.pendingEvent = { msg:`You've vacationed recently. ${s.vacationCooldown}wk cooldown.`, type:"bad" };
       return s;
     }
-    const cost = 2200;
+    const cost = 3000;
     if (s.money < cost) {
       s.pendingEvent = { msg:`Need ${fmtMoney(cost)} for a real getaway.`, type:"bad" };
       return s;
@@ -1790,7 +1560,7 @@ export function useGameState() {
       return s;
     }
     const unitCost = tmpl.baseCost + (opts?.bonusCost ?? 0);
-    const setup = Math.max(40, Math.floor(unitCost * 25));
+    const setup = Math.max(40, Math.floor(unitCost * 30));
     if (s.money < setup) {
       s.pendingEvent = { msg: `Need ${fmtMoney(setup)} to set up the ${type} run.`, type: "bad" };
       return s;
@@ -1851,7 +1621,7 @@ export function useGameState() {
       const tmpl = MERCH_TEMPLATES.find(t => t.type === sel.type);
       if (!tmpl) continue;
       const unitCost = tmpl.baseCost + sel.variantCostMod + sel.editionCostMod;
-      const setup = Math.max(40, Math.floor(unitCost * 25));
+      const setup = Math.max(40, Math.floor(unitCost * 30));
       const finalPrice = tmpl.basePrice + sel.variantPriceMod + sel.editionPriceMod;
       const variantTag = sel.variantName && sel.variantName !== "Standard Black" && sel.variantName !== "Standard Jewel Case" && sel.variantName !== "Black Shell" ? ` (${sel.variantName})` : "";
       const editionTag = sel.editionName && sel.editionName !== "Standard" ? ` — ${sel.editionName}` : "";
@@ -1934,7 +1704,42 @@ export function useGameState() {
     return s;
   }), [upd]);
 
-  const doSwitchGenre = useCallback((genre:Genre)=>upd(s=>{
+  const doSetArtworkBudget = useCallback((budget: ArtworkBudget)=>upd(s=>{
+    if (!s.project) return s;
+    const art = getArtworkTier(budget);
+    const current = getArtworkTier(s.project.artworkBudget);
+    const delta = (art?.cost ?? 0) - (current?.cost ?? 0);
+    if (delta > 0 && s.money < delta) {
+      s.pendingEvent = { msg: `Need ${fmtMoney(delta)} more for ${art?.name} artwork.`, type: "bad" };
+      return s;
+    }
+    if (delta !== 0) s.money -= delta;
+    s.project.artworkBudget = budget;
+    s.pendingEvent = { msg: `Artwork set: ${art?.name}.`, type: "good" };
+    return s;
+  }),[upd]);
+
+  const doSetStageDesign = useCallback((design: StageDesign)=>upd(s=>{
+    const def = getStageDesign(design);
+    if (!def) return s;
+    if (s.fame < def.unlockFame) {
+      s.pendingEvent = { msg: `Need ${def.unlockFame} fame to unlock ${def.name}.`, type: "bad" };
+      return s;
+    }
+    s.currentStageDesign = design;
+    s.pendingEvent = { msg: `Stage design: ${def.name}. ${def.desc}`, type: "good" };
+    return s;
+  }),[upd]);
+
+  const doSetWardrobe = useCallback((style: WardrobeStyle)=>upd(s=>{
+    s.currentWardrobe = style;
+    if (!s.wardrobeHistory.includes(style)) s.wardrobeHistory.push(style);
+    const w = getWardrobe(style)!;
+    s.pendingEvent = { msg: `Wardrobe set: ${w.name}. ${w.desc}`, type: "neutral" };
+    return s;
+  }),[upd]);
+
+    const doSwitchGenre = useCallback((genre:Genre)=>upd(s=>{
     s.genre=genre; s.rep=clamp(s.rep-10,0,100);
     // Superfans signed up for who you were. A pivot loses ~25% of them.
     const sfLost = Math.floor((s.superfans ?? 0) * 0.25);
@@ -1962,9 +1767,9 @@ export function useGameState() {
     doAddMerchItem, doToggleMerchItem, doRemoveMerchItem,
     doDismissPressing, doQuickPress,
     doTakeVacation, doResolveArcChoice, doAbortTour,
-    doAutoGenerateTracks,
     doTakeStudioBreak, doPushThrough, doCancelStudioChoice,
     doCloseTourWrapPresentation, doCloseSigningPresentation,
     doCloseAwardPresentation, doCloseMilestonePresentation,
+    doSetArtworkBudget, doSetStageDesign, doSetWardrobe,
   };
 }

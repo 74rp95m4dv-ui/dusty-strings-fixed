@@ -6,7 +6,6 @@
 export type Genre = "Country" | "Blues";
 export type GameScreen = "menu" | "setup" | "game" | "gameover" | "victory";
 export type ReleaseType = "Single" | "EP" | "Album" | "Live Album";
-export type RecordingMode = "standard" | "rush" | "deliberate";
 export type ReleaseOutcome = "Flop" | "Moderate" | "Hit" | "Viral";
 export type SongLifecycle = "Normal" | "Hit" | "Evergreen";
 
@@ -240,653 +239,99 @@ export const PRODUCER_SPECIALTY_QUALITY_BONUS = 4;
 // Eight labels with distinct personalities. Each has an A&R rep voice,
 // a stylistic preference (genre + favorite themes), eligibility gates,
 // and contract terms (advance, cuts, marketing boost, length).
-
-// ═══════════════════════════════════════════════════════════════
-// RECORD LABELS — REALISTIC CONTRACT SYSTEM
-// ═══════════════════════════════════════════════════════════════
-// Replaces the old simple label system with a full contract simulation:
-// • Advances & recoupment tracking
-// • Recording funds (separate budget per album)
-// • Royalty rates (points) paid AFTER recoupment
-// • 360-deal cuts: streaming, tour gross, merch, sync, publishing
-// • Legal clauses: cross-collateralization, controlled composition,
-//   suspension rights, key-person, creative control, approval rights
-// • Term structure: albums committed + options
-// • Marketing commitment & performance boost
-// • Risk assessment and lawyer-review flavor on every offer
-// ═══════════════════════════════════════════════════════════════
-
-export type LabelType = "major" | "americana" | "indie" | "boutique" | "specialty";
-export type DealRisk = "low" | "moderate" | "high" | "predatory";
-
 export interface Label {
   id: string;
   name: string;
-  exec: string;
-  type: LabelType;
+  exec: string;                // The A&R rep / "voice on the phone"
+  type: "major" | "americana" | "indie" | "boutique" | "specialty";
   city: string;
-  blurb: string;
-  pitch: string;
+  blurb: string;               // 1-2 sentence label vibe
+  pitch: string;               // Opening line they say in the offer
   genrePref: ("Country" | "Blues" | "Both")[];
-  themePrefs: string[];
-
-  // ── Eligibility Gates ──
+  themePrefs: string[];        // Themes they're hot on (matches THEMES.id)
   minFame: number;
   minRep: number;
   minFans: number;
-
-  // ── Financial Terms ──
   advanceMin: number;
   advanceMax: number;
-  recordingFundMin: number;
-  recordingFundMax: number;
-  royaltyRate: number;        // 0.10 = 10% — paid AFTER recoupment
-  recoupRate: number;         // usually 1.0 (100% of label share recoups)
-
-  // ── 360 Deal Cuts (what label takes OFF THE TOP of each stream) ──
-  streamingCut: number;      // 0..1
-  tourGrossCut: number;        // 0..1 — of tour GROSS revenue
-  merchCut: number;          // 0..1
-  syncCut: number;           // 0..1
-  publishingCut: number;     // 0..1 — of songwriting/publishing income
-
-  // ── Marketing ──
-  marketingCommitmentMin: number;
-  marketingCommitmentMax: number;
-  marketingBoost: number;    // release performance multiplier
-
-  // ── Contract Structure ──
-  albumsCommitted: number;   // must deliver
-  options: number;           // label can pick up
-  optionWeeks: number;       // weeks per option period
-  termWeeks: number;         // hard cap on contract length
-
-  // ── Legal Clauses ──
-  crossCollateralization: boolean;  // all albums recoup together?
-  controlledComposition: number;     // % of statutory mechanical (0.75 = 75%)
-  controlledCompositionCap: number;  // max songs affected
-  suspensionRights: boolean;        // can label suspend contract?
-  keyPersonClause: boolean;         // tied to specific A&R exec?
-  creativeControl: number;          // 0..100 (artist control %)
-  approvalRights: string[];         // e.g. ["producer","artwork","singles"]
-
-  perks: string[];
+  streamingCut: number;        // 0..1 — what label takes from streams
+  tourCut: number;             // 0..1 — what label takes from tour gross
+  marketingBoost: number;      // multiplier on release peak streams (legacy=1.3)
+  contractWeeks: number;
+  perks: string[];             // Human-readable perks for the offer card
   real?: boolean;
 }
 
-export interface LabelOffer {
-  labelId: string;
-  // Financial
-  advance: number;
-  recordingFund: number;
-  royaltyRate: number;
-  recoupRate: number;
-  // 360 cuts
-  streamingCut: number;
-  tourGrossCut: number;
-  merchCut: number;
-  syncCut: number;
-  publishingCut: number;
-  // Marketing
-  marketingCommitment: number;
-  marketingBoost: number;
-  // Contract
-  albumsCommitted: number;
-  options: number;
-  optionWeeks: number;
-  termWeeks: number;
-  // Legal
-  crossCollateralization: boolean;
-  controlledComposition: number;
-  controlledCompositionCap: number;
-  suspensionRights: boolean;
-  keyPersonClause: boolean;
-  creativeControl: number;
-  approvalRights: string[];
-  // Presentation
-  fitNote: string;
-  riskLevel: DealRisk;
-  dealScore: number;        // 0-100 computed attractiveness
-  lawyerNote: string;       // flavor text from "your attorney"
-}
-
-export interface SignedLabel {
-  labelId: string;
-  name: string;
-  exec: string;
-  type: LabelType;
-
-  // Financial tracking
-  advance: number;              // original advance amount
-  advanceRecouped: number;        // how much paid back so far
-  recordingFund: number;          // original recording fund
-  recordingFundUsed: number;      // how much spent
-  royaltyRate: number;
-  recoupRate: number;
-
-  // 360 cuts
-  streamingCut: number;
-  tourGrossCut: number;
-  merchCut: number;
-  syncCut: number;
-  publishingCut: number;
-
-  // Marketing
-  marketingCommitment: number;
-  marketingBoost: number;
-  marketingSpendYTD: number;
-
-  // Contract tracking
-  albumsCommitted: number;
-  albumsDelivered: number;
-  optionsRemaining: number;
-  optionWeeks: number;
-  weeksLeft: number;
-  totalWeeks: number;
-  signedAtWeek: number;
-
-  // Legal
-  crossCollateralization: boolean;
-  controlledComposition: number;
-  controlledCompositionCap: number;
-  suspensionRights: boolean;
-  keyPersonClause: boolean;
-  creativeControl: number;
-  approvalRights: string[];
-
-  // Status
-  isRecouped: boolean;
-  perks: string[];
-}
-
-// ── LABEL DATABASE ─────────────────────────────────────────
 export const LABELS: Label[] = [
-  // ═══════════════════════════════════════════════════════
-  // MAJORS
-  // ═══════════════════════════════════════════════════════
-  {
-    id: "big_wheel",
-    name: "Big Wheel Records",
-    exec: "Carl Roosevelt",
-    type: "major",
-    city: "Nashville, TN",
-    blurb: "Music Row machine. Spins gold from co-writes and radio plays. The advance is real; the fine print is longer.",
-    pitch: "We can put you on every truck radio between here and Tulsa. We just need to make a few... adjustments. Read the deal carefully — our lawyers did.",
-    genrePref: ["Country"],
-    themePrefs: ["love", "hometown", "road", "heartbreak"],
-    minFame: 25, minRep: 15, minFans: 5000,
-    // Financial
-    advanceMin: 80000, advanceMax: 250000,
-    recordingFundMin: 40000, recordingFundMax: 100000,
-    royaltyRate: 0.13, recoupRate: 1.0,
-    // 360 cuts — heavy
-    streamingCut: 0.25, tourGrossCut: 0.15, merchCut: 0.15,
-    syncCut: 0.20, publishingCut: 0.15,
-    // Marketing
-    marketingCommitmentMin: 60000, marketingCommitmentMax: 150000,
-    marketingBoost: 1.65,
-    // Contract
-    albumsCommitted: 3, options: 4, optionWeeks: 78, termWeeks: 312,
-    // Legal — major-label aggressive
-    crossCollateralization: true,
-    controlledComposition: 0.75, controlledCompositionCap: 10,
-    suspensionRights: true,
-    keyPersonClause: false,
-    creativeControl: 25,
-    approvalRights: ["singles"],
-    perks: [
-      "Guaranteed radio promotion",
-      "Full marketing department",
-      "Tour booking support",
-      "In-house sync team",
-      "Heavy creative input expected",
-      "Cross-collateralization across all albums",
-    ],
-  },
-  {
-    id: "hard_country",
-    name: "Hard Country Records",
-    exec: "Mitchell \"Mitch\" Lavoie",
-    type: "major",
-    city: "Nashville, TN",
-    blurb: "Mid-major with arena ambitions. Polished. Aggressive. Cuts you a real check — then takes a real cut.",
-    pitch: "You've got the hooks. We've got the machine. Let's go make some money together. Just understand: we make money first, you make money second.",
-    genrePref: ["Country"],
-    themePrefs: ["love", "road", "freedom", "heartbreak"],
-    minFame: 30, minRep: 18, minFans: 8000,
-    advanceMin: 120000, advanceMax: 400000,
-    recordingFundMin: 60000, recordingFundMax: 150000,
-    royaltyRate: 0.11, recoupRate: 1.0,
-    streamingCut: 0.28, tourGrossCut: 0.18, merchCut: 0.18,
-    syncCut: 0.25, publishingCut: 0.20,
-    marketingCommitmentMin: 80000, marketingCommitmentMax: 200000,
-    marketingBoost: 1.80,
-    albumsCommitted: 4, options: 5, optionWeeks: 78, termWeeks: 364,
-    crossCollateralization: true,
-    controlledComposition: 0.75, controlledCompositionCap: 10,
-    suspensionRights: true,
-    keyPersonClause: false,
-    creativeControl: 20,
-    approvalRights: ["producer", "singles"],
-    perks: [
-      "Major radio push",
-      "Arena tour booking",
-      "Brand deal pipeline",
-      "Significant creative input",
-      "360 participation on all revenue streams",
-      "Controlled composition clause (75% rate cap)",
-    ],
-  },
-
-  // ═══════════════════════════════════════════════════════
-  // SPECIALTY
-  // ═══════════════════════════════════════════════════════
-  {
-    id: "crossroads",
-    name: "Crossroads Blues",
-    exec: "Doris Mae Holloway",
-    type: "specialty",
-    city: "Memphis, TN",
-    blurb: "Blues-only. Run by an 80-year-old woman who knew Albert King personally. Old-school terms, no 360 nonsense.",
-    pitch: "We don't make pop. We don't make crossover. We make blues records that'll still mean something in fifty years. And we don't touch your touring money.",
-    genrePref: ["Blues"],
-    themePrefs: ["loss", "whiskey", "redemption", "heartbreak"],
-    minFame: 15, minRep: 25, minFans: 3000,
-    advanceMin: 15000, advanceMax: 60000,
-    recordingFundMin: 8000, recordingFundMax: 25000,
-    royaltyRate: 0.18, recoupRate: 1.0,
-    streamingCut: 0.12, tourGrossCut: 0.03, merchCut: 0.0,
-    syncCut: 0.08, publishingCut: 0.0,
-    marketingCommitmentMin: 12000, marketingCommitmentMax: 35000,
-    marketingBoost: 1.22,
-    albumsCommitted: 2, options: 2, optionWeeks: 52, termWeeks: 156,
-    crossCollateralization: false,
-    controlledComposition: 1.0, controlledCompositionCap: 12,
-    suspensionRights: false,
-    keyPersonClause: true,
-    creativeControl: 75,
-    approvalRights: ["producer", "artwork", "singles", "release date"],
-    perks: [
-      "Blues press connections",
-      "Festival booking circuit",
-      "Vinyl-first releases",
-      "Full creative control",
-      "No merch or touring cuts",
-      "Key-person clause (Doris is your A&R)",
-    ],
-  },
-
-  // ═══════════════════════════════════════════════════════
-  // AMERICANA
-  // ═══════════════════════════════════════════════════════
-  {
-    id: "smokehouse",
-    name: "Smokehouse Recordings",
-    exec: "Wyatt Pearce",
-    type: "americana",
-    city: "East Nashville, TN",
-    blurb: "Americana darling. Distributes through a Brooklyn warehouse and a prayer. Fair splits, modest reach.",
-    pitch: "You make the records you want to make. We just make sure they get heard by the right people. Our cut is moderate because our reach is moderate.",
-    genrePref: ["Country", "Blues"],
-    themePrefs: ["hometown", "road", "outlaw", "nostalgia", "redemption"],
-    minFame: 12, minRep: 18, minFans: 2500,
-    advanceMin: 12000, advanceMax: 50000,
-    recordingFundMin: 10000, recordingFundMax: 30000,
-    royaltyRate: 0.16, recoupRate: 1.0,
-    streamingCut: 0.15, tourGrossCut: 0.08, merchCut: 0.08,
-    syncCut: 0.12, publishingCut: 0.10,
-    marketingCommitmentMin: 15000, marketingCommitmentMax: 45000,
-    marketingBoost: 1.28,
-    albumsCommitted: 2, options: 3, optionWeeks: 52, termWeeks: 182,
-    crossCollateralization: true,
-    controlledComposition: 0.90, controlledCompositionCap: 11,
-    suspensionRights: true,
-    keyPersonClause: false,
-    creativeControl: 60,
-    approvalRights: ["producer", "artwork"],
-    perks: [
-      "Indie credibility",
-      "NPR & AAA press",
-      "Festival circuit",
-      "Moderate creative control",
-      "Cross-collateralization (albums only)",
-    ],
-  },
-
-  // ═══════════════════════════════════════════════════════
-  // INDIE
-  // ═══════════════════════════════════════════════════════
-  {
-    id: "two_step_rec",
-    name: "Two-Step Records",
-    exec: "Buck Hennessey",
-    type: "indie",
-    city: "Austin, TX",
-    blurb: "Outlaw country revival. Office is the upstairs of a honky tonk. Artist-friendly terms, artist-sized reach.",
-    pitch: "Half this town wants to make Nashville pop. We don't. Come make a real damn country record. We take a small cut because we don't have a tower downtown.",
-    genrePref: ["Country"],
-    themePrefs: ["outlaw", "whiskey", "freedom", "road", "workingman"],
-    minFame: 10, minRep: 20, minFans: 2000,
-    advanceMin: 8000, advanceMax: 35000,
-    recordingFundMin: 5000, recordingFundMax: 18000,
-    royaltyRate: 0.20, recoupRate: 1.0,
-    streamingCut: 0.12, tourGrossCut: 0.05, merchCut: 0.05,
-    syncCut: 0.10, publishingCut: 0.0,
-    marketingCommitmentMin: 8000, marketingCommitmentMax: 22000,
-    marketingBoost: 1.15,
-    albumsCommitted: 1, options: 2, optionWeeks: 52, termWeeks: 130,
-    crossCollateralization: false,
-    controlledComposition: 1.0, controlledCompositionCap: 12,
-    suspensionRights: false,
-    keyPersonClause: true,
-    creativeControl: 85,
-    approvalRights: ["producer", "artwork", "singles", "release date"],
-    perks: [
-      "Texas circuit booking",
-      "Outlaw cred",
-      "Vinyl runs guaranteed",
-      "Total creative control",
-      "No publishing cut",
-      "No cross-collateralization",
-    ],
-  },
-
-  // ═══════════════════════════════════════════════════════
-  // BOUTIQUE
-  // ═══════════════════════════════════════════════════════
-  {
-    id: "magnolia",
-    name: "Magnolia House",
-    exec: "June Hartwell",
-    type: "boutique",
-    city: "Asheville, NC",
-    blurb: "Singer-songwriter boutique. Three employees and a candle budget. The deal is gentle; the reach is intimate.",
-    pitch: "We sign songwriters. Just songwriters. If you've got something to say, we'll help you say it. We won't make you rich overnight, but you won't wake up owing us your house.",
-    genrePref: ["Country", "Blues"],
-    themePrefs: ["heartbreak", "loss", "love", "faith", "redemption"],
-    minFame: 8, minRep: 15, minFans: 1500,
-    advanceMin: 5000, advanceMax: 25000,
-    recordingFundMin: 3000, recordingFundMax: 12000,
-    royaltyRate: 0.22, recoupRate: 1.0,
-    streamingCut: 0.10, tourGrossCut: 0.03, merchCut: 0.05,
-    syncCut: 0.08, publishingCut: 0.05,
-    marketingCommitmentMin: 5000, marketingCommitmentMax: 15000,
-    marketingBoost: 1.10,
-    albumsCommitted: 1, options: 2, optionWeeks: 52, termWeeks: 104,
-    crossCollateralization: false,
-    controlledComposition: 1.0, controlledCompositionCap: 12,
-    suspensionRights: false,
-    keyPersonClause: true,
-    creativeControl: 90,
-    approvalRights: ["producer", "artwork", "singles", "release date", "tour routing"],
-    perks: [
-      "Songwriter publishing help",
-      "NPR/AAA press",
-      "Listening-room tour circuit",
-      "All creative control",
-      "Low 360 participation",
-      "June manages your A&R personally",
-    ],
-  },
-  {
-    id: "coal_holler",
-    name: "Coal Holler Music",
-    exec: "Ezra Tibbs",
-    type: "indie",
-    city: "Bristol, VA/TN",
-    blurb: "Working-class roots label. Founder's daddy worked the Pittston mines. Honest splits for honest music.",
-    pitch: "We make records for people who work for a living. And we pay our artists like it. No 360. No cross-collateralization. Just a straight deal.",
-    genrePref: ["Country", "Blues"],
-    themePrefs: ["workingman", "hometown", "faith", "loss", "whiskey"],
-    minFame: 6, minRep: 12, minFans: 1000,
-    advanceMin: 3000, advanceMax: 15000,
-    recordingFundMin: 2000, recordingFundMax: 8000,
-    royaltyRate: 0.25, recoupRate: 1.0,
-    streamingCut: 0.08, tourGrossCut: 0.0, merchCut: 0.0,
-    syncCut: 0.05, publishingCut: 0.0,
-    marketingCommitmentMin: 3000, marketingCommitmentMax: 10000,
-    marketingBoost: 1.08,
-    albumsCommitted: 1, options: 1, optionWeeks: 52, termWeeks: 78,
-    crossCollateralization: false,
-    controlledComposition: 1.0, controlledCompositionCap: 12,
-    suspensionRights: false,
-    keyPersonClause: false,
-    creativeControl: 95,
-    approvalRights: ["producer", "artwork", "singles", "release date", "tour routing", "merch design"],
-    perks: [
-      "Honest 50/50 publishing splits",
-      "Appalachian press network",
-      "Bluegrass festival circuit",
-      "Creative control",
-      "NO 360 cuts (no tour, no merch, no publishing)",
-      "No cross-collateralization",
-    ],
-  },
-  {
-    id: "front_porch",
-    name: "Front Porch Records",
-    exec: "Lanie Winslow",
-    type: "boutique",
-    city: "Athens, GA",
-    blurb: "Heartbreak ballad specialists. Roster is mostly women under thirty-five. Fair deal, strong playlist team.",
-    pitch: "You're writing some of the best heartbreak songs I've heard all year. Let us be the home for them. We'll push them to the right ears.",
-    genrePref: ["Country", "Blues"],
-    themePrefs: ["heartbreak", "love", "loss"],
-    minFame: 8, minRep: 14, minFans: 1800,
-    advanceMin: 6000, advanceMax: 28000,
-    recordingFundMin: 4000, recordingFundMax: 15000,
-    royaltyRate: 0.19, recoupRate: 1.0,
-    streamingCut: 0.13, tourGrossCut: 0.06, merchCut: 0.08,
-    syncCut: 0.10, publishingCut: 0.08,
-    marketingCommitmentMin: 8000, marketingCommitmentMax: 22000,
-    marketingBoost: 1.18,
-    albumsCommitted: 2, options: 2, optionWeeks: 52, termWeeks: 130,
-    crossCollateralization: false,
-    controlledComposition: 0.95, controlledCompositionCap: 12,
-    suspensionRights: false,
-    keyPersonClause: true,
-    creativeControl: 70,
-    approvalRights: ["producer", "artwork", "singles"],
-    perks: [
-      "Strong female artist roster",
-      "Streaming playlist push",
-      "Targeted demographic marketing",
-      "Creative freedom",
-      "Moderate 360 participation",
-    ],
-  },
+  { id:"big_wheel", name:"Big Wheel Records", exec:"Carl Roosevelt", type:"major", city:"Nashville, TN",
+    blurb:"Music Row machine. Spins gold from co-writes and radio plays.",
+    pitch:"We can put you on every truck radio between here and Tulsa. We just need to make a few... adjustments.",
+    genrePref:["Country"], themePrefs:["love","hometown","road","heartbreak"],
+    minFame:25, minRep:15, minFans:5000,
+    advanceMin:60000, advanceMax:120000,
+    streamingCut:0.22, tourCut:0.12, marketingBoost:1.5, contractWeeks:104,
+    perks:["Guaranteed radio promotion","Full marketing department","Tour booking support","Heavy creative input expected"] },
+  { id:"hard_country", name:"Hard Country Records", exec:"Mitchell \"Mitch\" Lavoie", type:"major", city:"Nashville, TN",
+    blurb:"Mid-major with arena ambitions. Polished. Aggressive. Cuts you a real check.",
+    pitch:"You've got the hooks. We've got the machine. Let's go make some money together.",
+    genrePref:["Country"], themePrefs:["love","road","freedom","heartbreak"],
+    minFame:30, minRep:18, minFans:8000,
+    advanceMin:80000, advanceMax:180000,
+    streamingCut:0.25, tourCut:0.13, marketingBoost:1.6, contractWeeks:104,
+    perks:["Major radio push","Arena tour booking","Brand deal pipeline","Significant creative input"] },
+  { id:"crossroads", name:"Crossroads Blues", exec:"Doris Mae Holloway", type:"specialty", city:"Memphis, TN",
+    blurb:"Blues-only. Run by an 80-year-old woman who knew Albert King personally.",
+    pitch:"We don't make pop. We don't make crossover. We make blues records that'll still mean something in fifty years.",
+    genrePref:["Blues"], themePrefs:["loss","whiskey","redemption","heartbreak"],
+    minFame:15, minRep:25, minFans:3000,
+    advanceMin:25000, advanceMax:55000,
+    streamingCut:0.14, tourCut:0.06, marketingBoost:1.20, contractWeeks:78,
+    perks:["Blues press connections","Festival booking circuit","Vinyl-first releases","Full creative control"] },
+  { id:"smokehouse", name:"Smokehouse Recordings", exec:"Wyatt Pearce", type:"americana", city:"East Nashville, TN",
+    blurb:"Americana darling. Distributes through a Brooklyn warehouse and a prayer.",
+    pitch:"You make the records you want to make. We just make sure they get heard by the right people.",
+    genrePref:["Country","Blues"], themePrefs:["hometown","road","outlaw","nostalgia","redemption"],
+    minFame:12, minRep:18, minFans:2500,
+    advanceMin:18000, advanceMax:42000,
+    streamingCut:0.15, tourCut:0.08, marketingBoost:1.25, contractWeeks:52,
+    perks:["Indie credibility","NPR & AAA press","Festival circuit","Total creative freedom"] },
+  { id:"two_step_rec", name:"Two-Step Records", exec:"Buck Hennessey", type:"indie", city:"Austin, TX",
+    blurb:"Outlaw country revival. Office is the upstairs of a honky tonk.",
+    pitch:"Half this town wants to make Nashville pop. We don't. Come make a real damn country record.",
+    genrePref:["Country"], themePrefs:["outlaw","whiskey","freedom","road","workingman"],
+    minFame:10, minRep:20, minFans:2000,
+    advanceMin:15000, advanceMax:35000,
+    streamingCut:0.13, tourCut:0.07, marketingBoost:1.18, contractWeeks:52,
+    perks:["Texas circuit booking","Outlaw cred","Vinyl runs guaranteed","Total creative control"] },
+  { id:"magnolia", name:"Magnolia House", exec:"June Hartwell", type:"boutique", city:"Asheville, NC",
+    blurb:"Singer-songwriter boutique. Three employees and a candle budget.",
+    pitch:"We sign songwriters. Just songwriters. If you've got something to say, we'll help you say it.",
+    genrePref:["Country","Blues"], themePrefs:["heartbreak","loss","love","faith","redemption"],
+    minFame:8, minRep:15, minFans:1500,
+    advanceMin:8000, advanceMax:22000,
+    streamingCut:0.12, tourCut:0.05, marketingBoost:1.10, contractWeeks:52,
+    perks:["Songwriter publishing help","NPR/AAA press","Listening-room tour circuit","All creative control"] },
+  { id:"coal_holler", name:"Coal Holler Music", exec:"Ezra Tibbs", type:"indie", city:"Bristol, VA/TN",
+    blurb:"Working-class roots label. Founder's daddy worked the Pittston mines.",
+    pitch:"We make records for people who work for a living. And we pay our artists like it.",
+    genrePref:["Country","Blues"], themePrefs:["workingman","hometown","faith","loss","whiskey"],
+    minFame:6, minRep:12, minFans:1000,
+    advanceMin:6000, advanceMax:18000,
+    streamingCut:0.11, tourCut:0.05, marketingBoost:1.08, contractWeeks:52,
+    perks:["Honest 50/50 publishing splits","Appalachian press network","Bluegrass festival circuit","Creative control"] },
+  { id:"front_porch", name:"Front Porch Records", exec:"Lanie Winslow", type:"boutique", city:"Athens, GA",
+    blurb:"Heartbreak ballad specialists. Roster is mostly women under thirty-five.",
+    pitch:"You're writing some of the best heartbreak songs I've heard all year. Let us be the home for them.",
+    genrePref:["Country","Blues"], themePrefs:["heartbreak","love","loss"],
+    minFame:8, minRep:14, minFans:1800,
+    advanceMin:10000, advanceMax:28000,
+    streamingCut:0.13, tourCut:0.06, marketingBoost:1.15, contractWeeks:52,
+    perks:["Strong female artist roster","Streaming playlist push","Targeted demographic marketing","Creative freedom"] },
 ];
 
-// ── HELPERS ────────────────────────────────────────────────
-
-export function getLabel(id: string): Label | undefined {
-  return LABELS.find((l) => l.id === id);
-}
-export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
-
-export function getRiskLabel(risk: DealRisk): { text: string; color: string; icon: string } {
-  switch (risk) {
-    case "low":    return { text: "Artist-Friendly", color: "var(--sage)", icon: "🟢" };
-    case "moderate": return { text: "Standard Terms", color: "var(--amber)", icon: "🟡" };
-    case "high":   return { text: "Label-Favorable", color: "var(--rust)", icon: "🟠" };
-    case "predatory": return { text: "Heavy — Lawyer Up", color: "#c0392b", icon: "🔴" };
-  }
-}
-
-// Compute a 0-100 deal-attractiveness score from the artist's perspective.
-// Higher = better for the artist.
-export function scoreDeal(offer: LabelOffer): number {
-  let score = 50;
-  // Advance generosity (normalized against a $200k baseline)
-  score += (offer.advance / 200000) * 15;
-  // Recording fund
-  score += (offer.recordingFund / 80000) * 10;
-  // Royalty rate (18% is neutral; each point away shifts 4)
-  score += (offer.royaltyRate - 0.18) * 400;
-  // 360 cuts — each percentage point costs 1.5 score
-  score -= offer.streamingCut * 150;
-  score -= offer.tourGrossCut * 200;
-  score -= offer.merchCut * 200;
-  score -= offer.syncCut * 120;
-  score -= offer.publishingCut * 180;
-  // Marketing
-  score += (offer.marketingCommitment / 100000) * 8;
-  score += (offer.marketingBoost - 1.0) * 20;
-  // Creative control
-  score += (offer.creativeControl - 50) * 0.4;
-  // Legal protections
-  if (!offer.crossCollateralization) score += 8;
-  if (!offer.suspensionRights) score += 5;
-  if (offer.keyPersonClause) score += 3;
-  if (offer.controlledComposition >= 1.0) score += 5;
-  // Term length (shorter is better)
-  score -= (offer.termWeeks / 52) * 1.5;
-  return clamp(score, 0, 100);
-}
-
-// Determine risk level from offer terms.
-export function assessRisk(offer: LabelOffer): DealRisk {
-  let redFlags = 0;
-  if (offer.crossCollateralization) redFlags += 2;
-  if (offer.suspensionRights) redFlags += 1;
-  if (offer.tourGrossCut > 0.12) redFlags += 2;
-  if (offer.merchCut > 0.12) redFlags += 2;
-  if (offer.publishingCut > 0.12) redFlags += 2;
-  if (offer.streamingCut > 0.22) redFlags += 1;
-  if (offer.royaltyRate < 0.13) redFlags += 2;
-  if (offer.creativeControl < 30) redFlags += 1;
-  if (offer.controlledComposition < 0.85) redFlags += 1;
-  if (offer.termWeeks > 260) redFlags += 1;
-
-  if (redFlags >= 7) return "predatory";
-  if (redFlags >= 4) return "high";
-  if (redFlags >= 2) return "moderate";
-  return "low";
-}
-
-// Generate lawyer flavor text based on offer terms.
-export function generateLawyerNote(offer: LabelOffer): string {
-  const notes: string[] = [];
-  if (offer.advance > 150000) notes.push("Big advance, but remember — it's all recoupable.");
-  else if (offer.advance < 15000) notes.push("Small advance means low risk, but you'll need tour money elsewhere.");
-
-  if (offer.royaltyRate >= 0.20) notes.push("Strong royalty rate. You'll see back-end money faster once recouped.");
-  else if (offer.royaltyRate <= 0.12) notes.push("Low royalty rate. You'll be unrecouped for a long time.");
-
-  if (offer.crossCollateralization) notes.push("CROSS-COLLATERALIZATION: Every album pays for every other album. Dangerous.");
-  if (offer.suspensionRights) notes.push("SUSPENSION RIGHTS: They can freeze you indefinitely.");
-  if (offer.tourGrossCut > 0.10) notes.push(`Tour gross cut of ${Math.round(offer.tourGrossCut*100)}% — they'll take a bite before you pay your crew.`);
-  if (offer.merchCut > 0.10) notes.push(`Merch cut of ${Math.round(offer.merchCut*100)}% — your table revenue isn't fully yours.`);
-  if (offer.publishingCut > 0.10) notes.push(`Publishing cut of ${Math.round(offer.publishingCut*100)}% — they want your songwriting money too.`);
-  if (offer.creativeControl < 35) notes.push("Low creative control. Expect notes on your mixes, your look, and your singles.");
-  if (offer.keyPersonClause) notes.push("Key-person clause: if your A&R leaves, you may have an exit window.");
-  if (offer.controlledComposition < 1.0) notes.push(`Controlled composition: mechanical rates capped at ${Math.round(offer.controlledComposition*100)}%. Songwriters get less.`);
-
-  if (notes.length === 0) return "Clean deal. Nothing here that'll keep me up at night.";
-  return notes.join(" ");
-}
-
-// ── OFFER GENERATION ───────────────────────────────────────
-
-export function generateLabelOffers(s: GameState): LabelOffer[] {
-  const sig = getSignatureTheme(s.themeCounts);
-  const eligible = LABELS.filter(
-    (L) =>
-      s.fame >= L.minFame &&
-      s.rep >= L.minRep &&
-      s.fans >= L.minFans &&
-      ((L.genrePref as string[]).includes(s.genre) || (L.genrePref as string[]).includes("Both"))
-  );
-  if (!eligible.length) return [];
-
-  const scored = eligible
-    .map((L) => {
-      let score = 1;
-      if (sig && L.themePrefs.includes(sig.themeId)) score += 1.5;
-      if ((L.genrePref as string[]).includes(s.genre)) score += 0.5;
-      score += Math.max(0, 1 - Math.abs(L.minFame - s.fame) / 40);
-      score += Math.random() * 0.7;
-      return { L, score };
-    })
-    .sort((a, b) => b.score - a.score);
-
-  const picks = scored.slice(0, Math.min(3, scored.length));
-
-  return picks.map(({ L }) => {
-    const adv = Math.floor(L.advanceMin + Math.random() * (L.advanceMax - L.advanceMin));
-    const recFund = Math.floor(L.recordingFundMin + Math.random() * (L.recordingFundMax - L.recordingFundMin));
-    const mkCommit = Math.floor(L.marketingCommitmentMin + Math.random() * (L.marketingCommitmentMax - L.marketingCommitmentMin));
-
-    // Slight variance on cuts based on player leverage (fame/rep)
-    const leverage = clamp((s.fame + s.rep * 2) / 100, 0, 1); // 0..1
-    const cutDiscount = leverage * 0.04; // up to 4% better cuts
-
-    const offer: LabelOffer = {
-      labelId: L.id,
-      advance: adv,
-      recordingFund: recFund,
-      royaltyRate: L.royaltyRate,
-      recoupRate: L.recoupRate,
-      streamingCut: clamp(L.streamingCut - cutDiscount, 0.02, 0.40),
-      tourGrossCut: clamp(L.tourGrossCut - cutDiscount, 0, 0.30),
-      merchCut: clamp(L.merchCut - cutDiscount, 0, 0.25),
-      syncCut: clamp(L.syncCut - cutDiscount, 0, 0.30),
-      publishingCut: clamp(L.publishingCut - cutDiscount, 0, 0.25),
-      marketingCommitment: mkCommit,
-      marketingBoost: L.marketingBoost,
-      albumsCommitted: L.albumsCommitted,
-      options: L.options,
-      optionWeeks: L.optionWeeks,
-      termWeeks: L.termWeeks,
-      crossCollateralization: L.crossCollateralization,
-      controlledComposition: L.controlledComposition,
-      controlledCompositionCap: L.controlledCompositionCap,
-      suspensionRights: L.suspensionRights,
-      keyPersonClause: L.keyPersonClause,
-      creativeControl: L.creativeControl,
-      approvalRights: [...L.approvalRights],
-      fitNote: "",
-      riskLevel: "moderate",
-      dealScore: 0,
-      lawyerNote: "",
-    };
-
-    // Fit note
-    const fitParts: string[] = [];
-    if (sig && L.themePrefs.includes(sig.themeId))
-      fitParts.push(`your ${sig.theme.name.toLowerCase()} catalog`);
-    fitParts.push(`your ${s.genre.toLowerCase()} sound`);
-    if (s.fame >= L.minFame + 12) fitParts.push("your visibility");
-    offer.fitNote = `They love ${fitParts.join(" and ")}.`;
-
-    // Assessments
-    offer.riskLevel = assessRisk(offer);
-    offer.dealScore = Math.round(scoreDeal(offer));
-    offer.lawyerNote = generateLawyerNote(offer);
-
-    return offer;
-  });
-}
-
-export function generateManagerOffers(s: GameState): ManagerOffer[] {
-  const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
-  if (!eligible.length) return [];
-  const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))
-    .sort((a,b)=>b.score-a.score);
-  const picks = scored.slice(0, Math.min(3, scored.length));
-  return picks.map(({m}) => ({
-    managerId: m.id,
-    weeklyFee: m.weeklyFee,
-    showRevPct: m.showRevPct,
-    brandDealBoost: m.brandDealBoost,
-    repPerWeek: m.repPerWeek,
-    fitNote: m.type === "legend"     ? "She's heard your material and is making an exception."
-           : m.type === "aggressive" ? "He's been watching your numbers and wants in."
-           : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
-           :                            "He thinks you've got the makings of a real career.",
-  }));
-}
-
+// ─── MANAGERS ─────────────────────────────────────────────
+// Five managers ranging from steady old-timer to legendary. Each charges
+// a weekly fee and provides distinct perks beyond the show-revenue bump.
 export interface Manager {
   id: string;
   name: string;
@@ -936,7 +381,16 @@ export const MANAGERS: Manager[] = [
     perks:["+25% show net revenue","+50% brand deal income","+0.4 rep/week","Open door to anyone in town"] },
 ];
 
-// ─── OFFER + CONTRACT TYPES ─────────────────────────────── (defined above)
+// ─── OFFER + CONTRACT TYPES ───────────────────────────────
+export interface LabelOffer {
+  labelId: string;
+  advance: number;              // randomized within label.advanceMin..advanceMax
+  streamingCut: number;
+  tourCut: number;
+  marketingBoost: number;
+  contractWeeks: number;
+  fitNote: string;              // why they're interested in YOU specifically
+}
 export interface ManagerOffer {
   managerId: string;
   weeklyFee: number;
@@ -945,7 +399,17 @@ export interface ManagerOffer {
   repPerWeek: number;
   fitNote: string;
 }
-
+export interface SignedLabel {
+  labelId: string;
+  name: string;
+  exec: string;
+  streamingCut: number;
+  tourCut: number;
+  marketingBoost: number;
+  weeksLeft: number;
+  signedAtWeek: number;
+  totalAdvance: number;
+}
 export interface SignedManager {
   managerId: string;
   name: string;
@@ -956,194 +420,58 @@ export interface SignedManager {
   signedAtWeek: number;
 }
 
+export function getLabel(id: string): Label | undefined { return LABELS.find(l => l.id === id); }
+export function getManager(id: string): Manager | undefined { return MANAGERS.find(m => m.id === id); }
 
-
-
-// ── RECOUPMENT & REVENUE MATH ─────────────────────────────
-
-export interface WeeklyLabelAccounting {
-  // Raw revenue that hit this week
-  streamingRevenue: number;
-  tourGrossRevenue: number;
-  merchRevenue: number;
-  syncRevenue: number;
-  publishingRevenue: number;
-
-  // Label's share (the 360 cuts)
-  labelStreamingShare: number;
-  labelTourShare: number;
-  labelMerchShare: number;
-  labelSyncShare: number;
-  labelPublishingShare: number;
-  totalLabelShare: number;
-
-  // Artist's immediate keep (revenue minus label cut)
-  artistStreamingKeep: number;
-  artistTourKeep: number;
-  artistMerchKeep: number;
-  artistSyncKeep: number;
-  artistPublishingKeep: number;
-  totalArtistKeep: number;
-
-  // Recoupment
-  advanceRemainingBefore: number;
-  recoupedThisWeek: number;
-  advanceRemainingAfter: number;
-  isRecouped: boolean;
-
-  // Royalty bonus (only if recouped)
-  royaltyBonus: number;
-
-  // Net to artist this week
-  artistNetThisWeek: number;
+// Generate up to 3 ranked label offers based on player's profile.
+export function generateLabelOffers(s: GameState): LabelOffer[] {
+  const sig = getSignatureTheme(s.themeCounts);
+  const eligible = LABELS.filter(L =>
+    s.fame >= L.minFame && s.rep >= L.minRep && s.fans >= L.minFans &&
+    (L.genrePref.includes(s.genre as any) || L.genrePref.includes("Both" as any))
+  );
+  if (!eligible.length) return [];
+  const scored = eligible.map(L => {
+    let score = 1;
+    if (sig && L.themePrefs.includes(sig.themeId)) score += 1.5;
+    if (L.genrePref.includes(s.genre as any)) score += 0.5;
+    // Closeness in fame band — small labels lose interest if you're way too big
+    score += Math.max(0, 1 - Math.abs(L.minFame - s.fame) / 40);
+    score += Math.random() * 0.7;
+    return { L, score };
+  }).sort((a,b)=>b.score-a.score);
+  const picks = scored.slice(0, Math.min(3, scored.length));
+  return picks.map(({L}) => {
+    const adv = Math.floor(L.advanceMin + Math.random() * (L.advanceMax - L.advanceMin));
+    const fitParts: string[] = [];
+    if (sig && L.themePrefs.includes(sig.themeId)) fitParts.push(`your ${sig.theme.name.toLowerCase()} songs`);
+    fitParts.push(`your ${s.genre.toLowerCase()} sound`);
+    if (s.fame >= L.minFame + 12) fitParts.push("your visibility");
+    const fitNote = `They love ${fitParts.join(" and ")}.`;
+    return { labelId:L.id, advance:adv,
+      streamingCut:L.streamingCut, tourCut:L.tourCut,
+      marketingBoost:L.marketingBoost, contractWeeks:L.contractWeeks, fitNote };
+  });
 }
 
-// Run weekly accounting for a signed label contract.
-// Returns how much the ARTIST actually gets paid this week.
-export function runLabelAccounting(
-  label: SignedLabel,
-  streamingRev: number,
-  tourGrossRev: number,
-  merchRev: number,
-  syncRev: number,
-  publishingRev: number
-): WeeklyLabelAccounting {
-  const lblStreaming = streamingRev * label.streamingCut;
-  const lblTour = tourGrossRev * label.tourGrossCut;
-  const lblMerch = merchRev * label.merchCut;
-  const lblSync = syncRev * label.syncCut;
-  const lblPublishing = publishingRev * label.publishingCut;
-  const totalLabelShare = lblStreaming + lblTour + lblMerch + lblSync + lblPublishing;
-
-  const artStreaming = streamingRev - lblStreaming;
-  const artTour = tourGrossRev - lblTour;
-  const artMerch = merchRev - lblMerch;
-  const artSync = syncRev - lblSync;
-  const artPublishing = publishingRev - lblPublishing;
-  const totalArtistKeep = artStreaming + artTour + artMerch + artSync + artPublishing;
-
-  const remainingBefore = label.advance - label.advanceRecouped;
-  const recoupThisWeek = Math.min(totalLabelShare * label.recoupRate, remainingBefore);
-  const remainingAfter = remainingBefore - recoupThisWeek;
-  const nowRecouped = remainingAfter <= 0;
-
-  // Royalty bonus: after recoupment, artist gets royaltyRate % of label's share
-  let royaltyBonus = 0;
-  if (nowRecouped) {
-    const excess = totalLabelShare - recoupThisWeek; // if label share > remaining balance
-    const royaltyBase = excess > 0 ? excess : totalLabelShare;
-    royaltyBonus = royaltyBase * label.royaltyRate;
-  }
-
-  return {
-    streamingRevenue: streamingRev,
-    tourGrossRevenue: tourGrossRev,
-    merchRevenue: merchRev,
-    syncRevenue: syncRev,
-    publishingRevenue: publishingRev,
-    labelStreamingShare: lblStreaming,
-    labelTourShare: lblTour,
-    labelMerchShare: lblMerch,
-    labelSyncShare: lblSync,
-    labelPublishingShare: lblPublishing,
-    totalLabelShare,
-    artistStreamingKeep: artStreaming,
-    artistTourKeep: artTour,
-    artistMerchKeep: artMerch,
-    artistSyncKeep: artSync,
-    artistPublishingKeep: artPublishing,
-    totalArtistKeep,
-    advanceRemainingBefore: remainingBefore,
-    recoupedThisWeek: recoupThisWeek,
-    advanceRemainingAfter: Math.max(0, remainingAfter),
-    isRecouped: nowRecouped,
-    royaltyBonus,
-    artistNetThisWeek: totalArtistKeep + royaltyBonus,
-  };
-}
-
-// Build a SignedLabel from an offer and the current game state.
-export function signLabel(offer: LabelOffer, state: GameState): SignedLabel {
-  const def = getLabel(offer.labelId)!;
-  return {
-    labelId: offer.labelId,
-    name: def.name,
-    exec: def.exec,
-    type: def.type,
-    advance: offer.advance,
-    advanceRecouped: 0,
-    recordingFund: offer.recordingFund,
-    recordingFundUsed: 0,
-    royaltyRate: offer.royaltyRate,
-    recoupRate: offer.recoupRate,
-    streamingCut: offer.streamingCut,
-    tourGrossCut: offer.tourGrossCut,
-    merchCut: offer.merchCut,
-    syncCut: offer.syncCut,
-    publishingCut: offer.publishingCut,
-    marketingCommitment: offer.marketingCommitment,
-    marketingBoost: offer.marketingBoost,
-    marketingSpendYTD: 0,
-    albumsCommitted: offer.albumsCommitted,
-    albumsDelivered: 0,
-    optionsRemaining: offer.options,
-    optionWeeks: offer.optionWeeks,
-    weeksLeft: offer.termWeeks,
-    totalWeeks: offer.termWeeks,
-    signedAtWeek: state.week,
-    crossCollateralization: offer.crossCollateralization,
-    controlledComposition: offer.controlledComposition,
-    controlledCompositionCap: offer.controlledCompositionCap,
-    suspensionRights: offer.suspensionRights,
-    keyPersonClause: offer.keyPersonClause,
-    creativeControl: offer.creativeControl,
-    approvalRights: [...offer.approvalRights],
-    isRecouped: false,
-    perks: [...def.perks],
-  };
-}
-
-// ── PRESENTATION HELPERS ─────────────────────────────────
-
-export function fmtPercent(n: number): string {
-  return Math.round(n * 100) + "%";
-}
-
-export function fmtDuration(weeks: number): string {
-  const years = weeks / 52;
-  if (years >= 1) return `${years.toFixed(1)} year${years >= 2 ? "s" : ""}`;
-  return `${weeks} weeks`;
-}
-
-export function recoupProgress(label: SignedLabel): {
-  pct: number;
-  formatted: string;
-  status: string;
-} {
-  const pct = clamp(label.advanceRecouped / label.advance, 0, 1);
-  const formatted = `${fmtMoney(label.advanceRecouped)} / ${fmtMoney(label.advance)}`;
-  const status = label.isRecouped
-    ? "✓ FULLY RECOUPED — royalties now paying"
-    : pct > 0.75
-    ? "Almost there"
-    : pct > 0.4
-    ? "Midway"
-    : pct > 0
-    ? "Just started"
-    : "Not yet recouped";
-  return { pct, formatted, status };
-}
-
-export function get360Summary(offer: LabelOffer | SignedLabel): {
-  totalCut: number;
-  severity: "light" | "moderate" | "heavy" | "crushing";
-  color: string;
-} {
-  const total = offer.streamingCut + offer.tourGrossCut + offer.merchCut + offer.syncCut + offer.publishingCut;
-  if (total < 0.15) return { totalCut: total, severity: "light", color: "var(--sage)" };
-  if (total < 0.35) return { totalCut: total, severity: "moderate", color: "var(--amber)" };
-  if (total < 0.60) return { totalCut: total, severity: "heavy", color: "var(--rust)" };
-  return { totalCut: total, severity: "crushing", color: "#c0392b" };
+// Generate up to 3 ranked manager offers based on player's profile.
+export function generateManagerOffers(s: GameState): ManagerOffer[] {
+  const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
+  if (!eligible.length) return [];
+  const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))
+    .sort((a,b)=>b.score-a.score);
+  const picks = scored.slice(0, Math.min(3, scored.length));
+  return picks.map(({m}) => ({
+    managerId: m.id,
+    weeklyFee: m.weeklyFee,
+    showRevPct: m.showRevPct,
+    brandDealBoost: m.brandDealBoost,
+    repPerWeek: m.repPerWeek,
+    fitNote: m.type === "legend"     ? "She's heard your material and is making an exception."
+           : m.type === "aggressive" ? "He's been watching your numbers and wants in."
+           : m.type === "boutique"   ? "She loves your songwriting and would manage you personally."
+           :                            "He thinks you've got the makings of a real career.",
+  }));
 }
 
 // ─── PRODUCER RELATIONSHIPS ───────────────────────────────
@@ -1230,75 +558,6 @@ export const STUDIOS: Studio[] = [
 export function getStudio(id?: string | null): Studio | undefined {
   return STUDIOS.find(st => st.id === (id ?? "home_studio"));
 }
-
-// ═══════════════════════════════════════════════════════════════
-// RECORDING TIME SYSTEM — Dynamic weeks based on studio, producer, mode
-// ═══════════════════════════════════════════════════════════════
-
-export const STUDIO_TIME_MODIFIERS: Record<number, number> = {
-  0: 1.00, // Home Studio — baseline
-  1: 0.95, // Indie Room — 5% faster
-  2: 0.88, // Regional Pro — 12% faster
-  3: 0.80, // World-Famous — 20% faster
-  4: 0.72, // Legendary — 28% faster
-};
-
-export const PRODUCER_TIME_MODIFIERS: Record<number, number> = {
-  0: 1.00, // Self-Produced — baseline
-  1: 0.95, // Local — 5% faster
-  2: 0.90, // Mid-Level — 10% faster
-  3: 0.82, // Elite — 18% faster
-  4: 0.75, // Legend — 25% faster
-};
-
-export const RECORDING_MODE_CONFIG: Record<RecordingMode, { timeMult: number; costMult: number; qualityMod: number; burnoutMod: number; label: string }> = {
-  standard:   { timeMult: 1.00, costMult: 1.00, qualityMod: 0,  burnoutMod: 0,  label: "Standard" },
-  rush:       { timeMult: 0.50, costMult: 1.50, qualityMod: -5, burnoutMod: 8,  label: "Rush" },
-  deliberate: { timeMult: 1.50, costMult: 1.00, qualityMod: 4,  burnoutMod: 3,  label: "Deliberate" },
-};
-
-export const BASE_WEEKS_BY_FORMAT: Record<string, { base: number; perTrack: number }> = {
-  Single:      { base: 3,  perTrack: 0.8 },
-  EP:          { base: 6,  perTrack: 0.8 },
-  Album:       { base: 12, perTrack: 0.8 },
-  "Live Album": { base: 2,  perTrack: 0.3 },
-};
-
-// Calculate total recording weeks dynamically.
-// Formula: ceil((baseWeeks + tracks * perTrack) * studioMod * producerMod * modeMod)
-export function calculateRecordingWeeks(
-  type: ReleaseType,
-  trackCount: number,
-  studioId: string,
-  producerId: string,
-  mode: RecordingMode = "standard"
-): number {
-  const studio = STUDIOS.find(s => s.id === studioId);
-  const producer = PRODUCERS.find(p => p.id === producerId);
-  const studioTier = studio?.tier ?? 0;
-  const producerTier = producer?.tier ?? 0;
-
-  const config = BASE_WEEKS_BY_FORMAT[type] ?? { base: 3, perTrack: 0.8 };
-  const baseWeeks = config.base + (trackCount * config.perTrack);
-
-  const studioMod = STUDIO_TIME_MODIFIERS[studioTier] ?? 1.0;
-  const producerMod = PRODUCER_TIME_MODIFIERS[producerTier] ?? 1.0;
-  const modeMod = RECORDING_MODE_CONFIG[mode].timeMult;
-
-  const total = Math.ceil(baseWeeks * studioMod * producerMod * modeMod);
-  return Math.max(1, total);
-}
-
-// Compute the "standard" weeks for a project (used by Deliberate mode burnout calc)
-export function getStandardRecordingWeeks(
-  type: ReleaseType,
-  trackCount: number,
-  studioId: string,
-  producerId: string
-): number {
-  return calculateRecordingWeeks(type, trackCount, studioId, producerId, "standard");
-}
-
 
 // ── FEATURES ───────────────────────────────────────────────
 // Each feature artist has personality, a hometown, a vibe, theme preferences,
@@ -1517,7 +776,7 @@ export function generateFeatureRequest(s: GameState): FeatureRequest | null {
   const TIER_IDEAL = [0, 12, 28, 55, 75];         // Sweet spot — similar-tier artists collab
   const TIER_FEES  = [0, 350, 2200, 9000, 28000]; // What they pay you, base
   const eligible = FEATURES.filter(f =>
-    (f.genres as string[]).includes(s.genre) &&
+    f.genres.includes(s.genre as any) &&
     s.fame >= TIER_GATES[f.tier] &&
     s.totalReleases >= 1
   );
@@ -1715,6 +974,9 @@ export function genFanReviews(outcome: string): FanReview[] {
 }
 
 export interface ReleasePresentation {
+  artworkBudget?: ArtworkBudget;
+  wardrobeStyle?: WardrobeStyle;
+  wardrobeReaction?: { reaction: string; fanMult: number; repDelta: number; msg: string };
   title: string;
   type: ReleaseType;
   outcome: ReleaseOutcome;
@@ -2442,44 +1704,117 @@ export function generateMerchReview(mood: "great"|"good"|"mixed"|"bad", week: nu
   };
 }
 
+// ── ALBUM ARTWORK ──────────────────────────────────────────
+export type ArtworkBudget = "diy" | "indie" | "pro" | "legendary";
+
+export interface ArtworkTier {
+  id: ArtworkBudget;
+  name: string;
+  cost: number;
+  qualityBonus: number;
+  physicalSalesMult: number;
+  vinylBoost: number;
+  desc: string;
+}
+
+export const ARTWORK_TIERS: ArtworkTier[] = [
+  { id:"diy",       name:"DIY Phone Pic",        cost:0,     qualityBonus:0,  physicalSalesMult:1.00, vinylBoost:1.00, desc:"A Polaroid on the porch. Honest, but invisible on a record-store shelf." },
+  { id:"indie",     name:"Indie Designer",       cost:800,   qualityBonus:4,  physicalSalesMult:1.12, vinylBoost:1.18, desc:"Local artist, hand-lettered. Gets shared on Instagram." },
+  { id:"pro",       name:"Pro Art Director",     cost:3500,  qualityBonus:8,  physicalSalesMult:1.22, vinylBoost:1.30, desc:"Industry portfolio. Looks like it belongs in a vinyl bin." },
+  { id:"legendary", name:"Legendary Cover Artist",cost:12000, qualityBonus:14, physicalSalesMult:1.35, vinylBoost:1.50, desc:"The name alone moves units. Collectors will buy two." },
+];
+
+export function getArtworkTier(id?: ArtworkBudget | null): ArtworkTier | undefined {
+  return ARTWORK_TIERS.find(a => a.id === (id ?? "diy"));
+}
+
+// ── STAGE DESIGN ───────────────────────────────────────────
+export type StageDesign = "minimalist" | "intimate" | "theatrical" | "pyro";
+
+export interface StageDesignDef {
+  id: StageDesign;
+  name: string;
+  costPerShow: number;
+  fanMult: number;
+  reviewBonus: number;
+  repRisk: number;
+  desc: string;
+  unlockFame: number;
+}
+
+export const STAGE_DESIGNS: StageDesignDef[] = [
+  { id:"minimalist", name:"Minimalist",     costPerShow:0,    fanMult:1.00, reviewBonus:0,  repRisk:0, desc:"You, the mic, and the songs. Cheap. Honest. Dependable.", unlockFame:0 },
+  { id:"intimate",   name:"Living Room Set",costPerShow:150,  fanMult:1.08, reviewBonus:2,  repRisk:0, desc:"Rugs, lamps, a couch on stage. Feels like a secret show.", unlockFame:8 },
+  { id:"theatrical", name:"Theatrical",     costPerShow:800,  fanMult:1.15, reviewBonus:5,  repRisk:2, desc:"Backdrops, lighting cues, costume changes. Big rooms only.", unlockFame:25 },
+  { id:"pyro",       name:"Pyro & Spectacle",costPerShow:2200,fanMult:1.22, reviewBonus:8,  repRisk:5, desc:"Fire, smoke, and a lighting rig that needs its own truck. Arena-grade.", unlockFame:55 },
+];
+
+export function getStageDesign(id?: StageDesign | null): StageDesignDef | undefined {
+  return STAGE_DESIGNS.find(d => d.id === (id ?? "minimalist"));
+}
+
+// ── WARDROBE / ERA LOOKS ───────────────────────────────────
+export type WardrobeStyle = "classic" | "modern" | "glam" | "raw" | "vintage" | "western" | "rebel";
+
+export interface WardrobeDef {
+  id: WardrobeStyle;
+  name: string;
+  icon: string;
+  tags: string[];
+  consistencyBonus: number;
+  evolutionMult: number;
+  selloutRisk: number;
+  desc: string;
+}
+
+export const WARDROBE_STYLES: WardrobeDef[] = [
+  { id:"classic",  name:"Classic Country", icon:"🤠", tags:["country","traditional","roots"], consistencyBonus:1, evolutionMult:1.00, selloutRisk:0.02, desc:"Nudie suits, boots, the look that never left." },
+  { id:"western",  name:"Western Wear",    icon:"🌵", tags:["country","western","outdoor"], consistencyBonus:1, evolutionMult:1.02, selloutRisk:0.02, desc:"Denim, dust, and wide-brim hats. Road-tested." },
+  { id:"vintage",  name:"Vintage Revival", icon:"📻", tags:["retro","classic","nostalgia"], consistencyBonus:2, evolutionMult:1.04, selloutRisk:0.03, desc:"Thrift-store gold. Looks like your granddad's yearbook." },
+  { id:"raw",      name:"Raw & Unpolished",icon:"🪵", tags:["roots","honest","grit"],      consistencyBonus:1, evolutionMult:1.01, selloutRisk:0.01, desc:"Flannel, worn jeans, no pretense. The anti-look." },
+  { id:"rebel",    name:"Outlaw Rebel",    icon:"🔥", tags:["rebel","edge","dark"],        consistencyBonus:1, evolutionMult:1.03, selloutRisk:0.04, desc:"Black leather, scars, and a don't-care glare." },
+  { id:"modern",   name:"Modern Clean",    icon:"✨", tags:["clean","current","polished"],  consistencyBonus:0, evolutionMult:0.95, selloutRisk:0.06, desc:"Tailored, contemporary, Instagram-ready. Some call it progress." },
+  { id:"glam",     name:"Glam & Flash",    icon:"💎", tags:["flash","glam","pop"],          consistencyBonus:0, evolutionMult:0.88, selloutRisk:0.10, desc:"Sequins, bold colors, stage makeup. A hard pivot from dusty roots." },
+];
+
+export function getWardrobe(id?: WardrobeStyle | null): WardrobeDef | undefined {
+  return WARDROBE_STYLES.find(w => w.id === (id ?? "raw"));
+}
+
+export function evaluateWardrobeChange(
+  prev: WardrobeStyle | null,
+  next: WardrobeStyle,
+  history: WardrobeStyle[],
+  fame: number
+): { reaction: string; fanMult: number; repDelta: number; msg: string } {
+  if (prev === next) {
+    const w = getWardrobe(next)!;
+    return { reaction: "consistency", fanMult: 1.0, repDelta: w.consistencyBonus, msg: `Staying ${w.name} — fans respect the commitment.` };
+  }
+  const prevDef = prev ? getWardrobe(prev) : null;
+  const nextDef = getWardrobe(next)!;
+  if (!prevDef) {
+    return { reaction: "fresh", fanMult: 1.0, repDelta: 0, msg: `First impression: ${nextDef.name}.` };
+  }
+  const shared = prevDef.tags.filter(t => nextDef.tags.includes(t)).length;
+  const totalUnique = new Set([...prevDef.tags, ...nextDef.tags]).size;
+  const overlap = shared / Math.max(1, totalUnique);
+  if (overlap >= 0.35) {
+    const bonus = Math.min(3, Math.floor(fame / 20));
+    return { reaction: "evolution", fanMult: nextDef.evolutionMult, repDelta: 2 + bonus, msg: `Fans see the ${prevDef.name} → ${nextDef.name} shift as growth. +${2 + bonus} rep.` };
+  } else {
+    return { reaction: "selling_out", fanMult: nextDef.evolutionMult, repDelta: -1, msg: `${nextDef.name}? A bold departure from ${prevDef.name}. Some fans are calling it a sellout move.` };
+  }
+}
+
 // ── WORD BANKS ─────────────────────────────────────────────
 const TW = {
-  adj: [
-    // Weather & atmosphere
-    "Cold","Dark","Dusty","Faded","Heavy","Hollow","Lost","Lonesome","Low","Midnight","Rainy","Red","Rusty","Silent","Smoky","Stormy","Sunburned","Thunder","Yellow","Pale","Angry","Bitter","Broken","Burning","Crying","Crooked","Desperate","Drunk","Empty","Fading","Forgotten","Golden","Gone","Grieving","Guilty","Hard","Haunted","Heartless","Hurting","Jealous","Barefoot","Backroads","Cotton","Copper","Cracked","Gravel","Iron","Muddy","Neon","Painted","Porch","Ragged","River","Rustic","Scarred","Steel","Stone","Tangled","Tin","Worn","Ancient","Dead","Early","Final","Last","Late","Long","Old","Slow","Still","Wicked","Wild","Weary","Wayward","Wandering","Tender","Troubled","Twisted","Unnamed","Crooked",
-    // Expanded
-    "Aching","Acid","Aged","Alabaster","Almond","Amber","Ample","Angelic","Anxious","Arctic","Ashen","Auburn","Autumn","Awake","Azure","Bad","Bald","Baleful","Balsam","Banded","Barren","Bashful","Battered","Beaten","Beautiful","Beckoning","Bedraggled","Beloved","Bent","Bereaved","Bereft","Bewitched","Big","Biting","Bittersweet","Black","Blazing","Bleak","Blessed","Blind","Blissful","Blithe","Blond","Blood","Bloodshot","Bloody","Blown","Blue","Blunt","Blushing","Boiling","Bold","Bony","Boreal","Bored","Boring","Borrowed","Bothered","Bountiful","Brackish","Braided","Brave","Brazen","Breakable","Breezy","Brick","Brief","Bright","Brilliant","Briny","Brittle","Broad","Broken","Bronze","Brooding","Brown","Brutal","Bubbling","Buckskin","Buffalo","Bulky","Bumpy","Burned","Burnished","Bushy","Busy","Buttered","Buzzing","Cactus","Calico","Calm","Camouflage","Canary","Candid","Candy","Canyon","Capable","Caramel","Carefree","Careful","Careless","Caring","Carpeted","Carved","Catalpa","Cautious","Cedar","Celebrated","Celestial","Cellar","Ceramic","Certain","Chained","Chalky","Champagne","Chapped","Charcoal","Charged","Charming","Charred","Chaste","Cheap","Cheeky","Cheerful","Cheery","Cherry","Chestnut","Chewed","Chilly","Chiseled","Chocolate","Choking","Chopped","Chosen","Chrome","Chunky","Cinder","Cinnamon","Circular","Citrus","Civil","Clammy","Claret","Classic","Clay","Clean","Clear","Clever","Clinging","Clinical","Clockwork","Clouded","Cloudy","Clumsy","Coarse","Coastal","Cobalt","Cocked","Cocoa","Coffee","Coin","Cold","Collapsing","Colossal","Colorful","Colossal","Combustible","Comely","Comfortable","Common","Compact","Competent","Complete","Complex","Composed","Compressed","Concrete","Condemned","Confident","Confused","Conscious","Constant","Contemptuous","Content","Contrite","Cooked","Cool","Copper","Coral","Corduroy","Core","Corn","Cornflower","Corpse","Cosmic","Costly","Cotton","Coughing","Country","Courageous","Courteous","Covered","Cowardly","Cracked","Crafty","Craggy","Crammed","Cranberry","Craven","Crazed","Cream","Creamy","Creative","Creeping","Crimson","Crinkled","Crisp","Critical","Crooked","Cross","Crowded","Crude","Cruel","Crumbled","Crushed","Crying","Crystal","Cubic","Cunning","Curious","Curly","Current","Curved","Custom","Cut","Cyan","Dainty","Damp","Dancing","Dandelion","Dapper","Daring","Dark","Dashing","Dawn","Daylight","Dazzling","Dead","Deadly","Dear","Deathly","Decent","Decimal","Decrepit","Deep","Defeated","Defiant","Definite","Delicate","Delicious","Delightful","Delirious","Delta","Demure","Dense","Dental","Departed","Dependent","Depraved","Desert","Desolate","Desperate","Devilish","Devoted","Diamond","Difficult","Digital","Diligent","Dim","Dimpled","Dingy","Dinner","Dire","Dirty","Discreet","Dismal","Distant","Distinct","Distorted","Divine","Dizzy","Docile","Doleful","Dollar","Dolomite","Done","Doomed","Dope","Dotted","Double","Dough","Dove","Drab","Drafty","Drained","Dreaded","Dreaming","Dreary","Dressed","Dried","Drifting","Dripping","Driven","Droll","Dropping","Drowned","Drunken","Dry","Dual","Dull","Dumb","Dusky","Dusty","Dutch","Dying","Dynamic","Eager","Early","Earnest","Earth","Earthen","Earthly","Earthy","Eastern","Easy","Ebon","Ebony","Echoing","Economic","Ecru","Edible","Educated","Eerie","Effective","Efficient","Effortless","Egg","Elastic","Elder","Electric","Elegant","Elemental","Elephant","Elevated","Elfin","Elite","Elm","Eloquent","Embarrassed","Emerald","Emotional","Empty","Enchanted","Endless","Energetic","Engaged","English","Engraved","Enormous","Enough","Enraged","Entire","Epic","Equal","Eternal","Ethical","Even","Evergreen","Every","Evil","Exact","Exalted","Excellent","Excited","Exciting","Executive","Exhausted","Exotic","Expected","Expensive","Expert","Explicit","Exploding","Express","Extended","Extra","Extreme","Eyed","Fabled","Faded","Faint","Fair","Faithful","Fake","Falling","False","Familiar","Famous","Fancy","Fantastic","Far","Fast","Fatal","Fatherly","Fatigued","Faulty","Favorable","Favorite","Fearful","Fearless","Feather","Feeble","Feigned","Feline","Female","Feral","Fertile","Fervent","Festive","Fickle","Fierce","Fiery","Fifth","Filthy","Final","Fine","Finicky","Fire","Firm","First","Fish","Fishing","Fisted","Fitting","Fixed","Flaky","Flame","Flannel","Flash","Flat","Flawed","Flawless","Fleeting","Flesh","Flexible","Flimsy","Flint","Floral","Flourishing","Flowing","Fluent","Fluffy","Fluid","Fluorescent","Flying","Foam","Focal","Foggy","Folding","Folksy","Fond","Foolish","Forbidden","Forceful","Foreign","Forest","Forever","Forged","Forgetful","Forgotten","Formal","Former","Formidable","Forsaken","Fortunate","Fossil","Foul","Found","Fourth","Fragile","Fragrant","Frail","Frank","Frantic","Frayed","Freakish","Free","Freezing","French","Frequent","Fresh","Fretted","Friendly","Frightened","Frightful","Frigid","Frilly","Frivolous","Frizzy","Front","Frost","Frosted","Frozen","Frugal","Fruit","Fuchsia","Full","Fumbling","Functional","Fundamental","Funereal","Funny","Furious","Furry","Further","Furtive","Fussy","Future","Fuzzy","Gabled","Gagged","Gallant","Galloping","Gambling","Game","Gaping","Garden","Garish","Garnet","Gaseous","Gaudy","Gaunt","Gauzy","Gawky","General","Generous","Genial","Genteel","Gentle","Genuine","Geographic","Ghost","Ghostly","Giant","Giddy","Gifted","Gigantic","Gilded","Ginger","Gingham","Girlish","Given","Giving","Glacial","Glad","Glaring","Glass","Glassy","Gleaming","Glib","Glistening","Glittering","Global","Gloomy","Glorious","Glossy","Glowing","Gluey","Glum","Gnarled","Gold","Golden","Good","Goose","Gossamer","Gothic","Graceful","Gracious","Gradual","Grand","Grandiose","Graphic","Grateful","Grave","Gray","Greasy","Great","Greedy","Green","Grieving","Grim","Grimy","Grinning","Gritty","Grizzled","Gross","Grotesque","Ground","Growing","Grown","Grubby","Gruesome","Gruff","Guilty","Gullible","Gummy","Gunny","Gusty","Gutted","Gutter","Haggard","Hairy","Half","Halting","Handsome","Handy","Happy","Hard","Hardy","Harebrained","Harmful","Harmless","Harmonic","Harsh","Hasty","Hated","Hateful","Haughty","Haunted","Hazel","Hazy","Heady","Healthy","Heartbroken","Hearty","Heather","Heavenly","Heavy","Hefty","Heinous","Heliotrope","Helpful","Helpless","Hemp","Herbal","Hereditary","Heroic","Hickory","Hidden","Hideous","High","Hilarious","Hilly","Hindered","Hip","Hissing","Hoarse","Hollow","Holy","Home","Homely","Honest","Honey","Honeyed","Honorary","Hopeful","Hopeless","Horizontal","Horned","Horrible","Horrid","Horrific","Hospitable","Hostile","Hot","Hourly","House","Howling","Huffy","Huge","Humble","Humid","Humiliated","Humming","Hundred","Hungry","Hunted","Hurried","Hurt","Hushed","Husky","Hydraulic","Hygienic","Hype","Icy","Ideal","Identical","Idle","Idyllic","Ignorant","Ill","Illegal","Illuminated","Illusive","Imaginary","Immaculate","Immense","Immortal","Impatient","Imperial","Implicit","Impossible","Impressive","Improved","Impure","Inane","Incandescent","Incessant","Incidental","Incomplete","Inconvenient","Increasing","Incredible","Indecent","Indigo","Indolent","Indoor","Industrial","Inept","Inert","Infamous","Infant","Inferior","Infinite","Infirm","Inflamed","Informal","Inherent","Initial","Injured","Inky","Inland","Inner","Innocent","Inquisitive","Insane","Insecure","Inside","Insidious","Insignificant","Insistent","Instant","Intact","Integral","Intense","Intent","Interim","Internal","International","Intimate","Intrepid","Intricate","Intriguing","Intrinsic","Invaluable","Inverse","Invisible","Inviting","Involved","Iridescent","Iron","Ironic","Irregular","Irritable","Irritated","Isinglass","Island","Isolated","Itchy","Ivory","Jade","Jagged","Jasper","Jaunty","Jealous","Jerry","Jet","Jigsaw","Jinxed","Jittery","Jobless","Jockey","Jolly","Jovial","Joyful","Joyous","Jubilant","Judicial","Juicy","Jumbled","Jumbo","Junior","Juniper","Just","Jute","Keen","Key","Kind","Kindred","Kinetic","Kingly","Kinky","Knavish","Knee","Knitted","Knobby","Knotted","Knowing","Known","Kooky","Labored","Lacy","Lame","Lamented","Languid","Lanky","Large","Last","Late","Latent","Lateral","Latin","Laurel","Lavender","Lawful","Lazy","Lead","Leafy","Lean","Learned","Leather","Leathery","Leaving","Left","Legal","Legendary","Legitimate","Lemon","Lengthy","Lenient","Lethal","Level","Lewd","Liberal","Lichen","Licit","Lied","Life","Light","Lightning","Likable","Lilac","Lily","Limber","Limited","Limp","Limpid","Linden","Linear","Linen","Lingering","Lion","Liquid","Listless","Literal","Literate","Little","Live","Lively","Livid","Living","Loaded","Loamy","Local","Locust","Lone","Lonely","Long","Loose","Lopsided","Lordly","Lost","Loud","Lousy","Loutish","Lovely","Loving","Low","Lower","Loyal","Lucid","Lucky","Lumbering","Luminous","Lumpish","Lunar","Lurid","Lush","Lustrous","Luxe","Luxuriant","Luxurious","Lying","Lyrical","Macabre","Magenta","Magic","Magical","Magnificent","Mahogany","Maiden","Main","Majestic","Major","Makeshift","Male","Malignant","Mammoth","Mango","Manic","Manual","Many","Maple","Marble","Marginal","Marine","Maritime","Marked","Maroon","Married","Marshy","Marvelous","Masculine","Masked","Massive","Master","Mat","Matchless","Material","Maternal","Matte","Mature","Mauve","Maximum","Meager","Mean","Measly","Meat","Meaty","Mechanical","Medical","Mediocre","Medium","Meek","Melancholy","Mellow","Melodic","Memorable","Menacing","Mental","Mercenary","Merciful","Mercurial","Mere","Merino","Merry","Mesquite","Metal","Metallic","Meteor","Methodical","Metropolitan","Mica","Micro","Mid","Middle","Mighty","Mild","Military","Milky","Milled","Million","Mimosa","Mindful","Mineral","Mini","Minimal","Minimum","Minor","Mint","Minute","Miraculous","Mirthful","Miserable","Miserly","Misguided","Misty","Mixed","Moaning","Mobile","Mock","Mocking","Modern","Modest","Moist","Molasses","Moldy","Molecular","Momentary","Monarch","Money","Monotone","Monstrous","Monthly","Moody","Moonlit","Moral","More","Morning","Mossy","Mother","Motor","Mottled","Mountain","Mournful","Mousy","Moving","Muddy","Mulberry","Multiple","Mumbling","Mundane","Municipal","Murky","Murmuring","Muscle","Muscular","Mushroom","Musical","Mustard","Musty","Mute","Muted","Mutual","Mysterious","Mystic","Mythic","Nacre","Naive","Naked","Nameless","Napping","Nappy","Narrow","Nasty","National","Native","Natural","Naughty","Nautical","Near","Neat","Necessary","Needy","Negative","Neglected","Neighborly","Neon","Nervous","Net","Neutral","New","Next","Nice","Nifty","Night","Nightly","Nimble","Nine","Ninth","Noble","Nocturnal","Noisy","Nomad","Nonstop","Noon","Normal","North","Northern","Northwest","Norwegian","Nostalgic","Notable","Noted","Noteworthy","Novel","Noxious","Nude","Null","Numb","Numerous","Nursery","Nurturing","Nut","Nutty","Nylon","Oaken","Oat","Obedient","Obese","Objectionable","Obliging","Oblique","Obscure","Obsequious","Observant","Obsessive","Obsolete","Obtuse","Obvious","Occasional","Ocean","Ochre","Odd","Off","Offensive","Official","Often","Oiled","Oily","Old","Olive","Olympic","Ominous","Omnipotent","Once","One","Only","Opaque","Open","Opposing","Orange","Orbital","Orchard","Ordinary","Organic","Ornamental","Ornery","Ostrich","Other","Otherwise","Outer","Outgoing","Outlaw","Outrageous","Outspoken","Over","Overcast","Overgrown","Overjoyed","Overseas","Overt","Owl","Owned","Oxidized","Oyster","Padded","Painful","Painted","Pale","Pallid","Palm","Paltry","Pampas","Panama","Panicked","Papery","Paper","Parched","Parental","Parliament","Parlor","Partial","Particular","Passing","Passionate","Passive","Past","Pastel","Pastoral","Patent","Patient","Patriotic","Patterned","Paved","Peaceful","Peach","Peaked","Peanut","Pearl","Pearly","Peat","Pecan","Peculiar","Pedestrian","Peeling","Peerless","Pelt","Penny","Pepper","Peppery","Perennial","Perfect","Perfumed","Periodic","Periwinkle","Permanent","Permissive","Perpetual","Perplexed","Persistent","Personal","Persuasive","Pert","Perverse","Petite","Petrified","Pewter","Phantom","Phony","Physical","Piano","Picked","Picky","Pied","Piercing","Pig","Pigeon","Pike","Piled","Pine","Pink","Pint","Pious","Piquant","Pitch","Pitted","Placid","Plain","Planetary","Plant","Plastic","Platinum","Plausible","Playful","Pleasant","Pleased","Pleasing","Plentiful","Pliable","Plodding","Plum","Plump","Plush","Pneumatic","Poached","Pocket","Poetic","Pointed","Pointless","Poison","Polished","Polite","Political","Pollen","Polka","Pomegranate","Pompous","Pond","Poor","Poplar","Popular","Porous","Portable","Portly","Positive","Possible","Potato","Potential","Pottery","Powder","Powdered","Powerful","Practical","Precious","Precise","Predatory","Prehistoric","Preliminary","Premier","Premium","Preoccupied","Present","Presidential","Pretty","Previous","Priceless","Prickly","Prime","Primitive","Princely","Prior","Prismatic","Private","Privileged","Prized","Probable","Productive","Profane","Profound","Profuse","Programmed","Progressive","Prominent","Promised","Prompt","Proper","Prophetic","Prospective","Prosperous","Protective","Proud","Provincial","Prudent","Psychedelic","Public","Puckered","Puffy","Pungent","Puny","Pure","Purple","Pursued","Pushy","Putrid","Puzzled","Puzzling","Quaint","Qualified","Quartered","Queasy","Queenly","Querulous","Questionable","Quick","Quiet","Quilted","Quirky","Quitting","Rabid","Racing","Radiant","Radical","Radio","Ragged","Rainbow","Rainy","Rambling","Random","Rapid","Rare","Rascally","Rash","Raspberry","Ratty","Ravenous","Raw","Ready","Real","Rebel","Rebellious","Recent","Reckless","Reclining","Red","Redolent","Refined","Reflective","Regal","Regular","Reindeer","Relative","Relaxed","Relentless","Reliable","Relieved","Reluctant","Remarkable","Remorseful","Remote","Removable","Renewed","Rent","Repeated","Repentant","Replete","Reported","Reptile","Required","Rescue","Resident","Resilient","Resolute","Resonant","Respectable","Respectful","Resplendent","Responsible","Restful","Restive","Restless","Restored","Retired","Retreating","Revealed","Reverent","Reverse","Revolving","Rewarding","Rhetorical","Ribbed","Rich","Ridden","Ridiculous","Right","Rigid","Ringed","Ripe","Risen","Rising","Risky","Ritual","Rival","Roaring","Roasted","Robust","Rocky","Roguish","Rolling","Roman","Romantic","Roomy","Rooted","Rosy","Rotary","Rotten","Rough","Round","Rowdy","Royal","Rubber","Ruby","Ruddy","Rude","Rugged","Ruined","Ruling","Rumpled","Rural","Rushed","Russet","Rust","Rustic","Rusty","Ruthless","Rutted","Sable","Sacred","Sad","Saddle","Safe","Saffron","Sage","Sailor","Saintly","Salmon","Salt","Salty","Sandy","Sanguine","Sap","Sapphire","Sassy","Satin","Satiny","Savage","Savory","Scabby","Scalded","Scaly","Scandalous","Scant","Scarce","Scared","Scarlet","Scary","Scented","Scholarly","Scientific","Scorched","Scornful","Scottish","Scoured","Scowling","Scraggy","Scrambled","Scraped","Scratchy","Scrawny","Screaming","Screeching","Screwball","Scrubby","Sculpted","Seaborne","Sealed","Seared","Seasonal","Seaworthy","Second","Secret","Secure","Sedate","Seductive","Seedy","Seemly","Select","Selfish","Senior","Sensible","Sensitive","Sensual","Sentimental","Separate","Serene","Serious","Serpentine","Servile","Set","Settled","Seven","Seventh","Several","Severe","Shabby","Shaded","Shadow","Shadowy","Shady","Shaggy","Shaky","Shallow","Shameful","Shameless","Shaped","Sharp","Shaven","Sheepish","Sheer","Shell","Sheltered","Shifty","Shimmering","Shining","Shiny","Shivering","Shocked","Shocking","Shoddy","Short","Shrewd","Shrill","Shriveled","Shrubby","Shy","Sick","Side","Silken","Silky","Silver","Silvery","Simple","Sincere","Sinful","Single","Singular","Sinking","Siren","Sisterly","Six","Sixth","Skeletal","Sketchy","Skilled","Skillful","Skinny","Slack","Slanted","Slapstick","Slate","Sleeping","Sleepy","Sleek","Slick","Slight","Slim","Slinky","Slippery","Sloppy","Slothful","Slow","Sluggish","Slumbering","Sly","Small","Smart","Smashing","Smelly","Smiling","Smitten","Smoky","Smooth","Smudged","Snappy","Sneaky","Snide","Snobbish","Snoopy","Snug","Soaring","Sobbing","Sociable","Social","Soft","Soggy","Solar","Sole","Solemn","Solid","Solitary","Somber","Sooty","Sopping","Sorrel","Sorrowful","Sorry","Sound","Sour","Southern","Southwest","Spare","Sparkling","Sparse","Spatial","Speckled","Speedy","Spicy","Spidery","Spiky","Spinal","Spiral","Spirited","Spiritual","Spiteful","Splendid","Splintered","Spongy","Spooky","Spotted","Spotty","Spreading","Spring","Springy","Spry","Square","Squeaky","Squeezed","Squinting","Stable","Staccato","Stained","Stale","Stalwart","Standard","Standing","Star","Starchy","Stark","Starlight","Startled","Starving","Static","Steadfast","Steady","Stealthy","Steam","Steamy","Steel","Steely","Steep","Sterile","Stern","Sticky","Stiff","Still","Stilted","Stingy","Stinking","Stirred","Stock","Stoic","Stone","Stony","Stormy","Stout","Straggling","Straight","Strained","Strange","Strapping","Strategic","Straw","Strawberry","Streaked","Street","Strenuous","Strict","Strident","Striking","String","Striped","Strong","Structural","Stubborn","Stuck","Studied","Studious","Stuffed","Stumbling","Stumpy","Stunning","Stunted","Stupid","Sturdy","Stylish","Suave","Subdued","Subsequent","Substantial","Subtle","Suburban","Successful","Succulent","Sudden","Suede","Suffering","Sufficient","Sugar","Sugary","Sullen","Sultry","Summer","Summery","Sundry","Sunken","Sunny","Sunset","Super","Superb","Superior","Supple","Sure","Surly","Surprised","Suspicious","Swampy","Swanky","Sweaty","Sweet","Sweltering","Swift","Swimming","Swinging","Swollen","Sylvan","Sympathetic","Synthetic","Tacit","Tacky","Tactful","Tainted","Tall","Tame","Tangerine","Tangled","Tanned","Tapered","Tardy","Tart","Tasteful","Tawdry","Tawny","Teal","Tearful","Teasing","Technical","Tedious","Teeming","Teenage","Teeny","Telltale","Temperate","Temporal","Temporary","Tempting","Tender","Tense","Tentative","Tenth","Tepid","Terrible","Terrific","Territorial","Tertiary","Testy","Textile","Thankful","Thatched","Theatrical","Their","Thermal","Thick","Thin","Thinkable","Third","Thirsty","Thistle","Thorny","Thorough","Thoughtful","Thoughtless","Threadbare","Threatening","Three","Thrift","Thrifty","Thriving","Throaty","Throbbing","Through","Throwaway","Thumping","Thunderous","Thwarted","Tidal","Tidy","Tight","Timber","Timid","Tiny","Tipsy","Tired","Titanic","Toasted","Tobacco","Tolerable","Tomato","Tonal","Tongue","Tonic","Top","Topaz","Torn","Torpid","Torrential","Tortured","Torturous","Total","Tough","Towering","Toxic","Trace","Tragic","Trained","Traitorous","Tranquil","Transcendent","Transient","Translucent","Transparent","Trapped","Trashy","Tremendous","Trendy","Triangular","Tricky","Trim","Triple","Trivial","Tropical","Troubled","Truculent","Truffle","Truly","Trumpet","Truncated","Trusting","Trusty","Truthful","Tubby","Tulip","Tumbled","Turbulent","Turquoise","Tweed","Twelfth","Twelve","Twentieth","Twenty","Twiggy","Twin","Twisted","Twitching","Two","Typical","Tyrannical","Ugly","Ultimate","Ultramarine","Unable","Unacceptable","Unassuming","Unattached","Unaware","Unbalanced","Unbeatable","Unbecoming","Unbelievable","Unbending","Unbiased","Unblemished","Unbroken","Uncanny","Uncertain","Uncivil","Unclean","Uncluttered","Uncomfortable","Uncommon","Unconscious","Uncontrolled","Uncooked","Uncouth","Uncovered","Undaunted","Undead","Under","Understated","Underwater","Undone","Undying","Uneasy","Unearthly","Uneasy","Unequal","Uneven","Unexpected","Unfair","Unfaithful","Unfamiliar","Unfinished","Unfit","Unfolded","Unforgettable","Unfortunate","Unfriendly","Ungainly","Unhappy","Unhealthy","Unholy","Uniform","Unilateral","Unimportant","Uninhibited","Uninterested","Unique","United","Universal","Unknown","Unlawful","Unlikely","Unlimited","Unlined","Unlucky","Unmarked","Unnatural","Unnecessary","Unnoticed","Unofficial","Unopened","Unpaid","Unpleasant","Unpopular","Unprepared","Unpretentious","Unprincipled","Unproductive","Unpromising","Unprotected","Unraveled","Unreal","Unreasonable","Unrefined","Unreliable","Unrelenting","Unremitting","Unrepentant","Unrequited","Unreserved","Unresolved","Unruffled","Unruly","Unsafe","Unsavory","Unscathed","Unseen","Unsettled","Unshaven","Unsightly","Unskilled","Unsocial","Unsound","Unsparing","Unspoiled","Unspoken","Unstable","Unsteady","Unstoppable","Unsuccessful","Unsuitable","Unsure","Unsuspecting","Unswerving","Untamed","Untapped","Untidy","Untimely","Untold","Untouched","Untrained","Untried","Untrue","Unused","Unusual","Unwanted","Unwary","Unwelcome","Unwell","Unwieldy","Unwilling","Unwise","Unwitting","Unworldly","Unworthy","Unwritten","Upbeat","Uppity","Upset","Uptight","Upturned","Urban","Urgent","Used","Useful","Useless","Usual","Utter","Vacant","Vague","Vain","Valiant","Valid","Valuable","Vanilla","Vapid","Variable","Varied","Varnished","Vast","Vegetable","Vegetal","Vegetarian","Vehement","Velour","Velvet","Velvety","Venerable","Vengeful","Venomous","Vented","Verbal","Verdant","Vermilion","Vertical","Very","Vested","Veteran","Viable","Vibrant","Vicious","Victorious","Viewable","Vigilant","Vigorous","Vile","Village","Villainous","Violet","Violent","Violet","Virgin","Virtual","Virtuous","Visceral","Viscous","Visible","Visual","Vital","Vitriolic","Vivid","Vocational","Voiceless","Volatile","Volcanic","Voluminous","Voluntary","Voracious","Vulgar","Vulnerable","Wacky","Wan","Wandering","Wanted","Warlike","Warm","Warming","Warped","Wary","Washable","Wasted","Watchful","Water","Watery","Wavering","Wax","Waxy","Wayward","Weak","Wealthy","Weary","Weathered","Weedy","Weekly","Weeping","Weighty","Weird","Welcome","Well","Western","Wet","Whimsical","Whispering","White","Whole","Wicked","Wide","Wild","Willing","Willow","Wily","Winding","Windy","Winged","Winning","Winter","Wintry","Wiry","Wise","Wishful","Wispy","Wistful","Withered","Witty","Wizard","Woebegone","Woeful","Wolfish","Wonderful","Wooden","Wool","Woolen","Woolly","Wordy","Workable","Working","Worldly","Worn","Worried","Worrying","Worthless","Worthy","Wounded","Wrathful","Wretched","Wrinkled","Wrong","Wry","Xeric","Yapping","Yawning","Yearly","Yearning","Yellow","Yielding","Young","Youthful","Yummy","Zany","Zealous","Zesty","Zigzag","Zinc","Zippy"
-  ],
-  noun: [
-    // Original
-    "Bayou","Creek","Delta","Dirt","Dust","Fields","Fog","Gravel","Hollow","Holler","Mountain","Mud","Pines","Rain","River","Road","Smoke","Storm","Swamp","Thunder","Barn","Bridge","Church","County","Crossroads","Front Porch","Highway","Jailhouse","Junction","Kitchen","Levee","Mill","Midnight","Old Town","Pasture","Railyard","Roadhouse","Saloon","Shack","Watering Hole","Blood","Bones","Ghost","Hands","Heart","Memory","Mind","Shadow","Skin","Soul","Spirit","Spine","Tears","Voice","Wound","Scar","Breath","Silence","Dream","Prayer","Bible","Bottle","Fiddle","Fire","Flame","Guitar","Grave","Lantern","Letter","Moon","Pistol","Rope","Saddle","Train","Whiskey","Wings","Wire","Wreath","Crown","Cross","Blues","Burden","Darkness","Debt","Faith","Freedom","Glory","Grace","Grief","Heaven","Hell","Hope","Justice","Kindness","Longing","Mercy","Pride","Promise","Regret","Sorrow",
-    // Expanded
-    "Abyss","Accident","Ace","Acorn","Act","Action","Actor","Adage","Adam","Adder","Address","Admiral","Advantage","Adventure","Advertisement","Advice","Aegis","Affair","Affection","Afternoon","Age","Agony","Agreement","Air","Airplane","Alarm","Ale","Alley","Alliance","Alligator","Alloy","Ally","Alphabet","Altar","Ambition","Amendment","Amulet","Anarchy","Anchor","Angel","Angle","Anger","Animal","Ankle","Anvil","Ape","Apology","Apparition","Apple","Arch","Architect","Argument","Aristocrat","Arm","Armor","Army","Arrow","Art","Article","Artist","Ash","Ashes","Asphalt","Assassin","Assembly","Asteroid","Athlete","Atlas","Atom","Attack","Attic","Attitude","Attorney","Auction","Aunt","Aura","Aurora","Author","Autumn","Avalanche","Avenue","Axe","Axiom","Babe","Baby","Back","Badge","Bag","Bait","Baker","Balance","Balcony","Ball","Ballad","Ballet","Balloon","Balm","Banana","Band","Bandit","Bang","Bank","Banner","Banquet","Banshee","Bar","Barb","Barbarian","Barbecue","Bard","Bargain","Bark","Barley","Barnacle","Baron","Barrel","Barrier","Basil","Basin","Basket","Bass","Bastion","Bat","Batch","Bath","Battery","Battle","Bay","Beach","Bead","Beam","Bean","Bear","Beard","Beast","Beat","Beauty","Beaver","Bed","Bee","Beef","Beer","Beetle","Beggar","Bell","Bellows","Belly","Belt","Bench","Bend","Benefit","Berry","Bet","Betrayal","Bible","Bicycle","Bid","Bigfoot","Bill","Bin","Bind","Biography","Bird","Birth","Biscuit","Bishop","Bit","Bite","Blackberry","Blade","Blame","Blanket","Blasphemy","Blaze","Bleach","Blessing","Blind","Blink","Bliss","Blizzard","Block","Blood","Bloom","Blossom","Blot","Blow","Blue","Bluebell","Bluebird","Bluff","Blur","Blush","Board","Boat","Bobcat","Body","Bog","Boil","Bolt","Bomb","Bond","Bone","Bonfire","Bongo","Bonus","Book","Boom","Boot","Border","Bore","Boss","Bottle","Bottom","Boulder","Boulevard","Bounce","Boundary","Bouquet","Bout","Bow","Bowl","Box","Boy","Brace","Bracelet","Brag","Braid","Brain","Brake","Branch","Brand","Brass","Brave","Bread","Break","Breakfast","Breath","Breeze","Brick","Bride","Bridge","Bridle","Brief","Brigade","Brim","Brine","Brink","Brit","Broccoli","Brochure","Bronco","Brook","Broom","Brother","Brow","Brownie","Brush","Bubble","Buck","Bucket","Buckle","Bud","Buddy","Buffalo","Bug","Bugle","Build","Building","Bulb","Bulk","Bull","Bullet","Bulletin","Bullfrog","Bum","Bumblebee","Bumper","Bunch","Bundle","Bunk","Bunker","Bunny","Bureau","Burger","Burglar","Burial","Burn","Bush","Business","Bust","Butcher","Butter","Buttercup","Butterfly","Button","Buy","Buyer","Buzz","Cabbage","Cabin","Cabinet","Cable","Cactus","Cafe","Cage","Cake","Calf","Call","Calm","Camel","Camp","Campfire","Can","Canal","Canary","Cancer","Candle","Candy","Cane","Cannon","Canoe","Canvas","Canyon","Cap","Cape","Capital","Captain","Car","Caravan","Carbon","Card","Cardinal","Care","Career","Cargo","Carpenter","Carpet","Carriage","Carrot","Cart","Carter","Cartoon","Case","Cash","Cask","Castle","Cat","Catalog","Catch","Caterpillar","Catfish","Cattle","Cauldron","Cave","Cavern","Cedar","Ceiling","Celebration","Cell","Cellar","Cemetery","Census","Centaur","Center","Century","Ceremony","Chain","Chair","Chalk","Challenge","Chamber","Champion","Chance","Chandelier","Change","Channel","Chaos","Chapel","Chapter","Charge","Chariot","Charity","Charm","Chart","Chase","Chasm","Chat","Chatter","Check","Cheek","Cheer","Cheese","Chef","Chemical","Cherry","Chess","Chest","Chestnut","Chicken","Chief","Child","Chill","Chimney","China","Chip","Chocolate","Choice","Choir","Choke","Church","Cigar","Cinder","Circle","Circus","Citizen","City","Clam","Clan","Clap","Clarinet","Clash","Clasp","Class","Claw","Clay","Clean","Clear","Clerk","Cliff","Climate","Climb","Climber","Clinic","Clock","Clod","Cloak","Clockwork","Clone","Close","Cloth","Cloud","Clover","Club","Clue","Clump","Cluster","Coach","Coal","Coast","Coat","Cobra","Cock","Cockpit","Cocoa","Code","Coffee","Coffin","Coil","Coin","Cola","Cold","Collar","College","Colony","Color","Colt","Column","Comb","Comet","Comfort","Comic","Command","Comment","Committee","Common","Compass","Competition","Complaint","Complex","Compound","Computer","Comrade","Concert","Concrete","Condition","Cone","Confession","Conflict","Confusion","Congress","Connection","Conquest","Conscience","Console","Conspiracy","Constable","Constant","Constitution","Construction","Contact","Contest","Context","Continent","Contract","Contrast","Control","Convent","Conversation","Convert","Cook","Cookie","Copper","Copy","Coral","Cord","Core","Cork","Corn","Corner","Corpse","Corsair","Cost","Costume","Cottage","Cotton","Couch","Cough","Council","Count","Counter","Country","County","Coup","Coupe","Courage","Course","Court","Cousin","Cove","Cover","Cow","Coward","Cowboy","Crab","Crack","Cracker","Cradle","Craft","Crane","Crash","Crate","Crawl","Craze","Cream","Creature","Credit","Creek","Creep","Crescent","Crest","Crew","Crib","Cricket","Crime","Crisis","Crisp","Critic","Crocodile","Crook","Crop","Cross","Crow","Crowd","Crown","Crude","Cruelty","Crumble","Crush","Crust","Cry","Crystal","Cub","Cuff","Cult","Cup","Curb","Cure","Curiosity","Curl","Curse","Curtain","Curve","Cushion","Custard","Custom","Customer","Cut","Cyanide","Cycle","Cyclone","Cylinder","Cymbal","Dad","Dagger","Daisy","Dale","Dam","Damage","Dame","Dance","Dancer","Danger","Dark","Dart","Dash","Data","Date","Daughter","Dawn","Day","Daylight","Dead","Deal","Dealer","Death","Debate","Debt","Deck","Deed","Deer","Defense","Defiance","Deficit","Degree","Deity","Delay","Delight","Delta","Demand","Demon","Den","Denim","Dent","Department","Departure","Deposit","Depth","Deputy","Derby","Desert","Design","Desk","Despair","Destiny","Destroyer","Detail","Detective","Detour","Device","Devil","Dew","Diamond","Diary","Dice","Dictator","Diet","Difference","Difficulty","Dig","Digger","Dime","Dinner","Dinosaur","Diplomat","Dirt","Disease","Dish","Disk","Display","Ditch","Dive","Diver","Divide","Divorce","Dock","Doctor","Document","Dog","Doll","Dollar","Dolphin","Domain","Dome","Donkey","Doom","Door","Dope","Dose","Dot","Double","Doubt","Dove","Down","Dozen","Draft","Drag","Dragon","Drain","Drama","Draw","Drawer","Dream","Dress","Drift","Drill","Drink","Drive","Driver","Drizzle","Drop","Drought","Drove","Drug","Drum","Drummer","Drunk","Dryad","Duck","Duet","Duke","Dune","Dungeon","Dusk","Dust","Dwarf","Dweller","Dye","Dynamite","Eagle","Ear","Earth","Earthquake","Easel","East","Eclipse","Edge","Edict","Editor","Education","Effect","Effort","Egg","Ego","Egypt","Elbow","Elder","Election","Electricity","Element","Elephant","Elevator","Elf","Elite","Elk","Elm","Ember","Emblem","Embryo","Emperor","Empire","Employee","End","Enemy","Energy","Engine","Engineer","England","Enigma","Enterprise","Entity","Entrance","Entry","Envoy","Epic","Epoch","Equal","Equation","Equipment","Era","Ermine","Error","Escape","Escort","Estate","Eternity","Ethics","Europe","Evening","Event","Evidence","Evil","Exam","Example","Exchange","Excuse","Exercise","Exit","Exile","Expanse","Expense","Experience","Expert","Explosion","Expression","Extent","Eye","Eyebrow","Eyelash","Fabric","Face","Fact","Factory","Failure","Fairy","Faith","Falcon","Fall","Fame","Family","Fan","Fang","Fantasy","Farce","Farm","Farmer","Fashion","Fast","Fat","Fate","Father","Fault","Favor","Fawn","Fear","Feast","Feather","Feature","Fee","Feed","Feel","Feeling","Feet","Fellow","Fence","Fern","Ferry","Festival","Fetter","Fever","Fiction","Fiddle","Field","Fiend","Fife","Fifth","Fight","Figure","File","Film","Filter","Fin","Finance","Finger","Finish","Fire","Firefly","Firm","First","Fish","Fisher","Fist","Fit","Fitting","Fix","Flag","Flame","Flare","Flash","Flask","Flat","Flavor","Flaw","Flea","Fleet","Flesh","Flicker","Flight","Flint","Flip","Float","Flock","Flood","Floor","Flora","Flour","Flower","Flu","Flute","Fly","Foam","Focus","Fog","Fold","Folk","Follower","Folly","Food","Fool","Foot","Force","Ford","Forest","Forge","Fork","Form","Format","Formula","Fort","Fortune","Fossil","Foul","Foundation","Fountain","Fox","Fraction","Fragrance","Frame","France","Frank","Fraud","Freak","Freedom","Freeze","Freight","French","Frequency","Fresh","Fret","Friction","Friend","Fringe","Frog","Front","Frost","Frown","Fruit","Fuel","Fugitive","Full","Fume","Fun","Function","Fund","Funeral","Fungus","Fur","Furnace","Fury","Future","Gadfly","Gage","Gag","Gain","Galaxy","Gale","Gall","Gallop","Gambler","Game","Gang","Gap","Garden","Garlic","Garnet","Gas","Gasket","Gate","Gateway","Gaze","Gear","Gecko","Gem","Gender","Gene","Genius","Genre","Gentleman","Geography","Gesture","Ghost","Giant","Gift","Giggle","Ginger","Girl","Gist","Glacier","Glade","Glance","Glare","Glass","Gleam","Glen","Glide","Glimmer","Glimpse","Globe","Gloom","Glory","Glove","Glow","Glue","Gnat","Gnome","Goat","Goblet","Goblin","God","Gold","Golf","Gondola","Gong","Good","Goodbye","Goose","Gopher","Gorge","Gospel","Gossip","Governor","Gown","Grace","Grade","Grain","Grammar","Grand","Grandfather","Grandmother","Grant","Grape","Graph","Grass","Gratitude","Grave","Gravel","Gravity","Gray","Grease","Great","Greed","Greek","Green","Greeting","Grey","Grief","Grill","Grimace","Grin","Grind","Grip","Grit","Groan","Grocery","Groom","Groove","Ground","Group","Grove","Growth","Grub","Guard","Guess","Guest","Guide","Guild","Guilt","Guitar","Gulf","Gully","Gum","Gun","Gunner","Gust","Gutter","Guy","Gym","Gypsy","Habit","Hail","Hair","Half","Hall","Halo","Ham","Hamburger","Hammer","Hand","Handful","Handle","Hands","Hang","Harbor","Hardship","Hare","Harm","Harmony","Harp","Harpy","Harvest","Hat","Hatch","Hate","Haul","Haven","Hawk","Hay","Hazard","Head","Headache","Healer","Health","Heap","Heart","Heat","Heath","Heaven","Hedge","Heel","Height","Heir","Helicopter","Hell","Helm","Help","Hem","Hen","Herd","Hero","Heron","Herring","Hickory","Hide","High","Highway","Hill","Hilt","Hind","Hint","Hip","Hiss","History","Hit","Hitch","Hive","Hoax","Hobby","Hobo","Hog","Hold","Hole","Holiday","Hollow","Holly","Home","Homework","Honesty","Honey","Hood","Hoof","Hook","Hope","Hopper","Horde","Horizon","Horn","Horror","Horse","Hose","Host","Hostage","Hostess","Hot","Hotel","Hound","Hour","House","Housing","Hover","Howl","Hug","Hull","Hum","Human","Humble","Humor","Hunch","Hunger","Hunt","Hunter","Hurdle","Hurricane","Hurry","Hurt","Husband","Hush","Hustle","Hyacinth","Hydra","Hymn","Hype","Ice","Idea","Ideal","Idiot","Idol","Illusion","Image","Impact","Imperial","Import","Impulse","Inch","Incident","Income","Increase","Index","India","Indian","Indigo","Industry","Infant","Inferno","Influx","Info","Ingot","Ink","Inlet","Inn","Insect","Inside","Insult","Intent","Interest","Internet","Interview","Invader","Invention","Iris","Iron","Island","Issue","Ivory","Jack","Jacket","Jade","Jaguar","Jail","Jam","Jar","Jaw","Jazz","Jealousy","Jeep","Jelly","Jerk","Jersey","Jet","Jewel","Jig","Jingle","Job","Jockey","Joke","Jolt","Journal","Journey","Joy","Judge","Jug","Juice","July","Jump","June","Jungle","Junk","Jury","Justice","Kale","Kangaroo","Karma","Kayak","Keg","Kennel","Kettle","Key","Keyboard","Kick","Kid","Killer","Kiln","Kind","King","Kingdom","Kink","Kiss","Kit","Kitchen","Kite","Kitten","Knee","Knife","Knight","Knit","Knob","Knock","Knot","Knowledge","Lab","Label","Labor","Laborer","Lace","Lack","Ladder","Lady","Lagoon","Lake","Lamb","Lamp","Lance","Land","Lane","Language","Lantern","Lap","Lapel","Lard","Lark","Lash","Lasso","Last","Latch","Laughter","Launch","Lava","Lawn","Lawyer","Layer","Lead","Leader","Leaf","League","Leak","Leap","Learning","Lease","Leather","Leave","Lecture","Ledger","Leech","Left","Leg","Legend","Legion","Lemon","Lender","Length","Lens","Lentil","Leopard","Lesson","Letter","Level","Lever","Leviathan","Liberty","Library","License","Lick","Lid","Lie","Life","Lift","Light","Lightning","Lilac","Lily","Limb","Limit","Limo","Line","Linen","Linger","Link","Lion","Lip","Liquid","List","Listen","Litany","Literature","Litter","Little","Liver","Lizard","Load","Loaf","Loan","Lobby","Lobster","Local","Lock","Locust","Lodge","Log","Logic","Lone","Lonely","Long","Look","Loop","Lord","Loss","Lot","Lotion","Lottery","Lounge","Love","Lover","Low","Luck","Luggage","Lumber","Lump","Lunch","Lung","Lure","Lush","Lust","Lute","Luxury","Lyric","Mace","Machine","Mad","Madam","Maggot","Magic","Magnet","Maid","Mail","Main","Major","Make","Maker","Male","Mall","Malt","Mammoth","Man","Mango","Manor","Mansion","Mantle","Map","Maple","Marble","March","Margin","Marigold","Marine","Mark","Market","Marriage","Marsh","Martyr","Marvel","Mascot","Mask","Mason","Mass","Master","Mat","Match","Mate","Material","Math","Matrix","Matter","Maul","May","Mayor","Maze","Meal","Mean","Meaning","Meat","Mechanic","Medal","Medicine","Medium","Meet","Meeting","Melody","Melt","Member","Membrane","Memorial","Memory","Menace","Mend","Mentor","Mercenary","Merchant","Mercy","Merit","Merry","Mesh","Mess","Message","Metal","Meteor","Method","Mice","Microphone","Middle","Midnight","Midst","Might","Mile","Milk","Mill","Miller","Million","Mind","Mine","Miner","Mineral","Minister","Minnow","Minor","Mint","Minute","Miracle","Mirror","Mirth","Misery","Miss","Mission","Mist","Mistake","Mix","Mixture","Moan","Mob","Mock","Mode","Model","Moderator","Modern","Mold","Mole","Moment","Monarch","Monday","Money","Mongoose","Monitor","Monkey","Monster","Month","Mood","Moon","Mop","Moral","Morning","Morsel","Mortal","Mosaic","Moss","Moth","Mother","Motion","Motive","Motor","Mound","Mountain","Mourner","Mouse","Mouth","Move","Movement","Mud","Mule","Mum","Murder","Muscle","Muse","Mushroom","Music","Musician","Mustard","Mutt","Mystery","Myth","Nail","Name","Nap","Napkin","Narcotic","Narrative","Nation","Native","Nature","Naval","Navy","Neck","Need","Needle","Neglect","Neighbor","Nerve","Nest","Net","Network","News","Newspaper","Nexus","Nibble","Nickel","Niece","Night","Nightmare","Nimbus","Nine","Nitrogen","Noble","Noise","Nomad","Noon","North","Nose","Note","Nothing","Notice","Noun","Novel","November","Nudge","Nugget","Null","Number","Nun","Nurse","Nut","Nutmeg","Nylon","Oaf","Oak","Oar","Oasis","Oath","Oatmeal","Obelisk","Object","Obligation","Oblivion","Oboe","Observation","Obsession","Ocean","Ocelot","October","Octopus","Ode","Odor","Offense","Offer","Office","Officer","Official","Offset","Ogre","Oil","Okra","Olive","Omega","Omen","Onion","Onset","Opera","Operation","Opinion","Opium","Opponent","Opportunity","Opposite","Oracle","Orange","Orbit","Orchestra","Orchid","Order","Ore","Organ","Organism","Organization","Orient","Origin","Ornament","Orphan","Osprey","Ostrich","Outback","Outfit","Outlaw","Outlet","Outlook","Output","Outside","Oval","Oven","Overcoat","Owl","Owner","Ox","Oxygen","Oyster","Pace","Pack","Packet","Pad","Page","Pail","Pain","Paint","Pair","Pal","Palace","Pale","Palm","Pamphlet","Pan","Pancake","Panda","Panel","Panic","Pant","Panther","Paper","Parachute","Parade","Paradise","Paragraph","Parallel","Paramount","Parcel","Pardon","Parent","Park","Parlor","Parrot","Part","Partner","Party","Pass","Passage","Passenger","Passion","Past","Pasture","Pat","Patch","Path","Patience","Patient","Patrol","Pattern","Pause","Pave","Paw","Pay","Peace","Peach","Peak","Pear","Pearl","Peasant","Peat","Pebble","Pedal","Peddler","Peg","Pelican","Pen","Penalty","Pencil","Penguin","Penny","People","Pepper","Percent","Perch","Perfect","Performance","Perfume","Period","Perk","Permission","Person","Perspective","Pest","Pet","Petal","Pew","Phantom","Phase","Pheasant","Philosophy","Phone","Photo","Phrase","Physic","Piano","Pick","Pickle","Picture","Pie","Piece","Pier","Pig","Pigeon","Pike","Pile","Pilgrim","Pill","Pillow","Pilot","Pimp","Pin","Pine","Pineapple","Pink","Pint","Pipe","Pirate","Pistol","Pit","Pitch","Pity","Place","Plague","Plain","Plan","Plane","Planet","Plant","Plantation","Plaster","Plate","Platform","Platinum","Play","Player","Plea","Pleasure","Pledge","Plenty","Plot","Plow","Pluck","Plug","Plum","Plumber","Plunge","Pocket","Poem","Poet","Poetry","Point","Poison","Poke","Poker","Pole","Police","Policy","Polish","Politics","Poll","Pollen","Polo","Pond","Pony","Pool","Poop","Pop","Pope","Poplar","Poppy","Population","Porch","Pork","Port","Porter","Portrait","Position","Possession","Post","Poster","Pot","Potato","Potion","Pouch","Pound","Poverty","Powder","Power","Practice","Prairie","Prayer","Preacher","Precaution","Precedent","Precipice","Predator","Preface","Prelude","Premier","Preparation","Presence","Present","President","Press","Pressure","Prestige","Pretense","Prey","Price","Pride","Priest","Primary","Prime","Prince","Princess","Print","Prison","Prize","Probation","Problem","Procedure","Process","Proclamation","Prodigy","Produce","Product","Profession","Professor","Profile","Profit","Program","Progress","Project","Promise","Proof","Prop","Prophet","Proposal","Prose","Prosecutor","Prospect","Protein","Protest","Protocol","Prowess","Prowl","Prune","Pry","Pub","Public","Puddle","Puff","Pug","Pull","Pulp","Pulse","Pump","Pumpkin","Punch","Punishment","Pup","Pupil","Puppet","Purchase","Pure","Purge","Purse","Push","Put","Puzzle","Pyramid","Quack","Quail","Quake","Quality","Quarry","Quarter","Queen","Quest","Question","Quicksand","Quiet","Quill","Quilt","Quince","Quit","Quiver","Quota","Rabbi","Rabbit","Raccoon","Race","Racer","Rack","Radar","Radiance","Radio","Raft","Rage","Raid","Rail","Railroad","Rain","Rainbow","Raise","Rake","Rally","Ram","Ranch","Range","Ranger","Rank","Ransom","Rap","Rascal","Rat","Rate","Ratio","Rattle","Raven","Ravine","Ray","Razor","Reaction","Read","Reader","Reading","Real","Realm","Rear","Reason","Rebel","Rebellion","Receipt","Receiver","Recess","Recipe","Record","Recorder","Recovery","Red","Reed","Reef","Reel","Refuge","Refugee","Refuse","Regard","Regent","Regiment","Region","Regret","Rein","Relation","Relative","Relief","Relish","Remain","Remains","Remark","Remedy","Remnant","Remote","Removal","Rendezvous","Renewal","Rent","Repair","Repast","Repeat","Report","Reporter","Repose","Request","Rescue","Research","Reserve","Reservoir","Resident","Residue","Resist","Resort","Resource","Respect","Rest","Restaurant","Result","Resume","Retreat","Return","Reunion","Revel","Revelation","Revenge","Revenue","Reverie","Review","Revolt","Revolution","Reward","Rhetoric","Rhubarb","Rhyme","Rhythm","Rib","Ribbon","Rice","Rich","Riches","Riddle","Ride","Rider","Ridge","Rifle","Right","Rigidity","Rim","Rind","Ring","Rink","Riot","Rip","Ripe","Ripple","Rise","Risk","Rite","Ritual","Rival","River","Rivulet","Road","Roar","Roast","Robber","Robe","Robin","Robot","Rock","Rocket","Rod","Rogue","Role","Roll","Romance","Rome","Roof","Room","Root","Rope","Rose","Rot","Rotation","Rouge","Rough","Round","Route","Routine","Row","Royal","Rubber","Ruby","Rudder","Ruff","Rug","Ruin","Rule","Ruler","Rumor","Run","Rune","Runner","Rush","Rust","Rut","Saber","Sack","Sacrifice","Saddle","Sadness","Safe","Safety","Saffron","Sage","Sail","Sailor","Saint","Salad","Salary","Sale","Salmon","Salon","Salt","Salute","Salvage","Sample","Sanction","Sand","Sandwich","Sap","Sapphire","Sash","Satellite","Satin","Satire","Sauce","Sausage","Savage","Save","Savior","Saw","Saxophone","Scale","Scalp","Scandal","Scare","Scarecrow","Scarf","Scene","Scent","Schedule","Scheme","Scholar","School","Science","Scientist","Scion","Scoop","Scope","Score","Scorn","Scout","Scrap","Scrape","Screen","Screw","Scribe","Script","Scroll","Scrub","Sculptor","Sea","Seal","Search","Season","Seat","Second","Secret","Secretary","Section","Sector","Security","Sedan","Seed","Seeker","Seer","Segment","Seizure","Self","Sell","Seller","Semester","Senate","Senator","Sensation","Sense","Sentence","Sentinel","Sentry","Sepal","Sequence","Serf","Sergeant","Serpent","Servant","Server","Service","Session","Set","Setting","Settle","Settlement","Seven","Sewer","Shack","Shade","Shadow","Shaft","Shag","Shaker","Shame","Shank","Shape","Share","Shark","Sharp","Shave","Shawl","Shear","Sheath","Shed","Sheep","Sheet","Shelf","Shell","Shelter","Shepherd","Sheriff","Shield","Shift","Shimmer","Shin","Ship","Shirt","Shiver","Shock","Shoe","Shoot","Shop","Shore","Short","Shot","Shoulder","Shout","Shovel","Show","Shower","Shred","Shrew","Shrine","Shrub","Shudder","Shuffle","Shun","Shut","Shutter","Sick","Side","Sidewalk","Sigh","Sight","Sign","Signal","Signature","Silence","Silk","Silver","Simmer","Sin","Singer","Single","Sink","Sinner","Sir","Siren","Sister","Sit","Site","Situation","Six","Size","Skate","Skeleton","Sketch","Ski","Skill","Skin","Skip","Skirt","Skull","Sky","Slab","Slag","Slam","Slander","Slap","Slash","Slave","Sled","Sleep","Sleet","Sleeve","Slice","Slick","Slide","Slim","Sling","Slip","Sliver","Slogan","Slope","Slot","Slug","Slum","Slump","Smack","Small","Smash","Smell","Smile","Smoke","Smudge","Snail","Snake","Snap","Snare","Sneak","Sneeze","Snob","Snore","Snow","Snug","Soap","Soccer","Sock","Socket","Soda","Sofa","Soft","Soil","Soldier","Sole","Solid","Solitude","Solution","Son","Song","Soot","Sophomore","Sorcerer","Sore","Sorrow","Sort","Soul","Sound","Soup","Source","South","Sow","Space","Spade","Span","Spar","Spare","Spark","Sparrow","Spasm","Spawn","Speak","Speaker","Spear","Special","Specialist","Species","Specimen","Spectacle","Specter","Spectrum","Speech","Speed","Spell","Sphere","Sphinx","Spice","Spider","Spike","Spill","Spin","Spine","Spiral","Spirit","Spit","Spite","Splash","Spleen","Splendor","Split","Spoil","Spoke","Sponge","Spoon","Sport","Spot","Spouse","Spray","Spread","Spring","Sprout","Spruce","Spur","Spy","Squad","Square","Squash","Squeak","Squid","Squirrel","Stab","Stable","Stack","Staff","Stage","Stain","Stair","Stake","Stalk","Stall","Stallion","Stamen","Stamp","Stand","Standard","Star","Starch","Stare","Start","Starvation","State","Statement","Station","Statue","Status","Stay","Steak","Steal","Steam","Steel","Steep","Steer","Stem","Step","Stereo","Stew","Stick","Stiff","Still","Sting","Stink","Stir","Stitch","Stock","Stoke","Stomach","Stone","Stool","Stop","Store","Storm","Story","Stove","Strain","Strand","Stranger","Strap","Straw","Stray","Streak","Stream","Street","Strength","Stress","Stretch","Strike","String","Strip","Stripe","Stroke","Stroll","Strong","Structure","Struggle","Student","Studio","Study","Stuff","Stump","Stunt","Style","Subject","Substance","Suburb","Subway","Success","Suck","Sudden","Suede","Suffering","Sugar","Suit","Sulfur","Sultan","Sum","Summer","Summit","Sun","Sunday","Sundown","Sunrise","Sunset","Sunshine","Super","Supply","Support","Supper","Surge","Surgery","Surprise","Surrender","Survey","Survivor","Suspect","Swallow","Swamp","Swan","Swarm","Sweat","Sweep","Sweet","Swell","Swift","Swim","Swing","Switch","Swoop","Sword","Symbol","Sympathy","Syndrome","Synonym","System","Table","Tack","Tackle","Tact","Tag","Tail","Tailor","Tale","Talent","Talk","Tallow","Tally","Talon","Tambourine","Tame","Tan","Tangle","Tank","Tanner","Tape","Taper","Tar","Target","Tart","Task","Taste","Tattoo","Tavern","Tax","Taxi","Tea","Teach","Teacher","Team","Tear","Tease","Teat","Technology","Teddy","Teen","Teeth","Telegram","Telephone","Telescope","Television","Temper","Temple","Tempo","Temptation","Tenant","Tendency","Tender","Tendon","Tennis","Tent","Tenth","Term","Termite","Tern","Terrace","Terrain","Terror","Test","Text","Texture","Thank","Thatch","Thaw","Theater","Theft","Theme","Theory","Therapy","Thicket","Thief","Thigh","Thimble","Thin","Thing","Think","Third","Thirst","Thorn","Thought","Thread","Threat","Thrift","Thrill","Throat","Throne","Throng","Throw","Thrust","Thud","Thumb","Thump","Thunder","Thwart","Tick","Ticket","Tide","Tiger","Tile","Till","Tilt","Timber","Time","Tin","Tincture","Tinder","Tip","Tire","Tissue","Title","Toad","Toast","Tobacco","Toe","Tofu","Toga","Toil","Token","Toll","Tomato","Tomb","Tome","Tone","Tongue","Tool","Tooth","Top","Topic","Torch","Tornado","Tortoise","Toss","Total","Touch","Tough","Tour","Tourist","Tow","Towel","Tower","Town","Toxin","Toy","Trace","Track","Trade","Trader","Tradition","Traffic","Trail","Train","Trainer","Trait","Tramp","Trance","Trap","Trash","Travel","Traveler","Tray","Treasure","Treasury","Treat","Treaty","Tree","Trek","Tremble","Trend","Trespass","Trial","Tribe","Tribune","Tribute","Trick","Trickle","Trigger","Trim","Trip","Triple","Troll","Trophy","Tropic","Trot","Trouble","Trough","Trout","Truce","Truck","Trudge","Trumpet","Trunk","Trust","Truth","Tuba","Tube","Tuck","Tug","Tulip","Tumble","Tumor","Tune","Tunic","Tunnel","Turkey","Turn","Turnip","Turtle","Tusk","Tutor","Twig","Twin","Twine","Twirl","Twist","Twitch","Type","Tyrant","Udder","Ugliness","Ulcer","Ultimatum","Umbrella","Uncle","Underdog","Underworld","Uniform","Union","Unit","Unity","Universe","University","Up","Update","Upgrade","Upper","Upset","Urchin","Urn","Use","Usher","Utensil","Utility","Utopia","Vacancy","Vacation","Vacuum","Vagrant","Vale","Valentine","Valet","Valley","Valor","Value","Valve","Vampire","Van","Vandal","Vane","Vanilla","Vanity","Vapor","Variable","Variant","Varnish","Vase","Vast","Vault","Veal","Vector","Veil","Vein","Velvet","Vendetta","Veneer","Venom","Vent","Venture","Verb","Verdict","Verge","Vermin","Verse","Version","Vessel","Vest","Vestige","Vet","Veteran","Veto","Vial","Vibe","Vice","Victim","Victory","View","Vigil","Villa","Village","Villain","Vine","Vinegar","Violet","Violin","Virtue","Virus","Visa","Vision","Visit","Visitor","Vista","Vitality","Vitamin","Vixen","Vocal","Vodka","Voice","Void","Volcano","Volume","Volunteer","Vomit","Vote","Voter","Vow","Voyage","Vulture","Wad","Waffle","Wage","Wagon","Waist","Wait","Wake","Walk","Walker","Wall","Walnut","Waltz","Wanderer","Want","War","Ward","Warden","Warehouse","Warfare","Warmth","Warning","Warrior","Wash","Wasp","Waste","Watch","Water","Waterfall","Watershed","Wave","Wax","Way","Weakness","Wealth","Weapon","Wear","Weasel","Weather","Weave","Web","Wedding","Wedge","Weed","Week","Weep","Weight","Weird","Welcome","Welfare","Well","West","Whale","Wheat","Wheel","Whip","Whirl","Whisper","Whistle","White","Whole","Wick","Widow","Width","Wife","Wig","Wild","Will","Willow","Win","Wind","Window","Wine","Wing","Wink","Winner","Winter","Wire","Wisdom","Wish","Wit","Witch","Withdrawal","Witness","Wolf","Woman","Wonder","Wood","Woodpecker","Wool","Word","Work","Worker","Workshop","World","Worm","Worry","Worship","Wound","Wrack","Wrath","Wreck","Wren","Wrench","Wrestler","Wrinkle","Wrist","Write","Writer","Writing","Wrong","Wryneck","Yacht","Yam","Yard","Yarn","Yawn","Year","Yeast","Yell","Yellow","Yelp","Yield","Yodel","Yoga","Yolk","Young","Youth","Yucca","Zany","Zebra","Zenith","Zero","Zest","Zigzag","Zinc","Zip","Zone","Zoo","Zoom"
-  ],
-  verb: [
-    // Original
-    "Aching","Bleeding","Breaking","Burning","Carrying","Chasing","Crawling","Crying","Drifting","Drinking","Driving","Drowning","Dying","Fading","Falling","Fighting","Gambling","Grieving","Haunting","Healing","Hiding","Holding","Howling","Hurting","Leaving","Lying","Missing","Moaning","Mourning","Paying","Preaching","Praying","Reckoning","Riding","Rising","Rolling","Running","Singing","Sleeping","Swearing","Walking","Wandering","Wishing","Working","Worrying","Screaming","Searching","Settling","Shaking","Trembling",
-    // Expanded
-    "Abandoning","Abiding","Absolving","Absorbing","Accelerating","Accepting","Accompanying","Accusing","Achieving","Acknowledging","Acquiring","Acting","Adapting","Adding","Addressing","Adhering","Adjusting","Admiring","Admitting","Adopting","Adoring","Adorning","Advancing","Advising","Advocating","Affecting","Affirming","Aiding","Aiming","Alerting","Aligning","Alleging","Allowing","Alluding","Altering","Amassing","Amazing","Ambling","Amending","Amplifying","Amusing","Analyzing","Anchoring","Angling","Animating","Announcing","Annoying","Answering","Anticipating","Apologizing","Appealing","Appearing","Applauding","Applying","Appointing","Appraising","Appreciating","Approaching","Approving","Arching","Arguing","Arising","Arming","Arousing","Arranging","Arresting","Arriving","Ascending","Asking","Asphyxiating","Aspiring","Assailing","Assassinating","Assembling","Assessing","Assigning","Assisting","Assuming","Assuring","Astonishing","Attaching","Attacking","Attempting","Attending","Attracting","Auctioning","Auditing","Augmenting","Averting","Avoiding","Awakening","Awning","Babbling","Backfiring","Backhanding","Backpedaling","Baffling","Baking","Balancing","Balking","Ballooning","Bamboozling","Banishing","Banking","Bargaining","Barking","Barring","Bartering","Bashing","Basking","Battering","Battling","Bawling","Beaching","Beaming","Bearing","Beating","Beckoning","Becoming","Befriending","Begging","Beginning","Behaving","Beheading","Belching","Believing","Bellowing","Bending","Benefiting","Berating","Beseeching","Bestowing","Betraying","Bewitching","Bickering","Bidding","Binding","Biting","Blaming","Blanching","Blaring","Blasting","Blazing","Bleaching","Blemishing","Blending","Blessing","Blinding","Blinking","Blistering","Bloating","Blocking","Blooming","Blossoming","Blotting","Blowing","Blundering","Blunting","Blushing","Blustering","Boarding","Boasting","Bobbing","Boiling","Bolstering","Bolting","Bombarding","Bonding","Bonking","Booking","Booming","Boosting","Boozing","Bordering","Boring","Borrowing","Bouncing","Bounding","Bowing","Boxing","Bracing","Bragging","Braising","Braking","Branching","Brandishing","Braving","Breaching","Breaking","Breathing","Breezing","Brewing","Bribing","Bridging","Brightening","Bringing","Bristling","Broaching","Broadcasting","Broadening","Broiling","Brooding","Browning","Browsing","Bruising","Brushing","Bubbling","Bucking","Budding","Buffing","Bugging","Building","Bulging","Bumbling","Bumping","Bunching","Bundling","Bungling","Bunkering","Bunting","Buoying","Burying","Bushing","Bustling","Butchering","Buttering","Buttoning","Buying","Buzzing","Bypassing","Cackling","Caging","Cajoling","Calculating","Calibrating","Calling","Calming","Camouflaging","Campaigning","Canceling","Candling","Canning","Canoeing","Capering","Capitalizing","Captaining","Captivating","Capturing","Careening","Caressing","Caroling","Carpeting","Carrying","Carving","Cascading","Cashing","Casting","Castigating","Catching","Caterwauling","Caulking","Causing","Cautioning","Cavorting","Ceasing","Celebrating","Cementing","Censoring","Centering","Certifying","Chafing","Chaining","Challenging","Championing","Changing","Channeling","Chanting","Chaperoning","Charging","Charming","Charting","Chasing","Chatting","Chattering","Cheating","Checking","Cheering","Cherishing","Chewing","Chiding","Chilling","Chiming","Chipping","Chirping","Chiseling","Choking","Chomping","Choosing","Chopping","Choreographing","Chortling","Chorus","Chowing","Christening","Chronicling","Chucking","Chuckling","Chugging","Churning","Circling","Circulating","Citing","Clacking","Claiming","Clambering","Clamoring","Clamping","Clanging","Clapping","Clarifying","Clashing","Clasping","Classifying","Clawing","Cleaning","Clearing","Cleaving","Clenching","Clicking","Climbing","Clinching","Clinging","Clinking","Clipping","Cloaking","Clocking","Clogging","Cloning","Closing","Clothing","Clouding","Clowning","Clubbing","Clucking","Clutching","Coaching","Coaling","Coasting","Coaxing","Cobbling","Cocking","Coddling","Coding","Coercing","Coexisting","Coffing","Cogitating","Coiling","Coining","Collapsing","Collaring","Collecting","Colliding","Colonizing","Coloring","Combating","Combining","Comforting","Commanding","Commemorating","Commencing","Commenting","Committing","Communicating","Commuting","Comparing","Compelling","Compensating","Competing","Complaining","Completing","Complicating","Complimenting","Composing","Compounding","Compressing","Comprising","Compromising","Concealing","Conceding","Conceiving","Concentrating","Concerning","Concluding","Concussing","Condemning","Condensing","Conditioning","Conducting","Confessing","Confiding","Configuring","Confining","Confirming","Confiscating","Conflicting","Conforming","Confounding","Confronting","Confusing","Congealing","Congratulating","Connecting","Conning","Conquering","Consenting","Conserving","Considering","Consigning","Consisting","Consoling","Consorting","Conspiring","Constituting","Constricting","Constructing","Consulting","Consuming","Contacting","Containing","Contaminating","Contemplating","Contending","Contenting","Contesting","Continuing","Contracting","Contradicting","Contrasting","Contributing","Controlling","Convening","Converging","Conversing","Converting","Conveying","Convicting","Convincing","Cooking","Cooling","Cooperating","Coping","Copying","Cording","Coring","Corking","Coring","Cornering","Correcting","Corresponding","Corroding","Corrupting","Costing","Coughing","Counseling","Counting","Courting","Covering","Coveting","Cowering","Cracking","Crackling","Cradling","Crafting","Cramming","Cramping","Cranking","Crashing","Craving","Crawling","Creaking","Creaming","Creasing","Creating","Crediting","Creeping","Cresting","Crevicing","Crewing","Cribbing","Crimping","Cringing","Crippling","Crisping","Criticizing","Croaking","Crooning","Crossing","Crouching","Crowding","Crowing","Crowning","Crucifying","Cruising","Crunching","Crusading","Crushing","Crying","Cuddling","Cuffing","Culling","Culminating","Cultivating","Curbing","Curing","Curling","Cursing","Curtailing","Curving","Cushioning","Cussing","Customizing","Cutting","Cycling","Dabbling","Dallying","Damaging","Dampening","Dancing","Daring","Darting","Dashing","Dating","Daubing","Dawdling","Dawning","Dazing","Dazzling","Dealing","Debating","Debilitating","Decaying","Deceiving","Deciding","Decimating","Deciphering","Declaiming","Declaring","Declining","Decoding","Decorating","Decreasing","Decreeing","Dedicating","Deducing","Deeming","Deepening","Defacing","Defaming","Defeating","Defending","Defining","Deflating","Deflecting","Defying","Degrading","Dehydrating","Delaying","Delegating","Deliberating","Delighting","Delimiting","Delivering","Delving","Demanding","Demolishing","Denoting","Denouncing","Denying","Departing","Depending","Depicting","Depleting","Deploring","Deploying","Deposing","Depressing","Depriving","Derailing","Deriding","Deriving","Describing","Desecrating","Deserting","Deserving","Designing","Desiring","Desisting","Despairing","Despising","Destroying","Detaching","Detailing","Detecting","Deterring","Detesting","Devastating","Developing","Deviating","Devouring","Diagnosing","Dialing","Dictating","Diddling","Dieting","Differing","Diffusing","Digging","Digesting","Dignifying","Digressing","Dilating","Diluting","Dimming","Dining","Dipping","Directing","Disabling","Disagreeing","Disappearing","Disappointing","Disapproving","Disarming","Disbanding","Discarding","Discerning","Discharging","Disciplining","Disclosing","Discomforting","Disconnecting","Discontinuing","Discounting","Discouraging","Discovering","Discrediting","Discussing","Disdaining","Disembarking","Disengaging","Disfiguring","Disgracing","Disguising","Disgusting","Dishing","Disheartening","Dishing","Disillusioning","Disinfecting","Disintegrating","Disliking","Dismantling","Dismaying","Dismissing","Disobeying","Disordering","Disowning","Dispatching","Dispelling","Dispensing","Dispersing","Displacing","Displaying","Displeasing","Disposing","Disproving","Disputing","Disqualifying","Disregarding","Disrupting","Dissatisfying","Dissecting","Disseminating","Dissenting","Dissolving","Dissing","Distancing","Distilling","Distinguishing","Distorting","Distracting","Distressing","Distributing","Distrusting","Disturbing","Ditching","Dithering","Diving","Diverging","Diversifying","Diverting","Dividing","Divining","Divorcing","Dizzying","Docking","Doctoring","Dodging","Doffing","Doling","Dolling","Domesticating","Dominating","Donating","Doodling","Dooming","Doping","Dosing","Doting","Dotting","Doubling","Doubting","Dousing","Dovetailing","Downing","Drafting","Dragging","Draining","Dramatizing","Draping","Drawing","Dreaming","Dredging","Dressing","Dribbling","Drifting","Drilling","Drinking","Dripping","Driving","Droning","Drooling","Drooping","Dropping","Drowning","Drubbing","Drudging","Drug","Drumming","Dry","Drying","Dubbing","Ducking","Dueling","Dulling","Dumbfounding","Dumping","Dunking","Dusting","Dwelling","Dwindling","Dyeing","Dying","Eager","Earning","Easing","Eating","Eavesdropping","Echoing","Eclipsing","Economizing","Edging","Editing","Educating","Eeking","Effecting","Effusing","Ejecting","Elaborating","Electing","Elevating","Eliminating","Eloping","Emanating","Embarking","Embarrassing","Embedding","Embellishing","Embezzling","Embracing","Emerging","Emming","Empathizing","Emphasizing","Employing","Empowering","Emptying","Enacting","Enameling","Enchanting","Encircling","Enclosing","Encountering","Encouraging","Endangering","Endeavoring","Ending","Endorsing","Endowing","Enduring","Energizing","Enforcing","Engaging","Engineering","Engraving","Engrossing","Enhancing","Enjoying","Enlarging","Enlightening","Enlisting","Enlivening","Enraging","Enriching","Enrolling","Ensnaring","Ensuring","Entailing","Entering","Entertaining","Enticing","Entrapping","Entrusting","Enumerating","Enunciating","Enveloping","Envying","Epidemic","Equalizing","Equipping","Eradicating","Erecting","Eroding","Erring","Erupting","Escalating","Escaping","Escorting","Establishing","Esteeming","Estimating","Estranging","Etching","Eulogizing","Evanescing","Evaporating","Evading","Evaluating","Evangelizing","Evaporating","Evening","Evicting","Evidencing","Evoking","Evolving","Exacerbating","Exacting","Exaggerating","Exalting","Examining","Exasperating","Excavating","Exceeding","Excelling","Exchanging","Exciting","Exclaiming","Excluding","Excusing","Executing","Exemplifying","Exercising","Exerting","Exhaling","Exhausting","Exhibiting","Exhorting","Exiling","Existing","Exiting","Expanding","Expecting","Expediting","Expelling","Expending","Experiencing","Experimenting","Expiring","Explaining","Explicating","Exploding","Exploiting","Exploring","Exporting","Exposing","Expounding","Expressing","Extending","Extinguishing","Extolling","Extracting","Extricating","Exulting","Eyeing","Fabricating","Facing","Fading","Failing","Fainting","Falling","Falsifying","Faltering","Familiarizing","Fanning","Fancying","Farming","Fascinating","Fashioning","Fastening","Fathoming","Fatiguing","Faulting","Favoring","Fawning","Fearing","Feasting","Feathering","Feeding","Feeling","Feigning","Felling","Fencing","Fending","Fermenting","Ferrying","Fertilizing","Festing","Fettering","Fidgeting","Fielding","Fighting","Figuring","Filching","Filing","Filling","Filming","Filtering","Finagling","Finalizing","Finding","Fingering","Finishing","Firing","Firming","Fishing","Fitting","Fixing","Fizzing","Flailing","Flaking","Flambéing","Flaming","Flanking","Flaring","Flashing","Flattening","Flattering","Flaunting","Flavoring","Flaying","Fleecing","Flinging","Flipping","Flirting","Flitting","Floating","Flocking","Flooding","Flopping","Flouncing","Floundering","Flourishing","Flowering","Flowing","Fluctuating","Fluffing","Flushing","Flustering","Flying","Focusing","Folding","Folks","Following","Fomenting","Fooling","Foraging","Forbidding","Forcing","Forecasting","Foreseeing","Foreshadowing","Forestalling","Forfeiting","Forging","Forgiving","Forking","Forming","Formulating","Forsaking","Fortifying","Forwarding","Fostering","Fouling","Founding","Fracturing","Framing","Fraternizing","Fraying","Freaking","Freeing","Freezing","Fretting","Friending","Frightening","Fringing","Frittering","Frizzing","Frolicking","Frowning","Fruiting","Frustrating","Frying","Fueling","Fulfilling","Fumbling","Fuming","Functioning","Funneling","Furbishing","Furling","Furnishing","Furring","Furthering","Fusing","Fussing","Gabbing","Gadding","Gagging","Gaining","Galloping","Gambolling","Ganging","Gaping","Garbling","Garnishing","Garrisoning","Gasping","Gating","Gathering","Gauging","Gazing","Gearing","Generalizing","Generating","Gesturing","Getting","Ghosting","Gibbering","Gifting","Giggling","Gilding","Ginning","Girding","Giving","Gladdening","Glancing","Glaring","Glazing","Gleaming","Gleaning","Gliding","Glimmering","Glimpsing","Glistening","Glittering","Gloating","Globetrotting","Glorifying","Glossing","Glowing","Gluing","Gnashing","Gnawing","Going","Goading","Gobbling","Golfing","Gone","Goosing","Gorging","Governing","Grabbing","Gracing","Grading","Graduating","Grafting","Graining","Granting","Grappling","Grasping","Grating","Gratifying","Grave","Graving","Graying","Grazing","Grease","Greasing","Greening","Greeting","Grieving","Grilling","Grimacing","Grinding","Grinning","Gripping","Gritting","Groaning","Grooving","Groping","Grossing","Groveling","Growing","Growling","Grubbing","Grumbling","Guaranteeing","Guarding","Guessing","Guiding","Guilting","Gulping","Gunning","Gurgling","Gushing","Gusting","Gutting","Guzzling","Gypsying","Hacking","Haggling","Hailing","Halting","Hammering","Hampering","Handing","Handling","Hanging","Hankering","Happening","Hardening","Harming","Harping","Harrowing","Harvesting","Hassling","Hastening","Hatching","Hating","Hauling","Haunting","Having","Hawking","Hazing","Heading","Healing","Hearing","Hearten","Heating","Heaving","Hedging","Heeding","Hefting","Heightening","Helping","Hemming","Heralding","Herding","Hesitating","Hibernating","Hiccuping","Hiding","Hiking","Hinder","Hinging","Hinting","Hiring","Hissing","Hitching","Hitting","Hoarding","Hobbling","Hoeing","Hogging","Holding","Hollering","Hollowing","Homing","Honoring","Hooking","Hooting","Hoping","Hopping","Horrifying","Horsing","Hosing","Hosting","Hounding","Housing","Hovering","Howling","Huddling","Huffing","Hugging","Hulking","Humming","Hunching","Hungering","Hunkering","Hunting","Hurdling","Hurrying","Hurting","Hushing","Hustling","Hyping","Hypnotizing","Ice","Icing","Idealizing","Identifying","Idling","Igniting","Ignoring","Illuminating","Illustrating","Imagining","Imitating","Immolating","Impaling","Impelling","Impersonating","Implementing","Implicating","Imploring","Importing","Imposing","Impounding","Impressing","Imprinting","Imprisoning","Improving","Inaugurating","Incinerating","Inclining","Including","Increasing","Incurring","Indicating","Indulging","Infecting","Inferring","Infesting","Infiltrating","Inflaming","Inflating","Inflicting","Influencing","Informing","Infringing","Infuriating","Infusing","Ingesting","Inhabiting","Inhaling","Inheriting","Inhibiting","Initiating","Injecting","Injuring","Inking","Inlaying","Innovating","Inquiring","Inscribing","Inserting","Insinuating","Insisting","Inspecting","Inspiring","Installing","Instigating","Instilling","Instructing","Insulating","Insulting","Integrating","Intending","Intensifying","Interacting","Intercepting","Interchanging","Interesting","Interfering","Interlacing","Intermingling","Interpreting","Interrogating","Interrupting","Intertwining","Interviewing","Intimidating","Intoning","Intoxicating","Intriguing","Introducing","Intruding","Intuiting","Inundating","Invading","Inventing","Inventorying","Inverting","Investigating","Investing","Invigorating","Inviting","Invoking","Involving","Iodizing","Ironing","Irradiating","Irking","Irrigating","Irritating","Isolating","Issuing","Itching","Itemizing","Jabbing","Jailing","Jamming","Jangling","Jarring","Jaunting","Jawing","Jazzing","Jeering","Jelling","Jeopardizing","Jerking","Jesting","Jettisoning","Jibing","Jiggling","Jilting","Jingling","Jinxing","Jittering","Jiving","Jockeying","Jogging","Joining","Joking","Jolting","Jostling","Journeying","Jousting","Judging","Juggling","Julienning","Jumping","Junking","Justifying","Keening","Keeping","Keying","Kicking","Kidnapping","Killing","Kissing","Kneading","Kneeling","Knifing","Knighting","Knitting","Knocking","Knotting","Knowing","Labeling","Laboring","Lacerating","Lacking","Lading","Lamenting","Lamping","Lancing","Landing","Languishing","Lapping","Lapsing","Lashing","Lassoing","Lasting","Latching","Laughing","Launching","Laundering","Laying","Leading","Leaking","Leaning","Leaping","Learning","Leaving","Lecturing","Leering","Legalizing","Legislating","Lending","Lengthening","Lessening","Leveling","Leveraging","Levying","Liberating","Licking","Lifting","Lighting","Likening","Limiting","Limping","Lining","Lingering","Linking","Lionizing","Lip","Liquidating","Listening","Litigating","Littering","Living","Loading","Loafing","Loaning","Lobbying","Localizing","Locating","Locking","Lodging","Logging","Loitering","Looking","Loosening","Loping","Losing","Lounging","Loving","Lowering","Lulling","Lumbering","Lumping","Lunching","Lunging","Lurching","Luring","Lurking","Lusting","Lynching","Maddening","Maiming","Maintaining","Making","Malfunctioning","Malingering","Maltreating","Managing","Maneuvering","Mangling","Manhandling","Manifesting","Manipulating","Manning","Mantling","Manufacturing","Marching","Marginalizing","Marking","Marketing","Marring","Marrying","Marshaling","Marveling","Mashing","Masking","Massacring","Massaging","Massing","Mastering","Matching","Mating","Matriculating","Mattering","Maturing","Mauling","Maximizing","Meandering","Meaning","Measuring","Meddling","Mediating","Meeting","Melding","Melting","Memorizing","Mending","Mentioning","Merging","Meriting","Mesmerizing","Mess","Messaging","Metabolizing","Meting","Mewing","Migrating","Milking","Milling","Miming","Mimicking","Mincing","Minding","Mining","Ministering","Minting","Mirroring","Misbehaving","Miscalculating","Misconstruing","Misdirecting","Misfiring","Misgiving","Misguiding","Mishearing","Misjudging","Mislaying","Misleading","Misplacing","Misquoting","Misreading","Misrepresenting","Missing","Misspeaking","Mistaking","Misting","Mistrusting","Misunderstanding","Misusing","Mitigating","Mixing","Moaning","Mobilizing","Mocking","Modeling","Moderating","Modernizing","Modifying","Modulating","Molding","Molesting","Monitoring","Mooing","Mooring","Moping","Mopping","Mortifying","Motioning","Motivating","Mounding","Mounting","Mourning","Moving","Mowing","Muddling","Mugging","Mulching","Multiplying","Mumbling","Munching","Murmuring","Muse","Musing","Mussing","Mustering","Mutating","Muting","Mutilating","Mutinying","Muttering","Mystifying","Nabbing","Nagging","Nailing","Naming","Napping","Narrating","Narrowing","Nasalizing","Navigating","Nearing","Necking","Needing","Negating","Neglecting","Negotiating","Nesting","Nestling","Netting","Neutralizing","Nibbling","Nickel","Nicking","Nip","Nipping","Nitpicking","Nixing","Nodding","Nominating","Normalizing","Nosing","Notching","Noting","Noticing","Notifying","Nourishing","Nudging","Nullifying","Numbering","Numbing","Nurturing","Obeying","Objecting","Obliterating","Obscuring","Observing","Obsessing","Obtaining","Occurring","Offending","Offering","Officiating","Ogling","Oiling","Okaying","Omitting","Ooze","Opining","Opposing","Oppressing","Opting","Orbiting","Orchestrating","Ordering","Organizing","Orienting","Originating","Ornamenting","Orphaning","Oscillating","Ostracizing","Ousting","Outbidding","Outclassing","Outdoing","Outfitting","Outfoxing","Outgrowing","Outlawing","Outlining","Outliving","Outnumbering","Outpacing","Outraging","Outranking","Outrunning","Outshining","Outsmarting","Outstretching","Outvoting","Outweighing","Overacting","Overarching","Overawing","Overbalancing","Overbearing","Overblowing","Overbooking","Overburdening","Overcharging","Overcoming","Overcompensating","Overcooking","Overcrowding","Overdoing","Overdosing","Overeating","Overestimating","Overexposing","Overflowing","Overhauling","Overhearing","Overheating","Overlapping","Overloading","Overlooking","Overpowering","Overpricing","Overrating","Overreaching","Overriding","Overruling","Overrunning","Overseeing","Overselling","Overshadowing","Oversimplifying","Oversleeping","Overspending","Overstating","Overstaying","Overstepping","Overstocking","Overthrowing","Overtaking","Overturning","Overwhelming","Overworking","Owning","Oxidizing","Pacing","Packaging","Packing","Padding","Paddling","Page","Paging","Paining","Painting","Pairing","Pampering","Panicking","Panting","Papering","Parachuting","Parading","Paralyzing","Paring","Parking","Parodying","Parting","Partitioning","Partnering","Passing","Pasting","Patching","Patenting","Patrolling","Patterning","Pausing","Paving","Pawing","Paying","Peaking","Pecking","Pedaling","Peeking","Peeling","Peeping","Pegging","Pelting","Penalizing","Penciling","Peppering","Perceiving","Perfecting","Performing","Perfuming","Perishing","Permeating","Permitting","Perpetrating","Perpetuating","Perplexing","Persecuting","Persevering","Persisting","Personalizing","Persuading","Perturbing","Perusing","Pervading","Pester","Petitioning","Petrifying","Phasing","Phoning","Photocopying","Photographing","Phrasing","Picking","Picketing","Pickling","Picturing","Piercing","Piling","Piloting","Pinching","Pining","Pinning","Pioneering","Piping","Pirating","Pissing","Pit","Pitting","Pitying","Placating","Placing","Plaguing","Planning","Planting","Plastering","Playing","Pleading","Pleasuring","Pledging","Plighting","Plodding","Plotting","Plucking","Plugging","Plumbing","Plummeting","Plundering","Plunging","Plying","Pocketing","Poetizing","Pointing","Poisoning","Poking","Polishing","Politicizing","Polling","Pondering","Pontificating","Pooling","Popping","Popularizing","Poring","Portraying","Posing","Positioning","Possessing","Posting","Postponing","Postulating","Potting","Pounding","Pouring","Pouting","Powdering","Powering","Practicing","Praising","Prancing","Prattling","Praying","Preaching","Preceding","Precipitating","Precluding","Predicating","Predicting","Predisposing","Preempting","Preferring","Prejudging","Premiering","Preparing","Prescribing","Presenting","Preserving","Presiding","Pressing","Pressuring","Presuming","Pretending","Prevailing","Preventing","Previewing","Preying","Pricing","Pricking","Pride","Priming","Primping","Printing","Prioritizing","Probing","Proceeding","Processing","Proclaiming","Procrastinating","Procuring","Prodding","Producing","Profaning","Professing","Profiling","Profiting","Programing","Progressing","Prohibiting","Projecting","Prolonging","Promising","Promoting","Prompting","Pronouncing","Proofing","Propagating","Propelling","Prophesying","Proposing","Propping","Prospecting","Prospering","Protecting","Protesting","Protracting","Protruding","Proving","Providing","Provoking","Prowling","Pruning","Prying","Publicizing","Publishing","Puffing","Pulling","Pulsing","Pummeling","Pumping","Punching","Puncturing","Punishing","Punting","Pupating","Purchasing","Purring","Pursuing","Pushing","Putting","Puzzling","Quacking","Quaffing","Quailing","Quaking","Qualifying","Quantifying","Quarreling","Quarrying","Quavering","Queening","Quelling","Quenching","Quer","Querying","Questioning","Quibbling","Quieting","Quilting","Quipping","Quitting","Quivering","Quizzing","Quoting","Racing","Racking","Radiating","Raging","Raiding","Railing","Raining","Raising","Raking","Rallying","Rambling","Ramming","Ranching","Randomizing","Ranging","Ranking","Ransacking","Ranting","Rapping","Rasping","Ratifying","Rating","Rationalizing","Ratting","Rattling","Ravaging","Raving","Razing","Reaching","Reacting","Reading","Ready","Reaffirming","Realigning","Realizing","Reaming","Reaping","Rearing","Reasoning","Reassembling","Reassuring","Rebelling","Rebounding","Rebuffing","Rebuilding","Rebuking","Recalling","Recanting","Recapping","Recapturing","Receiving","Recessing","Recharging","Reciting","Reckoning","Reclaiming","Recognizing","Recollecting","Recommending","Reconciling","Reconditioning","Reconnoitering","Recording","Recouping","Recovering","Recruiting","Rectifying","Recuperating","Recurring","Recycling","Redeeming","Redefining","Redesigning","Redirecting","Rediscovering","Reducing","Reeking","Reeling","Referencing","Referring","Refining","Reflecting","Refocusing","Reforming","Refracting","Refraining","Refreshing","Refueling","Refunding","Refurbishing","Refusing","Refuting","Regaining","Regaling","Regarding","Regenerating","Registering","Regressing","Regretting","Regulating","Rehabilitating","Rehearsing","Reigning","Reimbursing","Reinforcing","Reining","Reinstating","Reinterpreting","Reintroducing","Reinvesting","Reiterating","Rejecting","Rejoicing","Rejoining","Rejuvenating","Relapsing","Relating","Relaxing","Relaying","Releasing","Relenting","Relieving","Relinquishing","Relishing","Reliving","Relying","Remaining","Remanding","Remarking","Remarrying","Remedying","Remembering","Reminding","Remitting","Remodeling","Remonstrating","Removing","Renaming","Rendering","Rending","Renewing","Renouncing","Renovating","Renting","Reopening","Reorganizing","Repairing","Repeating","Repelling","Repenting","Replacing","Replying","Reporting","Reposing","Representing","Repressing","Reprieving","Reprimanding","Reproaching","Reproducing","Repudiating","Repulsing","Reputing","Requesting","Requiring","Requisitioning","Rereading","Rescinding","Rescuing","Researching","Reselling","Resembling","Reserving","Resetting","Residing","Resigning","Resisting","Resolving","Resonating","Resorting","Resounding","Respecting","Respiring","Responding","Resting","Restocking","Restoring","Restraining","Restricting","Resuming","Retailing","Retaining","Retaliating","Retarding","Retching","Rethinking","Retiring","Retorting","Retracing","Retracting","Retreating","Retrieving","Returning","Reuniting","Reusing","Revealing","Reveling","Revenging","Reverberating","Revering","Reversing","Reverting","Reviewing","Revising","Reviving","Revoking","Revolutionizing","Revolving","Rewarding","Rewinding","Rhapsodizing","Rhetorizing","Rhyming","Ribbing","Ricocheting","Ridding","Riding","Ridiculing","Rifling","Rigging","Righting","Ringing","Rinsing","Rioting","Ripening","Ripping","Rising","Risking","Rivaling","Roaming","Roaring","Roasting","Robbing","Rocking","Rocketing","Roding","Rolling","Romancing","Romping","Roosting","Rooting","Roping","Rotating","Rotting","Roughing","Rounding","Rousing","Rout","Routing","Roving","Rowing","Rubbing","Ruffling","Ruining","Ruling","Rumbling","Rummaging","Rumoring","Running","Rupturing","Rushing","Rusticating","Rustling","Sabotaging","Sacking","Sacrificing","Saddening","Saddling","Safeguarding","Sagging","Sailing","Salivating","Sallying","Saluting","Salvaging","Sampling","Sanctifying","Sanctioning","Sandbagging","Sandblasting","Sandwiching","Sapping","Sashaying","Satirizing","Satisfying","Saturating","Sauntering","Saving","Savoring","Sawing","Saying","Scaffolding","Scaling","Scalping","Scampering","Scanning","Scaring","Scarifying","Scarring","Scattering","Scavenging","Scenting","Scheduling","Scheming","Schooling","Scoffing","Scolding","Scooping","Scooting","Scorching","Scoring","Scorning","Scouring","Scouting","Scowling","Scrabbling","Scrambling","Scrapping","Scratching","Scrawling","Screaming","Screeching","Screening","Screwing","Scribbling","Scrimmaging","Scripting","Scrolling","Scrounging","Scrubbing","Scrupling","Scudding","Scuffing","Sculpting","Scurrying","Scuttling","Sealing","Searching","Seasoning","Seating","Seceding","Seconding","Secreting","Sectioning","Securing","Seducing","Seeing","Seeking","Seeming","Seething","Segmenting","Seizing","Selecting","Selling","Sending","Sensing","Sentencing","Sentinel","Separating","Sequencing","Serenading","Sermonizing","Serving","Servicing","Setting","Settling","Severing","Sewing","Shacking","Shackling","Shading","Shadowing","Shaking","Shallowing","Shambling","Shaming","Shampooing","Shanking","Shaping","Sharing","Sharking","Sharpening","Shattering","Shaving","Shearing","Shedding","Shelling","Sheltering","Shepherding","Shielding","Shifting","Shimmering","Shinning","Shipping","Shivering","Shocking","Shoeing","Shooting","Shopping","Shortening","Shouldering","Shouting","Shoveling","Showing","Showering","Shredding","Shrieking","Shrilling","Shrimping","Shrinking","Shriveling","Shrugging","Shuddering","Shuffling","Shunning","Shunting","Shushing","Shutting","Sickening","Siding","Sifting","Sighing","Signing","Signifying","Silencing","Silting","Simmering","Simplifying","Simulating","Singing","Singling","Sinking","Siphoning","Siring","Sitting","Situating","Sizing","Skating","Sketching","Skewering","Skidding","Skimming","Skipping","Skirmishing","Skirting","Skulking","Slacking","Slaking","Slamming","Slandering","Slanting","Slapping","Slashing","Slate","Slathering","Slaughtering","Slave","Slavering","Sledding","Sleeping","Sleeting","Slicing","Slicking","Sliding","Slimming","Slinging","Slinking","Slipping","Slitting","Slobbering","Slogging","Sloping","Slopping","Slouching","Slowing","Slugging","Sluicing","Slumbering","Slumping","Slurring","Smacking","Smashing","Smearing","Smelling","Smelting","Smiling","Smirking","Smoking","Smoldering","Smooching","Smoothing","Smothering","Smudging","Smuggling","Snacking","Snagging","Snaking","Snapping","Snaring","Snarling","Snatching","Sneaking","Sneering","Sneezing","Snickering","Sniffing","Sniping","Sniveling","Snoozing","Snoring","Snorting","Snowing","Snubbing","Snuffing","Soaking","Soaring","Sobbing","Sobering","Socializing","Socketing","Softening","Soiling","Soldering","Soldiering","Soliciting","Solidifying","Soliloquizing","Solving","Soothe","Sopping","Sorrowing","Sorting","Sounding","Souring","Sousing","Sowing","Spackling","Spanning","Sparing","Sparking","Sparkling","Sparring","Spasming","Spattering","Spawning","Speaking","Spearheading","Spearing","Specifying","Speckling","Spectating","Speculating","Speeding","Spelling","Spending","Spewing","Spicing","Spiking","Spilling","Spinning","Spiraling","Spiriting","Spitting","Splashing","Splaying","Splicing","Splintering","Splitting","Splurging","Spoiling","Sponging","Sponsoring","Spooking","Spooning","Sporting","Spotting","Spouting","Spraining","Sprawling","Spraying","Spreading","Springing","Sprinkling","Sprinting","Sprouting","Spurring","Spurting","Sputtering","Spying","Squabbling","Squalling","Squandering","Squashing","Squeaking","Squealing","Squeezing","Squinting","Squirming","Squirt","Stabbing","Stabilizing","Stacking","Staffing","Staggering","Staining","Staking","Stalking","Stalling","Stampeding","Stamping","Stanching","Standing","Stapling","Staring","Starting","Startling","Starving","Stashing","Stating","Stationing","Staving","Staying","Stealing","Steaming","Steering","Stemming","Stenciling","Stepping","Sterilizing","Stewing","Sticking","Stiffening","Stifling","Stigmatizing","Still","Stilling","Stimulating","Stinging","Stinking","Stippling","Stirring","Stitching","Stocking","Stoking","Stomping","Stoning","Stooping","Stopping","Storing","Storming","Straddling","Strafing","Straining","Stranding","Strangling","Strapping","Stratifying","Straying","Streaking","Streaming","Streamlining","Strengthening","Stressing","Stretching","Strewing","Striding","Striking","Stringing","Stripping","Striving","Stroking","Strolling","Struggling","Strutting","Stubbing","Studding","Studying","Stuffing","Stumbling","Stumping","Stunning","Stunting","Stuttering","Styling","Subdividing","Subduing","Subjecting","Submerging","Submitting","Subscribing","Subsiding","Subsidizing","Substantiating","Substituting","Subverting","Succeeding","Succumbing","Sucking","Sueing","Suffering","Suffocating","Suffusing","Sugging","Suggesting","Suing","Sulking","Sullen","Sulllying","Summarizing","Summoning","Sunning","Superceding","Supervising","Supplanting","Supplementing","Supplying","Supporting","Supposing","Suppressing","Surfacing","Surging","Surmising","Surmounting","Surpassing","Surprising","Surrendering","Surrounding","Surveying","Surviving","Suspecting","Suspending","Sustaining","Swabbing","Swaddling","Swaggering","Swallowing","Swamping","Swanning","Swapping","Swarming","Swashbuckling","Swatting","Swaying","Swearing","Sweating","Sweeping","Sweetening","Swell","Swelling","Swerving","Swigging","Swilling","Swimming","Swinging","Swiping","Swirling","Swishing","Switching","Swiveling","Swooning","Swooping","Syllabling","Symbolizing","Sympathizing","Synchronizing","Syncopating","Synthesizing","Systematizing","Tabling","Tackling","Tagging","Tailing","Tailoring","Tainting","Taking","Talking","Tallying","Taming","Tamping","Tangling","Tantalizing","Tapping","Tarring","Tarting","Tasking","Tasting","Tattering","Tattooing","Taunting","Taxiing","Taxing","Teaching","Tearing","Teasing","Teeing","Teetering","Teething","Telecasting","Telegraphing","Telephoning","Telling","Tempering","Tempting","Tending","Tendering","Tensing","Terminating","Terrifying","Testing","Tethering","Thanking","Thatching","Thawing","Theorizing","Thickening","Thieving","Thinning","Thirsting","Thonging","Thorning","Thrash","Thrashing","Threading","Threatening","Threshing","Thriving","Throbbing","Thronging","Throttling","Throwing","Thrusting","Thudding","Thumbing","Thumping","Thundering","Thwarting","Ticking","Tickling","Tiding","Tidying","Tieing","Tightening","Tilling","Tilting","Timing","Tingling","Tinkering","Tinkling","Tinting","Tipping","Tiptoeing","Tiring","Tithing","Titillating","Titling","Toadying","Toasting","Toggling","Toiling","Tolerating","Tolling","Tonguing","Tooling","Tooting","Toppling","Tormenting","Torturing","Tossing","Totaling","Tottering","Touching","Touring","Touting","Towing","Towering","Toying","Tracing","Tracking","Trading","Traducing","Trailing","Training","Traipsing","Tramping","Trampling","Transcending","Transferring","Transforming","Translating","Transmitting","Transmuting","Transpiring","Transporting","Transposing","Trapping","Traveling","Traversing","Treading","Treasuring","Treating","Trebling","Trembling","Trending","Trespassing","Triangulating","Tricking","Trickling","Trifling","Triggering","Trimming","Tripping","Triumphing","Trivializing","Trolling","Tromping","Trooping","Trotting","Troubling","Trouncing","Trudging","Trumpeting","Truncating","Trusting","Trying","Tucking","Tugging","Tumbling","Tuning","Tunneling","Turning","Turtling","Tutoring","Tweaking","Tweeting","Twiddling","Twining","Twinkling","Twirling","Twisting","Twitching","Twittering","Typing","Ululating","Umpiring","Unbalancing","Unbending","Unbinding","Unblocking","Unbolting","Unbosoming","Unboxing","Unbraiding","Unbending","Unburdening","Unbuttoning","Uncapping","Unchaining","Unchecking","Unclasping","Uncloaking","Unclogging","Unclothing","Uncoiling","Uncorking","Uncovering","Uncrossing","Underbidding","Undercutting","Underestimating","Undergoing","Underlining","Undermining","Underscoring","Understanding","Undertaking","Underwriting","Undoing","Undressing","Undulating","Unearthing","Unfastening","Unfolding","Unfurling","Unhitching","Unhooking","Unifying","Uniting","Unlacing","Unlatching","Unleashing","Unlocking","Unloosing","Unmasking","Unpacking","Unplugging","Unraveling","Unrolling","Unsaddling","Unscrewing","Unsealing","Unsheathing","Unsnapping","Unstrapping","Untangling","Unthinking","Untying","Unveiling","Unwinding","Unwrapping","Upbraiding","Upending","Upgrading","Upholding","Upping","Upstaging","Urging","Using","Ushering","Utilizing","Uttering","Vacating","Vacuuming","Vailing","Validating","Valorizing","Valuing","Vanishing","Vanquishing","Vaporizing","Varnishing","Vaulting","Vaunting","Veering","Vending","Venerating","Venging","Ventilating","Venting","Venturing","Verbalizing","Verifying","Vesting","Vetoing","Vexing","Vibrating","Victimizing","Viewing","Vilifying","Vindicating","Violating","Visiting","Visualizing","Vitiating","Vivifying","Vocalizing","Voiding","Volunteering","Vomiting","Voting","Vouching","Vowing","Voyaging","Vying","Waddling","Wading","Waffling","Waging","Wagging","Waging","Wailing","Waiting","Waiving","Waking","Wallowing","Wandering","Waning","Wanting","Warding","Warming","Warning","Warping","Warranting","Washing","Wasting","Watching","Watering","Wavering","Waxing","Weakening","Weaning","Wearing","Wearying","Weathering","Weaving","Wedding","Wedging","Weeding","Weeping","Weighing","Weighting","Welcoming","Welling","Welling","Welshing","Wending","Wetting","Whacking","Wheeling","Wheezing","Whimpering","Whining","Whipping","Whirling","Whispering","Whistling","Whitening","Whittling","Wicking","Widening","Wielding","Wiggling","Wilting","Wincing","Winding","Winging","Winking","Winning","Wiping","Wiring","Wishing","Withdrawing","Withering","Withholding","Witnessing","Wittering","Wiving","Wobbling","Wolfing","Wondering","Wooding","Woofing","Working","Worrying","Worsening","Worshiping","Wounding","Wrangling","Wrapping","Wrecking","Wrenching","Wresting","Wrestling","Wriggling","Wringing","Writing","Wronging","Yawing","Yanking","Yawning","Yearning","Yelling","Yielding","Yodeling","Zigzagging","Zipping","Zooming"
-  ],
-  place: [
-    // Original
-    "Alabama","Appalachia","Arkansas","Bakersfield","Beaumont","Biloxi","Clarksdale","Crossville","Deep East Texas","East Nashville","Georgia","Highway 61","Huntsville","Jackson","Kentucky","Louisiana","Memphis","Mississippi","Nashville","New Orleans","Natchez","Oklahoma","Piedmont","Red River","Shreveport","Tennessee","Tupelo","Yazoo",
-    // Expanded
-    "Abilene","Acadiana","Acoma","Alamogordo","Alamo","Albany","Albuquerque","Alexandria","Allentown","Amarillo","Americus","Anadarko","Andalusia","Anniston","Anson","Antioch","Apache","Appomattox","Ardmore","Arizona","Arkadelphia","Asheboro","Asheville","Athens","Atlanta","Auburn","Augusta","Austin","Avoyelles","Bainbridge","Bakersfield","Baltimore","Bastrop","Baton Rouge","Bayou","Beaumont","Beeville","Belmont","Bend","Berkeley","Berlin","Bethlehem","Big Bend","Big Sandy","Biloxi","Birmingham","Black Belt","Blacksburg","Blanco","Bloomington","Bluefield","Bluegrass","Boise","Boone","Borger","Bossier","Boulder","Bowling Green","Bozeman","Bradford","Brazos","Brenham","Brevard","Bridgeport","Brisbane","Bristol","Brownsville","Bryan","Buckhead","Buffalo","Bullock","Burbank","Burleson","Burlington","Cairo","Cajun","Calhoun","Camden","Cameron","Campbell","Caney","Canton","Cape Fear","Carbondale","Carolina","Carrollton","Carthage","Casper","Catahoula","Cedar Creek","Champaign","Chandler","Charleston","Charlotte","Chattahoochee","Chattanooga","Checotah","Cherokee","Cheyenne","Chicago","Chickasaw","Choctaw","Cimarron","Cincinnati","Claremore","Clarksdale","Clarksville","Clayton","Cleveland","Clinton","Clovis","Coahoma","Cobb","Colbert","College Station","Collin","Colorado","Columbia","Columbus","Comanche","Concho","Conroe","Conway","Cook","Cookeville","Coosa","Corinth","Corpus Christi","Corsicana","Cotton","Covington","Coweta","Craig","Crawford","Creek","Crossville","Crockett","Crowley","Cumberland","Cypress","Dallas","Daphne","Dawson","Dayton","Decatur","DeKalb","Del Rio","Delta","Denton","Denver","Des Moines","Detroit","Dickson","Dixie","Dodge City","Dothan","Douglas","Drew","Dublin","Dumas","Durham","Dyer","Eagle Pass","Earle","Eastland","Ector","Edinburg","El Dorado","El Paso","Elbert","Elmore","Emanuel","Enid","Enterprise","Etowah","Eufaula","Evangeline","Fairfield","Falkville","Fannin","Fayette","Fayetteville","Fentress","Ferguson","Fife","Flagstaff","Florence","Floyd","Foley","Forrest","Fort Smith","Fort Worth","Franklin","Fresno","Frio","Fulton","Gainesville","Gadsden","Galveston","Gaston","Geneva","George","Georgetown","Gibson","Gilmer","Glasgow","Glenn","Gonzales","Gordon","Graham","Granbury","Grand Prairie","Grayson","Green","Greenbrier","Greene","Greensboro","Greenville","Greenwood","Grimes","Grove","Guadalupe","Gulfport","Habersham","Hale","Hall","Hamilton","Hampton","Hancock","Hardin","Harlan","Harris","Harrison","Hart","Hartford","Hawkins","Haywood","Hazlehurst","Heard","Hempstead","Henderson","Hendricks","Henry","Hernando","Hickman","Hidalgo","Highland","Highlands","Hillsboro","Hinds","Hoke","Holland","Holly","Houston","Howard","Houston","Hudson","Hunt","Huntington","Huntsville","Huron","Hutchinson","Iberville","Idaho","Illinois","Independence","Indian","Indianola","Indiana","Iowa","Iredell","Irving","Itawamba","Jackson","Jasper","Jefferson","Jessamine","Johnson","Johnston","Jones","Joplin","Kalamazoo","Kaufman","Kemper","Kentucky","Kerr","Kershaw","King","Kingston","Kinney","Kirby","Knox","Knoxville","Kosciusko","Lafayette","Lamar","Lancaster","Lauderdale","Laurel","Lawrence","Lawrenceburg","Leake","Lee","Lehigh","Lenoir","Leon","Letcher","Lewis","Lexington","Liberty","Limestone","Lincoln","Little Rock","Livingston","Logan","Lone Star","Longview","Lorain","Loudon","Love","Lowndes","Lubbock","Lumpkin","Macon","Madison","Magoffin","Mahoning","Malvern","Manchester","Marion","Marshall","Martin","Mason","Matagorda","Maury","McAllen","McCracken","McCreary","McDowell","McIntosh","McKinney","McMinn","McNairy","Meade","Mecklenburg","Medina","Memphis","Mercer","Meridian","Miami","Middlesex","Midland","Milam","Miller","Mills","Milwaukee","Mineral","Minneapolis","Mississippi","Missouri","Mobile","Monroe","Montague","Montana","Montgomery","Moody","Morgan","Morris","Morrow","Moultrie","Mount Vernon","Muhlenberg","Murray","Muskegon","Muskingum","Nacogdoches","Nash","Nashville","Natchez","Natchitoches","Navarro","Nelson","Nevada","New Castle","New Haven","New Madrid","New York","Newark","Newton","Nicholas","Nolan","Norfolk","Norman","Northampton","Nottoway","Nueces","Oakland","Obion","Ohio","Oktibbeha","Oldham","Oneida","Onslow","Orange","Orleans","Osage","Otero","Ottawa","Ouachita","Overton","Owen","Oxford","Ozark","Page","Palm Beach","Panola","Parke","Parker","Parmer","Pasquotank","Patton","Paulding","Peach","Pearl River","Pecos","Pender","Perry","Petersburg","Philadelphia","Pickens","Pickett","Pike","Pittsburgh","Pittsylvania","Plaquemines","Polk","Pontotoc","Pope","Portland","Potter","Powell","Prentiss","Preston","Prince","Providence","Pulaski","Pushmataha","Quitman","Rabun","Raleigh","Randolph","Rankin","Rapides","Red River","Reeves","Reno","Richmond","Rio Grande","Roane","Roberts","Robertson","Robeson","Rockingham","Rooks","Ross","Rowan","Rutherford","Rusk","Sabine","Sacramento","Saline","Salt Lake","San Angelo","San Antonio","San Marcos","Sangamon","Santa Fe","Sarasota","Sauk","Savannah","Scott","Searcy","Sebastian","Seminole","Seneca","Sequatchie","Sevier","Shannon","Sharkey","Shelby","Shenandoah","Sibley","Simpson","Siskiyou","Smith","Smyth","Somerset","Sonoma","Spartanburg","Spencer","St. Clair","St. Francis","St. Louis","St. Tammany","Starr","Stephens","Steuben","Stewart","Stone","Stonewall","Stonewall","Sullivan","Sumner","Sumter","Sunflower","Surry","Susquehanna","Sussex","Sutter","Swain","Talladega","Tallahassee","Tallapoosa","Tampa","Tarrant","Tate","Taylor","Tazewell","Telfair","Tennessee","Terrebonne","Terry","Texas","Thurston","Tift","Tipton","Tishomingo","Titus","Todd","Tom Green","Toronto","Travis","Troup","Troy","Tucker","Tulare","Tulsa","Turner","Tuscaloosa","Tuscarawas","Twiggs","Tyler","Tyrrell","Uintah","Union","Upshur","Upson","Utah","Uvalde","Val Verde","Valencia","Van Buren","Van Zandt","Vance","Vermilion","Vermont","Vernon","Victoria","Vigo","Vilas","Virginia","Volusia","Wabash","Wagoner","Wake","Walker","Waller","Walton","Ware","Warren","Warren","Washington","Watauga","Wayne","Weakley","Webb","Webster","Weld","Westmoreland","Wharton","Wheeler","White","Wichita","Wilcox","Wilkes","Wilkinson","Williams","Williamson","Wilson","Windsor","Winston","Wise","Wolfe","Wood","Woodruff","Woods","Worcester","Worth","Wright","Wyandotte","Wyoming","Yadkin","Yalobusha","Yancey","Yazoo","Yell","York","Young","Zavala"
-  ],
-  name: [
-    // Original
-    "Annie","Bobby","Carla","Darlene","Earl","Ellie Mae","Frank","Gracie","Hank","Iris","Jesse","Jolene","Kay","Lena","Luther","Mae","Mabel","Nora","Otis","Pearl","Ramona","Rosie","Ruby","Sally","Sonny","Stella","Tommy","Vera","Wanda","Willie",
-    // Expanded
-    "Abby","Ada","Addie","Adeline","Aggie","Aileen","Alberta","Alice","Alma","Amanda","Amber","Amelia","Amy","Angela","Ann","Anna","Anne","Annie","April","Arlene","Ashley","Audrey","Ava","Barb","Barbara","Beatrice","Becky","Belinda","Bernice","Bess","Bessie","Beth","Bethany","Betsy","Betty","Beulah","Beverly","Billie","Blanche","Bobbi","Bonnie","Brandi","Brandy","Brenda","Brittany","Brooke","Candy","Carol","Carrie","Cathy","Charlene","Cheryl","Christina","Christine","Cindy","Clara","Claudia","Colleen","Connie","Constance","Cora","Crystal","Daisy","Dana","Danielle","Daphne","Dawn","Deana","Deann","Deanna","Debbie","Debora","Deborah","Debra","Dee","Delia","Della","Delores","Denise","Diana","Diane","Dianne","Dixie","Dolores","Donna","Dora","Doreen","Doris","Dorothy","Edith","Edna","Eileen","Elaine","Eleanor","Elena","Elinor","Elizabeth","Ella","Ellen","Elsa","Emily","Emma","Erica","Erin","Ethel","Etta","Evelyn","Fannie","Fay","Faye","Flora","Florence","Frances","Francine","Freda","Gail","Gayle","Geneva","Georgia","Geraldine","Gertrude","Gina","Gladys","Glenda","Gloria","Grace","Greta","Gwen","Gwendolyn","Hannah","Harriet","Hattie","Hazel","Heather","Helen","Henrietta","Hilda","Holly","Hope","Ida","Inez","Irene","Iris","Irma","Isabel","Jackie","Jamie","Jane","Janet","Janice","Jean","Jeanette","Jeanne","Jenny","Jessica","Jewel","Jill","Jo","Joan","Joann","Joanna","Jodi","Jody","Joy","Joyce","Juanita","Judith","Judy","Julia","Julie","June","Karen","Kate","Katherine","Kathleen","Kathryn","Kathy","Katie","Katrina","Kay","Kelly","Kim","Kimberly","Kristen","Kristin","Kristina","Lana","Laura","Lauren","Laurie","Leah","Lena","Leona","Leslie","Leta","Lettie","Lila","Lillian","Lillie","Linda","Lisa","Lizzie","Lois","Lola","Loretta","Lori","Lorraine","Lou","Louise","Lucille","Lucy","Luella","Lula","Lydia","Lynn","Mabel","Mable","Madeline","Mae","Maggie","Marcia","Marcie","Margaret","Margarita","Margie","Maria","Marian","Marie","Marilyn","Marion","Marjorie","Marlene","Marsha","Martha","Mary","Mattie","Maureen","Maxine","May","Melanie","Melinda","Melissa","Melody","Meredith","Mia","Michelle","Mildred","Millie","Minnie","Miranda","Miriam","Missy","Misty","Mollie","Mona","Monica","Myra","Myrtle","Nadine","Nancy","Naomi","Nell","Nellie","Nettie","Nichole","Nicole","Nina","Nora","Norma","Olga","Pam","Pamela","Pat","Patricia","Patsy","Patti","Patty","Paula","Peggy","Penny","Phyllis","Polly","Priscilla","Rachel","Ramona","Reba","Rebecca","Regina","Rena","Rene","Renee","Rhonda","Rita","Roberta","Robin","Rosa","Rosalie","Rose","Rosemary","Rosie","Roxanne","Ruby","Ruth","Sally","Samantha","Sandra","Sandy","Sara","Sarah","Shannon","Sharon","Sheila","Shelby","Shelia","Shelley","Sherri","Sherry","Shirley","Sonia","Stacey","Stacy","Stella","Stephanie","Sue","Susan","Susie","Suzanne","Tamara","Tami","Tammy","Tanya","Tara","Teresa","Terri","Terry","Tess","Tessa","Thelma","Theresa","Tiffany","Tina","Traci","Tracy","Valerie","Vanessa","Velma","Vera","Verna","Veronica","Vicki","Vickie","Victoria","Viola","Violet","Virginia","Vivian","Wanda","Wendy","Wilma","Yolanda","Yvonne"
-  ],
-  phrase: [
-    // Original
-    "After Dark","All Night Long","At the Crossroads","Back Down Home","Better Days","Between the Lines","By the River","Cold and Gone","Come Sundown","Deep in My Soul","Don't Look Back","Down the Line","Far From Here","For Good","From the Bottle","Gone to Ground","Gravel in My Bones","Hard Times","Heading South","In My Blood","In the Dark","Last Call","Last Ride","Left Behind","Letting Go","Long Gone","Lord Have Mercy","No Good Reason","No Turning Back","On My Way","On the Road","One More Night","Out in the Rain","Over the Mountain","Past Midnight","Raising Hell","Six Feet Deep","Six Strings Down","Still Here","Stone Cold","Straight to Hell","The Devil Knows","The Hard Way","The Long Way Home","Through the Fire","Til the Wheels Fall Off","Too Far Gone","Way Down South","When the Lights Go Down","Where I Come From","Whiskey Talking","Without a Prayer","Years Behind Me",
-    // Expanded
-    "Ain't No Grave","All Over Again","Almost Home","Angel Band","Another Day","Any Old Time","Back Where I Belong","Bad Moon Rising","Ballad of a Broken Man","Banks of the Ohio","Barroom Roses","Before the Dawn","Behind the Wall","Beneath the Pines","Beyond the Blue","Big River","Black Mountain Rag","Blind Lemon","Blue Moon of Kentucky","Blue Yodel","Blues Stay Away from Me","Born to Lose","Bottom of the Glass","Bury Me Not","By and By","Cabin on the Hill","Can't You Hear Me","Carolina in My Mind","Carry Me Back","Chattanooga Choo Choo","City of New Orleans","Coal Miner's Daughter","Cold Jordan","Columbus Stockade","Come All Ye Fair","Come Back Baby","Cotton Fields","Crazy Arms","Cripple Creek","Dark as a Dungeon","Dark Hollow","Dark Was the Night","Dead Flowers","Deep Elem Blues","Delta Dawn","Devil's Right Hand","Dixie Chicken","Don't Let Your Deal","Don't Think Twice","Down in the Valley","Down the Road Apiece","Driftwood on the River","East Virginia Blues","Easy Rider","Eight More Miles","El Paso","Faded Love","Fast Asleep","Folsom Prison","For the Sake of the Song","Fox on the Run","Frankie and Johnny","Freight Train Blues","Friend of the Devil","Gallows Pole","Gentle on My Mind","Get Along Home","Ghost Riders","Girl from the North Country","Go Down Moses","Going to California","Goodnight Irene","Grand Ole Opry","Greenback Dollar","Guitar Man","Handsome Molly","Harlan County Line","He Was a Friend","Heartaches by the Number","Heaven's Bright Shore","Hello in There","Hey Good Lookin'","High on a Mountain","Highway 40 Blues","Hobo's Lullaby","Home on the Range","Honky Tonk Angels","Hot Burrito","House of the Rising Sun","I Am a Man","I Am a Pilgrim","I Am the Man","I Know You Rider","I Saw the Light","I'll Fly Away","I'm So Lonesome","In the Jailhouse","In the Pines","It Makes No Difference","Jack of Diamonds","Jambalaya","John Henry","John the Revelator","Jolene","Keep on the Sunny Side","Kentucky Waltz","King of the Road","Kisses Sweeter","Ladies Love Outlaws","Laredo","Leaving on a Jet Plane","Life by the Drop","Little Maggie","Lonesome Dove","Lonesome Fugitive","Lonesome Road Blues","Long Black Veil","Lost Highway","Louisiana Man","Love Has No Pride","Luckenbach Texas","Make Me a Pallet","Man of Constant Sorrow","Matty Groves","Maybellene","Midnight Rider","Midnight Special","Miller's Cave","Miss the Mississippi","Molly and Tenbrooks","Monday Morning Blues","More Pretty Girls","Mountain Dew","Muleskinner Blues","My Elusive Dreams","My Old Kentucky Home","Nine Pound Hammer","Nobody Knows","North Country Blues","Oh Shenandoah","Old Joe Clark","Old Rattler","On Top of Old Smoky","Orange Blossom Special","Pancho and Lefty","Pistol Packin' Mama","Pretty Polly","Proud Mary","Ragged but Right","Rambler Gambler","Rank Stranger","Red River Valley","Reuben's Train","Ring of Fire","Rocky Top","Roll in My Sweet Baby's Arms","Roll on Buddy","Rose of Cimarron","Salty Dog","Santy Anno","Satisfied Mind","Shenandoah","Sitting on Top","Six Days on the Road","Soldier's Joy","Somebody Touched Me","Somewhere Over Yonder","Song for the Life","St. James Infirmary","Stand by Your Man","Statesboro Blues","Stealin'","Streets of Laredo","Summertime Blues","Sweetheart of the Rodeo","Take Me Home","Tangled Up in Blue","Tennessee Flat Top","Tennessee Stud","Tennessee Waltz","That Old Time","The Cuckoo","The Great Divide","The Last Thing","The Night They Drove","The Times They Are","The Wabash Cannonball","The Water Is Wide","The Weight","This Land Is Your Land","This Train","Tom Dooley","Train 45","Truck Drivin' Man","Tryin' to Get to Heaven","Turkey in the Straw","Uncle Pen","Wabash Cannonball","Walk the Line","Walking After Midnight","Waltz Across Texas","Waltz of the Wind","Wandering Boy","Wasted Days","Way Downtown","Wayfaring Stranger","We Shall Overcome","West Texas Cowboy","Whiskey Before Breakfast","White Freightliner","White House Blues","Who Will Sing","Wild Horses","Wildwood Flower","Will the Circle","Wimoweh","Worried Man Blues","Wreck of the Old 97","You Are My Sunshine","Your Cheatin' Heart"
-  ],
+  adj:["Cold","Dark","Dusty","Faded","Heavy","Hollow","Lost","Lonesome","Low","Midnight","Rainy","Red","Rusty","Silent","Smoky","Stormy","Sunburned","Thunder","Yellow","Pale","Angry","Bitter","Broken","Burning","Crying","Crooked","Desperate","Drunk","Empty","Fading","Forgotten","Golden","Gone","Grieving","Guilty","Hard","Haunted","Heartless","Hurting","Jealous","Barefoot","Backroads","Cotton","Copper","Cracked","Gravel","Iron","Muddy","Neon","Painted","Porch","Ragged","River","Rustic","Scarred","Steel","Stone","Tangled","Tin","Worn","Ancient","Dead","Early","Final","Last","Late","Long","Old","Slow","Still","Wicked","Wild","Weary","Wayward","Wandering","Tender","Troubled","Twisted","Unnamed","Crooked"],
+  noun:["Bayou","Creek","Delta","Dirt","Dust","Fields","Fog","Gravel","Hollow","Holler","Mountain","Mud","Pines","Rain","River","Road","Smoke","Storm","Swamp","Thunder","Barn","Bridge","Church","County","Crossroads","Front Porch","Highway","Jailhouse","Junction","Kitchen","Levee","Mill","Midnight","Old Town","Pasture","Railyard","Roadhouse","Saloon","Shack","Watering Hole","Blood","Bones","Ghost","Hands","Heart","Memory","Mind","Shadow","Skin","Soul","Spirit","Spine","Tears","Voice","Wound","Scar","Breath","Silence","Dream","Prayer","Bible","Bottle","Fiddle","Fire","Flame","Guitar","Grave","Lantern","Letter","Moon","Pistol","Rope","Saddle","Train","Whiskey","Wings","Wire","Wreath","Crown","Cross","Blues","Burden","Darkness","Debt","Faith","Freedom","Glory","Grace","Grief","Heaven","Hell","Hope","Justice","Kindness","Longing","Mercy","Pride","Promise","Regret","Sorrow"],
+  verb:["Aching","Bleeding","Breaking","Burning","Carrying","Chasing","Crawling","Crying","Drifting","Drinking","Driving","Drowning","Dying","Fading","Falling","Fighting","Gambling","Grieving","Haunting","Healing","Hiding","Holding","Howling","Hurting","Leaving","Lying","Missing","Moaning","Mourning","Paying","Preaching","Praying","Reckoning","Riding","Rising","Rolling","Running","Singing","Sleeping","Swearing","Walking","Wandering","Wishing","Working","Worrying","Screaming","Searching","Settling","Shaking","Trembling"],
+  place:["Alabama","Appalachia","Arkansas","Bakersfield","Beaumont","Biloxi","Clarksdale","Crossville","Deep East Texas","East Nashville","Georgia","Highway 61","Huntsville","Jackson","Kentucky","Louisiana","Memphis","Mississippi","Nashville","New Orleans","Natchez","Oklahoma","Piedmont","Red River","Shreveport","Tennessee","Tupelo","Yazoo"],
+  name:["Annie","Bobby","Carla","Darlene","Earl","Ellie Mae","Frank","Gracie","Hank","Iris","Jesse","Jolene","Kay","Lena","Luther","Mae","Mabel","Nora","Otis","Pearl","Ramona","Rosie","Ruby","Sally","Sonny","Stella","Tommy","Vera","Wanda","Willie"],
+  phrase:["After Dark","All Night Long","At the Crossroads","Back Down Home","Better Days","Between the Lines","By the River","Cold and Gone","Come Sundown","Deep in My Soul","Don't Look Back","Down the Line","Far From Here","For Good","From the Bottle","Gone to Ground","Gravel in My Bones","Hard Times","Heading South","In My Blood","In the Dark","Last Call","Last Ride","Left Behind","Letting Go","Long Gone","Lord Have Mercy","No Good Reason","No Turning Back","On My Way","On the Road","One More Night","Out in the Rain","Over the Mountain","Past Midnight","Raising Hell","Six Feet Deep","Six Strings Down","Still Here","Stone Cold","Straight to Hell","The Devil Knows","The Hard Way","The Long Way Home","Through the Fire","Til the Wheels Fall Off","Too Far Gone","Way Down South","When the Lights Go Down","Where I Come From","Whiskey Talking","Without a Prayer","Years Behind Me"],
 };
 
 const ANAME = {
@@ -2490,25 +1825,11 @@ const ANAME = {
 
 // ── ARTIST NAME GENERATOR ──────────────────────────────────
 const AN = {
-  first: [
-    // Classic country
-    "Hank","Waylon","Willie","Merle","Buck","Earl","Chet","Roy","Lefty","Tex","Bo","Luke","Cody","Beau","Clay","Wade","Clyde","Otis","Johnny","Dale","Slim","Dock","Floyd","Garth","Glen","Ray","Charlie","Emmett","Luther","Junior","Buddy","Harlan","Deke","Zeke","Homer","Rufus","Beauregard","Jessie","Travis","Lyle","Porter","Stonewall","Jimmie","Doc","Eddie","Conway","Ricky","Tom","Bobby","George","Alan","Randy","Tim","Kenny","Brad","Dierks","Eric","Jason","Keith","Toby","Trace","Vince","Clint","Tracy","Collin","Joe","John","Mark","Paul","Steve","Don","Jim","Bill","Jack","Frank","Tommy","Billy","Jimmy","Jerry","Ronnie","Gary","Danny","Ricky","Marty","Lynn","Roger","Bruce","Dean","Gordon","Hoyt","Freddy","Webb","Red","Jerry Jeff","Guy","Townes","Rodney","Robert","John Prine","Sturgill","Tyler","Zach","Colter","Cody","Ian","Charles","Sam","Nathan","Ben","Jake","Seth","Noah","Ethan","Mason","Logan","Aiden","Caleb","Wyatt","Gunner","Colt","Dallas","Austin","Dakota","Cheyenne","Dusty","Rio","Sage","River","Forest","Hunter","Fisher","Walker","Ranger","Scout","Sawyer","Cooper","Carter","Parker","Tanner","Slater","Forrest","Woody","Dusty","Sunny","Stormy","Rain","Cloud","Wolf","Bear","Fox","Hawk","Eagle","Raven","Crow","Coyote","Snake","Bull","Stallion","Mustang","Bronco","Maverick","Ranger","Scout","Scout","Scout",
-    // Blues
-    "Muddy","Howlin","Lightnin","Blind","Little","Big","Leadbelly","Son","Delta","Rev","Elmore","Buddy","Sonny","Magic","Guitar","B.B.","Albert","Freddie","John Lee","Muddy","Slim","Hound Dog","Big Mama","Koko","Etta","Bessie","Ma","Memphis","Mississippi","Louisiana","Texas","Chicago","Detroit","St. Louis","Atlanta","New Orleans","Memphis","Jackson","Natchez","Vicksburg","Greenville","Clarksdale","Helena","Tunica","Oxford","Tupelo","Meridian","Hattiesburg","Laurel","Columbus","Gulfport","Biloxi","Pascagoula","Mobile","Montgomery","Birmingham","Huntsville","Tuscaloosa","Gadsden","Decatur","Florence","Muscle","Shoals","Sheffield","Tuscumbia","Russellville","Jasper","Cullman","Albertville","Boaz","Fort Payne","Scottsboro","Athens","Hartselle","Arab","Guntersville","Rainsville","Sylvania","Henagar","Ider","Pisgah","Flat Rock","Higdon","Bryant","Bridgeport","South Pittsburg","Sewanee","Monteagle","Tracy City","Coalmont","Gruetli","Laager","Altamont","Beersheba","Spencer","Doyle","Quebeck","Campaign","Rock Island","McMinnville","Smithville","Woodbury","Morrison","Viola","Lascassas","Auburntown","Liberty","Gordonsville","Carthage","Lebanon","Hartsville","Gallatin","Portland","Westmoreland","Mitchellville","Cross Plains","Cedar Hill","Pleasant View","Coopertown","Ridgetop","Millersville","Goodlettsville","Madison","Old Hickory","Hermitage","Lakewood","Donelson","Antioch","Nolensville","Brentwood","Franklin","Spring Hill","Thompson's Station","Nunnelly","Lyles","Wrigley","Only","Hampshire","Mount Pleasant","Santa Fe","Summertown","Ethridge","Loretto","St. Joseph","Iron City","Lawrenceburg","Pulaski","Waynesboro","Clifton","Savannah","Crump","Adamsville","Selmer","Bethel Springs","Finger","Ramsey","Hornsby","Pocahontas","Middleton","Toone","Bolivar","Whiteville","Somerville","Moscow","Williston","Oakland","Rossville","Brunswick","Tiptonville","Ridgely","Dyersburg","Newbern","Humboldt","Trenton","Gibson","Milan","McKenzie","Huntingdon","Camden","Paris","Waverly","Dover","Clarksville","Ashland City","Pleasant View","Coopertown","Ridgetop","Millersville","Goodlettsville","Madison","Old Hickory","Hermitage","Lakewood","Donelson","Antioch","Nolensville","Brentwood","Franklin","Spring Hill","Thompson's Station","Nunnelly","Lyles","Wrigley","Only","Hampshire","Mount Pleasant","Santa Fe","Summertown","Ethridge","Loretto","St. Joseph","Iron City","Lawrenceburg","Pulaski","Waynesboro","Clifton","Savannah","Crump","Adamsville","Selmer","Bethel Springs","Finger","Ramsey","Hornsby","Pocahontas","Middleton","Toone","Bolivar","Whiteville","Somerville","Moscow","Williston","Oakland","Rossville","Brunswick","Tiptonville","Ridgely","Dyersburg","Newbern","Humboldt","Trenton","Gibson","Milan","McKenzie","Huntingdon","Camden","Paris","Waverly","Dover","Clarksville","Ashland City","Pleasant View","Coopertown","Ridgetop","Millersville","Goodlettsville","Madison","Old Hickory","Hermitage","Lakewood","Donelson","Antioch","Nolensville","Brentwood","Franklin","Spring Hill","Thompson's Station","Nunnelly","Lyles","Wrigley","Only","Hampshire","Mount Pleasant","Santa Fe","Summertown","Ethridge","Loretto","St. Joseph","Iron City","Lawrenceburg","Pulaski","Waynesboro","Clifton","Savannah","Crump","Adamsville","Selmer","Bethel Springs","Finger","Ramsey","Hornsby","Pocahontas","Middleton","Toone","Bolivar","Whiteville","Somerville","Moscow","Williston","Oakland","Rossville","Brunswick","Tiptonville","Ridgely","Dyersburg","Newbern","Humboldt","Trenton","Gibson","Milan","McKenzie","Huntingdon","Camden","Paris","Waverly","Dover","Clarksville","Ashland City"
-  ],
-  last: [
-    // Country legends
-    "Monroe","Rhodes","Cash","Jennings","Travis","Haggard","Tucker","Jones","Williams","Price","Stone","Cross","Lane","King","Waters","Johnson","Dixon","Turner","Walker","Brown","Davis","Hayes","Webb","Cobb","Doss","Holt","Boone","Sims","Poe","Gentry","Sayles","Colter","Frizzell","Tillis","Owens","Macon","Parsons","Clark","Ritter","Autry","Acuff","Foley","Tubb","Wills","Wells","Lynn","Cline","Lovett","Earle","Croce","Rawlings","Nelson","Kristofferson","Harris","Ronstadt","Parton","Wynette","Mandrell","Murray","West","Gibson","Shepard","Anderson","Strait","Black","Brooks","Dunn","Jackson","McGraw","Hill","Urban","Aldean","Bryan","Church","Stapleton","Isbell","Simpson","Childers","Jinks","Moreland","McMurtry","Fulks","Snider","Hubbard","Keen","Shaver","Van Zandt","Gilmore","Ely","Hancock","Walker","Friedman","Russell","Bromberg","McClinton","Bishop","Raitt","Browne","Souther","Meisner","Schmit","Leadon","Felder","Walsh","Henley","Frey","Lindley","Bruce","Hornsby","Waits","Cohen","Mitchell","Young","Dylan","Petty","Springsteen","Seger","Mellencamp","Fogerty","Creedence","Band","Byrds","Eagles","Poco","Flying Burrito","Commander","Pure Prairie","New Riders","Goose Creek","Ozark Mountain","Dillard","Nitty Gritty","Asleep at the Wheel","Lost Gonzo","Western Swing","Cherokee","Choctaw","Chickasaw","Creek","Seminole","Shawnee","Potawatomi","Osage","Kiowa","Comanche","Apache","Navajo","Hopi","Zuni","Pueblo","Ute","Paiute","Shoshone","Bannock","Nez Perce","Crow","Blackfeet","Cheyenne","Arapaho","Lakota","Dakota","Nakota","Ojibwe","Odawa","Potawatomi","Menominee","Ho-Chunk","Oneida","Mohawk","Seneca","Cayuga","Onondaga","Tuscarora","Oneida","Mohawk","Seneca","Cayuga","Onondaga","Tuscarora"
-  ],
-  prefix: [
-    "Blind","Lonesome","Dusty","Lucky","Mississippi","Reverend","Ol'","Big","Little","Muddy","Slim","Tex","Iron","Smoky","Dirty","Hollow","Hard","Mean","Crazy","Wild","Wicked","Honest","Broken","Barefoot","Drunk","Sober","High","Low","Fast","Slow","Red","Blue","Black","White","Yellow","Green","Brown","Gray","Silver","Golden","Copper","Steel","Iron","Lead","Tin","Brass","Bronze","Glass","Crystal","Diamond","Ruby","Emerald","Sapphire","Pearl","Amber","Jade","Opal","Onyx","Quartz","Granite","Marble","Slate","Limestone","Sandstone","Clay","Dirt","Mud","Dust","Gravel","Sand","Soil","Earth","Stone","Rock","Pebble","Boulder","Cliff","Canyon","Ravine","Gully","Gorge","Valley","Hollow","Holler","Ridge","Peak","Summit","Crest","Crown","Brow","Forehead","Temple","Chin","Jaw","Cheek","Neck","Throat","Chest","Breast","Heart","Liver","Lung","Kidney","Spleen","Gall","Bladder","Womb","Gut","Belly","Stomach","Rib","Bone","Skull","Spine","Hip","Knee","Ankle","Heel","Toe","Finger","Thumb","Palm","Wrist","Elbow","Shoulder","Arm","Leg","Thigh","Shin","Calf","Foot","Hand","Head","Face","Eye","Ear","Nose","Mouth","Lip","Tongue","Tooth","Hair","Beard","Mustache","Whisker","Brow","Lash","Brow","Lash"
-  ],
-  band: [
-    "& the Hellbenders","& the Road Dogs","& the Honky Tonk Boys","& the Southern Cross","& the Delta Kings","& the Crossroad Blues Band","& the Backroads","& the Midnight Riders","& the Gospel Train","& the Bottle Rockets","& the Rambling Ghosts","& the Dust Devils","& the Wandering Stars","& the Lost Highway","& the Broken Compass","& the Rusty Nails","& the Whiskey Rebels","& the Cottonmouths","& the Copperheads","& the Timber Rattlers","& the Diamondbacks","& the Gila Monsters","& the Horned Toads","& the Roadrunners","& the Coyotes","& the Jackrabbits","& the Cottontails","& the Pronghorns","& the Bighorns","& the Mustangs","& the Broncs","& the Paints","& the Appaloosas","& the Quarter Horses","& the Thoroughbreds","& the Standardbreds","& the Arabians","& the Morgans","& the Tennessees","& the Kentucky Saddlers","& the Rocky Mountains","& the Great Smokies","& the Ozark Mountain Daredevils","& the Blue Ridge Rangers","& the Cumberland Gap","& the Natchez Trace","& the Trail of Tears","& the Chisholm Trail","& the Goodnight-Loving","& the Shawnee Trail","& the Bozeman Trail","& the Oregon Trail","& the Santa Fe Trail","& the Old Spanish Trail","& the El Camino Real","& the King's Highway","& the Wilderness Road","& the Cumberland Road","& the National Road","& the Bankhead Highway","& the Dixie Highway","& the Lincoln Highway","& the Jefferson Highway","& the Jackson Highway","& the Lee Highway","& the Pershing Highway","& the Victory Highway","& the Ocean Highway","& the Dixie Overland","& the Old Oregon","& the Mormon Trail","& the California Trail","& the Pony Express","& the Butterfield Overland","& the Southern Overland","& the Gila Trail","& the Cooke's Wagon Road","& the Emigrant Road","& the Lander Road","& the Sublette Cutoff","& the Hastings Cutoff","& the Applegate Trail","& the Barlow Road","& the Meek Cutoff","& the Elliott Cutoff","& the Greenwood Cutoff","& the Raft River","& the Snake River","& the Humboldt River","& the Truckee River","& the Carson River","& the Walker River","& the Bishop Creek","& the Owens River","& the Kern River","& the Kings River","& the San Joaquin","& the Sacramento","& the American River","& the Feather River","& the Yuba River","& the Bear River","& the Mokelumne","& the Calaveras","& the Stanislaus","& the Tuolumne","& the Merced","& the Fresno","& the Tulare","& the Kern","& the Mojave","& the Colorado","& the Green River","& the White River","& the Yampa","& the Duchesne","& the Price River","& the San Rafael","& the Dirty Devil","& the Escalante","& the Paria","& the Kanab","& the Virgin","& the Muddy","& the Las Vegas Wash","& the Amargosa","& the Death Valley","& the Panamint","& the Searles","& the Owens Lake","& the Mono Lake","& the Tahoe","& the Pyramid","& the Walker","& the Carson","& the Humboldt","& the Quinn River","& the Thousand Springs","& the Malheur","& the Owyhee","& the Bruneau","& the Jarbidge","& the Salmon Falls","& the Snake River Plain","& the Hagerman","& the Thousand Springs","& the Clearwater","& the Lochsa","& the Selway","& the Middle Fork","& the South Fork","& the North Fork","& the Main Salmon","& the Lemhi","& the Pahsimeroi","& the Big Lost","& the Little Lost","& the Wood River","& the Big Wood","& the Little Wood","& the Camas","& the Silver Creek","& the Trail Creek","& the Big Creek","& the Little Creek","& the Bear Valley","& the Deer Creek","& the Elk Creek","& the Wolf Creek","& the Coyote Creek","& the Dry Creek","& the Rock Creek","& the Sand Creek","& the Mud Creek","& the Willow Creek","& the Cottonwood Creek","& the Ash Creek","& the Birch Creek","& the Cedar Creek","& the Cherry Creek","& the Dogwood Creek","& the Elm Creek","& the Fir Creek","& the Hickory Creek","& the Juniper Creek","& the Larch Creek","& the Maple Creek","& the Oak Creek","& the Pine Creek","& the Poplar Creek","& the Redwood Creek","& the Spruce Creek","& the Sycamore Creek","& the Walnut Creek","& the Willow Creek","& the Alder Creek","& the Aspen Creek","& the Basswood Creek","& the Beech Creek","& the Butternut Creek","& the Catalpa Creek","& the Chestnut Creek","& the Cottonwood Creek","& the Cypress Creek","& the Dogwood Creek","& the Elder Creek","& the Hackberry Creek","& the Hawthorn Creek","& the Hemlock Creek","& the Holly Creek","& the Honeylocust Creek","& the Hornbeam Creek","& the Ironwood Creek","& the Kentucky Coffee Creek","& the Linden Creek","& the Locust Creek","& the Magnolia Creek","& the Mulberry Creek","& the Osage Orange Creek","& the Pawpaw Creek","& the Pecan Creek","& the Persimmon Creek","& the Redbud Creek","& the Sassafras Creek","& the Serviceberry Creek","& the Sweetgum Creek","& the Sycamore Creek","& the Tulip Tree Creek","& the Walnut Creek","& the Witch Hazel Creek","& the Yellowwood Creek","& the Zelkova Creek"
-  ],
-  single: [
-    "Leadbelly","Moonshine","Cattail","Gravel","Crossroads","Rawhide","Saddleback","Tumbleweed","Copperhead","Ironwood","Blackwater","Redbird","Riverbed","Boxcar","Holler","Ridgeline","Lonesome","Hardscrabble","Plainsman","Dustdevil","Sandstorm","Hailstone","Tornado","Floodwater","Droughtline","Wildfire","Icehouse","Snowdrift","Frostbite","Heatwave","Dustbowl","Grapes","Wrath","Thunderhead","Lightningrod","Rainmaker","Cloudburst","Sunshine","Moonbeam","Starlight","Daybreak","Nightfall","Dusk","Dawn","Twilight","Midday","Midnight","Noon","Sunup","Sundown","Moonrise","Moonset","High Tide","Low Tide","Ebb","Flow","Surge","Ripple","Wave","Wake","Drift","Current","Eddy","Whirlpool","Maelstrom","Vortex","Cyclone","Typhoon","Monsoon","Mistral","Sirocco","Chinook","Santa Ana","Nor'easter","Blizzard","Avalanche","Landslide","Mudslide","Rockslide","Debris Flow","Lahar","Pyroclast","Ashfall","Tephra","Pumice","Obsidian","Basalt","Granite","Schist","Gneiss","Marble","Quartzite","Slate","Shale","Sandstone","Conglomerate","Breccia","Chert","Flint","Jasper","Agate","Onyx","Opal","Turquoise","Lapis","Malachite","Azurite","Chrysocolla","Tourmaline","Garnet","Amethyst","Citrine","Topaz","Peridot","Aquamarine","Bloodstone","Carnelian","Chalcedony","Coral","Ivory","Jet","Amber","Copal","Resin","Sap","Tar","Pitch","Bitumen","Asphalt","Concrete","Steel","Iron","Brass","Bronze","Copper","Tin","Lead","Zinc","Nickel","Chrome","Platinum","Gold","Silver","Mercury","Quicksilver","Aluminum","Titanium","Uranium","Plutonium","Neptunium","Americium","Curium","Berkelium","Californium","Einsteinium","Fermium","Mendelevium","Nobelium","Lawrencium","Rutherfordium","Dubnium","Seaborgium","Bohrium","Hassium","Meitnerium","Darmstadtium","Roentgenium","Copernicium","Nihonium","Flerovium","Moscovium","Livermorium","Tennessine","Oganesson"
-  ],
+  first: ["Hank","Waylon","Willie","Merle","Buck","Earl","Chet","Roy","Lefty","Tex","Bo","Luke","Cody","Beau","Clay","Wade","Clyde","Otis","Johnny","Dale","Slim","Dock","Floyd","Garth","Glen","Ray","Charlie","Emmett","Luther","Junior","Buddy","Harlan","Deke","Zeke","Homer","Rufus","Beauregard","Jessie","Travis","Lyle","Porter","Stonewall","Muddy","Howlin","Lightnin","Blind","Little","Big","Leadbelly","Son","Delta","Rev","Elmore","Buddy","Sonny","Magic","Guitar"],
+  last: ["Monroe","Rhodes","Cash","Jennings","Travis","Haggard","Tucker","Jones","Williams","Price","Stone","Cross","Lane","King","Waters","Johnson","Dixon","Turner","Walker","Brown","Davis","Hayes","Webb","Cobb","Doss","Holt","Boone","Sims","Poe","Gentry","Sayles","Colter","Frizzell","Tillis","Owens","Macon","Parsons","Clark","Ritter","Autry","Acuff","Foley","Tubb","Wills","Wells","Lynn","Cline","Lovett","Earle","Croce","Rawlings"],
+  prefix: ["Blind","Lonesome","Dusty","Lucky","Mississippi","Reverend","Ol'","Big","Little","Muddy","Slim","Tex","Iron","Smoky"],
+  band: ["& the Hellbenders","& the Road Dogs","& the Honky Tonk Boys","& the Southern Cross","& the Delta Kings","& the Crossroad Blues Band","& the Backroads","& the Midnight Riders","& the Gospel Train","& the Bottle Rockets","& the Rambling Ghosts","& the Dust Devils"],
+  single: ["Leadbelly","Moonshine","Cattail","Gravel","Crossroads","Rawhide","Saddleback","Tumbleweed","Copperhead","Ironwood","Blackwater","Redbird","Riverbed","Boxcar","Holler","Ridgeline","Lonesome","Hardscrabble","Plainsman"],
 };
 
 export function genArtistName(): string {
@@ -2520,79 +1841,10 @@ export function genArtistName(): string {
   return rnd(AN.first) + " " + rnd(AN.last);
 }
 
-// ── RANDOM NAME GENERATOR ──────────────────────────────────
-// Generates a complete random artist name. Can be used for NPCs
-// or as a "Random Name" button on the player setup screen.
-export function generateRandomName(): string {
-  const patterns = [
-    // 15% chance: Single word name
-    () => rnd(AN.single),
-    // 15% chance: Prefix + Last name
-    () => rnd(AN.prefix) + " " + rnd(AN.last),
-    // 15% chance: First + Last + Band suffix
-    () => rnd(AN.first) + " " + rnd(AN.last) + " " + rnd(AN.band),
-    // 15% chance: Prefix + First + Last
-    () => rnd(AN.prefix) + " " + rnd(AN.first) + " " + rnd(AN.last),
-    // 20% chance: Classic First + Last
-    () => rnd(AN.first) + " " + rnd(AN.last),
-    // 10% chance: First + "The" + Noun
-    () => rnd(AN.first) + " the " + rnd(AN.single),
-    // 10% chance: The + Adjective + Last
-    () => "The " + rnd(AN.prefix) + " " + rnd(AN.last),
-  ];
-  return rnd(patterns)();
-}
-
-// Quick alias for UI buttons
-export const getRandomArtistName = generateRandomName;
-
 // ── HELPERS ────────────────────────────────────────────────
 export function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)]; }
 export function roll(mn: number, mx: number): number { return mn + Math.random() * (mx - mn); }
 export function clamp(v: number, mn: number, mx: number): number { return Math.max(mn, Math.min(mx, v)); }
-
-// ── STREAMING PLATFORM SYSTEM ─────────────────────────────────────────────
-export interface StreamingPlatform {
-  id: string;
-  name: string;
-  ratePerStream: number;
-  rateRange: [number, number];
-  marketShare: number;
-  premiumOnly: boolean;
-  discoveryWeight: number;
-}
-
-export const STREAMING_PLATFORMS: StreamingPlatform[] = [
-  { id: "spotify",  name: "Spotify",       ratePerStream: 0.0042, rateRange: [0.003, 0.0058],  marketShare: 0.52, premiumOnly: false, discoveryWeight: 1.0 },
-  { id: "apple",    name: "Apple Music",   ratePerStream: 0.0085, rateRange: [0.007, 0.010],   marketShare: 0.22, premiumOnly: true,  discoveryWeight: 0.6 },
-  { id: "amazon",   name: "Amazon Music",  ratePerStream: 0.0055, rateRange: [0.004, 0.008],   marketShare: 0.12, premiumOnly: false, discoveryWeight: 0.4 },
-  { id: "youtube",  name: "YouTube Music", ratePerStream: 0.0020, rateRange: [0.0005, 0.003],  marketShare: 0.09, premiumOnly: false, discoveryWeight: 0.7 },
-  { id: "tidal",    name: "Tidal",         ratePerStream: 0.0130, rateRange: [0.012, 0.015],   marketShare: 0.02, premiumOnly: true,  discoveryWeight: 0.3 },
-  { id: "deezer",   name: "Deezer",        ratePerStream: 0.0055, rateRange: [0.004, 0.006],   marketShare: 0.02, premiumOnly: false, discoveryWeight: 0.2 },
-  { id: "pandora",  name: "Pandora",       ratePerStream: 0.0014, rateRange: [0.0013, 0.0015], marketShare: 0.01, premiumOnly: false, discoveryWeight: 0.3 },
-];
-
-export const BASE_STREAMING_RATE = 0.0048;
-
-export const GEO_RATE_MODIFIERS: Record<string, number> = {
-  "US": 1.15, "UK": 1.08, "CA": 1.05, "DE": 1.02, "AU": 1.00,
-  "FR": 0.95, "BR": 0.72, "MX": 0.68, "IN": 0.28, "other": 0.85,
-};
-
-export const DEFAULT_GEO_DIST: Record<string, number> = {
-  "US": 0.62, "UK": 0.08, "CA": 0.05, "DE": 0.03, "AU": 0.02,
-  "FR": 0.02, "BR": 0.03, "MX": 0.02, "IN": 0.01, "other": 0.12,
-};
-
-export const PREMIUM_SPLIT: Record<string, number> = {
-  spotify: 0.58, apple: 1.00, amazon: 0.65, youtube: 0.35,
-  tidal: 1.00, deezer: 0.55, pandora: 0.25,
-};
-
-export const PREMIUM_MULTIPLIER = 3.2;
-
-export const SPOTIFY_MIN_STREAMS = 1000;
-
 export function fmt(n: number): string { return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : Math.floor(n).toString(); }
 export function fmtMoney(n: number): string {
   const abs = Math.abs(Math.round(n));
@@ -2622,209 +1874,9 @@ const TPATS: (() => string)[] = [
   () => rnd(TW.adj) + " " + rnd(TW.name),
   () => "Devil " + rnd(TW.verb) + " " + rnd(TW.noun),
   () => "When the " + rnd(TW.noun) + " " + rnd(TW.verb),
-  // NEW PATTERNS
-  () => rnd(TW.name) + " " + rnd(TW.verb) + " " + rnd(TW.noun),
-  () => "Down by the " + rnd(TW.noun),
-  () => "Up on " + rnd(TW.place),
-  () => "The Night " + rnd(TW.name) + " " + rnd(TW.verb),
-  () => rnd(TW.adj) + " " + rnd(TW.place) + " " + rnd(TW.noun),
-  () => rnd(TW.verb) + " Down " + rnd(TW.place),
-  () => "Long Gone " + rnd(TW.noun),
-  () => "Just " + rnd(TW.verb) + " " + rnd(TW.noun),
-  () => rnd(TW.noun) + " in the " + rnd(TW.noun),
-  () => "Blood on the " + rnd(TW.noun),
-  () => rnd(TW.name) + " Don't " + rnd(TW.verb) + " No More",
-  () => "Midnight " + rnd(TW.noun),
-  () => "Sunday " + rnd(TW.noun),
-  () => "Black " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "White " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Red " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Blue " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gold " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Silver " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Copper " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Iron " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Steel " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Stone " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Wooden " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Paper " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Glass " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Crystal " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Diamond " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Ruby " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Emerald " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Sapphire " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Pearl " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Amber " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Jade " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Opal " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Onyx " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Quartz " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Granite " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Marble " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Slate " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Limestone " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Sandstone " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Clay " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Dirt " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Mud " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Dust " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gravel " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Sand " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Soil " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Earth " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Stone " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Rock " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Pebble " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Boulder " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Cliff " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Canyon " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Ravine " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gully " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gorge " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Valley " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Hollow " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Holler " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Ridge " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Peak " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Summit " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Crest " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Crown " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Brow " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Forehead " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Temple " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Chin " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Jaw " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Cheek " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Neck " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Throat " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Chest " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Breast " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Heart " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Liver " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Lung " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Kidney " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Spleen " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gall " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Bladder " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Womb " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Gut " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Belly " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Stomach " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Rib " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Bone " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Skull " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Spine " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Hip " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Knee " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Ankle " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Heel " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Toe " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Finger " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Thumb " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Palm " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Wrist " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Elbow " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Shoulder " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Arm " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Leg " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Thigh " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Shin " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Calf " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Foot " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Hand " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Head " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Face " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Eye " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Ear " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Nose " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Mouth " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Lip " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Tongue " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Tooth " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Hair " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Beard " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Mustache " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Whisker " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Brow " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Lash " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Brow " + rnd(TW.noun) + " " + rnd(TW.noun),
-  () => "Lash " + rnd(TW.noun) + " " + rnd(TW.noun),
 ];
 
 export function genTrackName(): string { return rnd(TPATS)(); }
-// Theme-specific track name generators
-const THEME_TRACK_WORDS: Record<string, { prefixes: string[]; nouns: string[]; suffixes: string[] }> = {
-  heartbreak: {
-    prefixes: ["Broken", "Empty", "Lonely", "Tears", "Goodbye", "Last", "Lost", "Hurting", "Cold", "Faded", "Gone", "Haunted", "Scarred", "Bitter", "Final"],
-    nouns: ["Heart", "Love", "Ring", "Letter", "Memory", "Whiskey", "Barstool", "Goodbye", "Shadow", "Ghost", "Rain", "Storm", "Wound", "Promise", "Regret"],
-    suffixes: ["Blues", "Song", "Ballad", "Lament", "Goodbye", "Again", "Tonight", "Forever", "Away", "Down"],
-  },
-  whiskey: {
-    prefixes: ["Drunk", "Neon", "Midnight", "Empty", "Last", "Double", "Cheap", "Burning", "Wicked", "Old", "Dirty", "Red", "Smoky", "Slow", "Hard"],
-    nouns: ["Bottle", "Glass", "Bar", "Stool", "Whiskey", "Bourbon", "Shot", "Tavern", "Neon", "Hangover", "Pour", "Drink", "Devil", "Angel", "Memory"],
-    suffixes: ["Blues", "Song", "Again", "Tonight", "Down", "Away", "Morning", "Night", "Hour", "Rain"],
-  },
-  hometown: {
-    prefixes: ["Old", "Small", "Dusty", "Backroads", "Cotton", "Mama's", "Daddy's", "Grandpa's", "Home", "Porch", "Front", "Sunday", "Summer", "Southern", "Country"],
-    nouns: ["Home", "Town", "Porch", "Road", "Dirt", "Field", "River", "Church", "Mama", "Daddy", "Dog", "Truck", "House", "Swing", "Memory"],
-    suffixes: ["Road", "Blues", "Song", "Home", "Again", "Boy", "Girl", "Dream", "Days", "Night"],
-  },
-  road: {
-    prefixes: ["Long", "Open", "Endless", "Dusty", "Lonely", "Midnight", "Highway", "Back", "Wandering", "Leaving", "Running", "Rambling", "Miles", "Wheels", "Freeway"],
-    nouns: ["Road", "Highway", "Motel", "Mile", "Horizon", "Wheels", "Gas", "Station", "Map", "Sign", "Border", "State", "Line", "Sunset", "Dawn"],
-    suffixes: ["Ahead", "Behind", "Blues", "Song", "Again", "Home", "Away", "Down", "Line", "Ride"],
-  },
-  faith: {
-    prefixes: ["Amazing", "Blessed", "Holy", "Sunday", "Gospel", "Sinner's", "Redeemed", "Saved", "Heavenly", "Golden", "Angel", "Glory", "Mercy", "Grace", "Prayer"],
-    nouns: ["Grace", "Mercy", "Prayer", "Hymn", "Glory", "Heaven", "Angel", "Church", "Steeple", "Bible", "Cross", "Jordan", "River", "Glory", "Light"],
-    suffixes: ["Hymn", "Song", "Glory", "Amen", "Home", "Bound", "Blues", "Light", "Way", "Call"],
-  },
-  rebellion: {
-    prefixes: ["Wild", "Reckless", "Burning", "Rebel", "Outlaw", "Wanted", "Dangerous", "Fighting", "Running", "Free", "Broken", "Chains", "Loud", "Young", "Fast"],
-    nouns: ["Rebel", "Outlaw", "Gun", "Horse", "Law", "Sheriff", "Jail", "Train", "Robber", "Bandit", "Fist", "Fight", "Fire", "Storm", "Thunder"],
-    suffixes: ["Run", "Blues", "Song", "Down", "Away", "Free", "Forever", "Night", "Ride", "Wind"],
-  },
-  redemption: {
-    prefixes: ["Saved", "Redeemed", "Washed", "New", "Clean", "Forgiven", "Found", "Healed", "Rising", "Second", "Born", "Bright", "Golden", "Morning", "Mercy"],
-    nouns: ["Grace", "Chance", "Life", "Day", "Dawn", "Light", "Road", "Home", "Heart", "Soul", "Hand", "Way", "Path", "River", "Mountain"],
-    suffixes: ["Again", "Home", "Blues", "Song", "Free", "Rising", "Up", "On", "Way", "Dawn"],
-  },
-  nature: {
-    prefixes: ["Wild", "Mountain", "River", "Summer", "Autumn", "Winter", "Spring", "Thunder", "Lightning", "Morning", "Golden", "Dusty", "Green", "Old", "Ancient"],
-    nouns: ["Mountain", "River", "Wind", "Rain", "Storm", "Tree", "Field", "Meadow", "Creek", "Lake", "Forest", "Trail", "Sunset", "Moon", "Star"],
-    suffixes: ["Song", "Blues", "Wind", "Rain", "Light", "Night", "Dawn", "Call", "Home", "Way"],
-  },
-  outlaw: {
-    prefixes: ["Wanted", "Dead", "Lone", "Midnight", "Riding", "Running", "Six", "Hanging", "Desert", "Dusty", "Blood", "Cold", "Steel", "Iron", "Wicked"],
-    nouns: ["Gun", "Horse", "Saddle", "Spur", "Badge", "Sheriff", "Posse", "Jail", "Noose", "Desert", "Sun", "Trail", "Dust", "Wind", "Ghost"],
-    suffixes: ["Run", "Blues", "Song", "Down", "Ride", "Wind", "Sun", "Dawn", "Night", "Trail"],
-  },
-  party: {
-    prefixes: ["Friday", "Saturday", "Neon", "Loud", "Crazy", "Wild", "Drunk", "Dancing", "Backroad", "Tailgate", "Bonfire", "Beer", "Good", "Hot", "Summer"],
-    nouns: ["Night", "Party", "Time", "Beer", "Truck", "Radio", "Song", "Dance", "Girl", "Boy", "Crowd", "Band", "Stage", "Light", "Moon"],
-    suffixes: ["Again", "Tonight", "Down", "Up", "Blues", "Song", "Time", "Night", "Party", "On"],
-  },
-};
-
-export function genThemedTrackName(themeId?: string): string {
-  if (!themeId || !THEME_TRACK_WORDS[themeId]) {
-    return genTrackName();
-  }
-  const words = THEME_TRACK_WORDS[themeId];
-  const pats = [
-    () => rnd(words.prefixes) + " " + rnd(words.nouns),
-    () => "The " + rnd(words.prefixes) + " " + rnd(words.nouns),
-    () => rnd(words.nouns) + " " + rnd(words.suffixes),
-    () => rnd(words.prefixes) + " " + rnd(words.nouns) + " " + rnd(words.suffixes),
-    () => "My " + rnd(words.prefixes) + " " + rnd(words.nouns),
-    () => rnd(words.nouns) + " of " + rnd(words.nouns),
-    () => "Old " + rnd(words.nouns),
-    () => rnd(words.prefixes) + " " + rnd(words.nouns) + " Blues",
-  ];
-  return rnd(pats)();
-}
-
 export function genAlbumName(artistName = ""): string {
   const pats = [
     () => rnd(ANAME.pre) + " " + rnd(ANAME.noun),
@@ -2972,6 +2024,7 @@ export function producerStyleBonus(producer: Producer | undefined, track: TrackE
 }
 
 export interface RecordingProject {
+  artworkBudget?: ArtworkBudget;
   type: ReleaseType;
   title: string;
   genre: Genre;
@@ -2987,10 +2040,11 @@ export interface RecordingProject {
   studioBreakThisWeek?: boolean;
   pushThroughThisWeek?: boolean;
   pushThroughCount?: number;
-  mode?: RecordingMode;
 }
 
 export interface UnreleasedProject {
+  artworkBudget?: ArtworkBudget;
+  wardrobeStyle?: WardrobeStyle;
   id: string;
   type: ReleaseType;
   title: string;
@@ -3005,6 +2059,8 @@ export interface UnreleasedProject {
 }
 
 export interface DiscographyEntry {
+  artworkBudget?: ArtworkBudget;
+  wardrobeStyle?: WardrobeStyle;
   id: string;
   type: ReleaseType;
   title: string;
@@ -3098,6 +2154,8 @@ export function pickTrendTheme(current: string | null | undefined): string {
 }
 
 export interface CatalogEntry {
+  artworkBudget?: ArtworkBudget;
+  wardrobeStyle?: WardrobeStyle;
   id: string;
   title: string;
   type: ReleaseType;
@@ -3116,28 +2174,6 @@ export interface CatalogEntry {
   comebackCooldown: number;
   tracks: TrackEntry[];
   hasMusicVideo: boolean;
-  // ── Streaming v2.0 tracking ──
-  platformMix?: Record<string, number>;
-  geoDist?: Record<string, number>;
-  premiumRatio?: number;
-  effectiveRate?: number;
-  lifetimeRevenue?: number;
-  weeklyRevenue?: number;
-  revenueHistory?: number[];
-  streamStats?: {
-    totalStreams: number;
-    weeklyStreams: number;
-    peakStreams: number;
-    totalRevenue: number;
-    weeklyRevenue: number;
-    platformBreakdown: Record<string, number>;
-    geoBreakdown: Record<string, number>;
-    effectiveRate: number;
-    premiumRatio: number;
-    usShare: number;
-    hitThreshold: boolean;
-    revenueHistory: number[];
-  };
 }
 
 export interface TourStop {
@@ -3670,12 +2706,11 @@ export interface GameState {
   activeArcs: ArcInstance[];
   completedArcs: string[]; // arc ids that already played out (don't re-fire)
   pendingArcChoice: { arcId: string; stepIndex: number } | null;
+  currentStageDesign: StageDesign | null;
+  currentWardrobe: WardrobeStyle | null;
+  wardrobeHistory: WardrobeStyle[];
   // game over
   gameOverReason?: string;
-  // ── Streaming v2.0 platform/geographic tracking ──
-  platformMix: Record<string, number>;
-  geoDist: Record<string, number>;
-  premiumRatio: number;
 }
 
 export const INITIAL_STATE: GameState = {
@@ -3756,10 +2791,9 @@ export const INITIAL_STATE: GameState = {
   activeArcs: [],
   completedArcs: [],
   pendingArcChoice: null,
-  // ── Streaming v2.0 defaults ──
-  platformMix: { spotify: 0.52, apple: 0.22, amazon: 0.12, youtube: 0.09, tidal: 0.02, deezer: 0.02, pandora: 0.01 },
-  geoDist: { US: 0.62, UK: 0.08, CA: 0.05, DE: 0.03, AU: 0.02, FR: 0.02, BR: 0.03, MX: 0.02, IN: 0.01, other: 0.12 },
-  premiumRatio: 0.45,
+  currentStageDesign: null,
+  currentWardrobe: null,
+  wardrobeHistory: [],
 };
 
 // ── CHART DATA (for StreamingTab) ──────────────────────────

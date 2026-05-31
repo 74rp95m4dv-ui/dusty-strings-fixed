@@ -4592,7 +4592,7 @@ export function generateSyncOffers(s: GameState): SyncOffer[] {
       repBonus: show.rep,
       selloutHit: show.sellout,
       weeksToRespond: 3,
-      description: show.name + " wants "" + song.title + "" for their next season. " + (show.type === "prestige" ? "Prestige placement." : show.type === "embarrassing" ? "Might hurt your cred." : "Straight commercial deal."),
+      description: show.name + ' wants "' + song.title + '" for their next season. ' + (show.type === "prestige" ? "Prestige placement." : show.type === "embarrassing" ? "Might hurt your cred." : "Straight commercial deal."),
     });
   }
   return offers;

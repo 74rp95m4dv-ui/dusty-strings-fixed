@@ -1,4 +1,4 @@
-import { GameState, getTheme } from "./gameLogic";
+import { GameState, getTheme, fmtMoney, MANAGERS, fmtDuration, fmtPercent } from "./gameLogic";
 
 export interface NewspaperStory {
   section: "Front Page" | "Country" | "Blues" | "Industry" | "Scene" | "Charts" | "Local";
@@ -409,6 +409,117 @@ const NPC_ODD_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       body:`A mobile recording rig, two microphones, and a cooperative clerk in ${pick(CITIES)} produced what ${a} is calling "the only honest record I've made in years." Release date TBD; the artist says they're "still deciding if the world deserves it."`}; },
 ];
 
+
+// ── PLAYER PUBLISHING STORIES ──────────────────────────────
+function playerPublishingStories(s: GameState): NewspaperStory[] {
+  const out: NewspaperStory[] = [];
+  const me = s.artistName || "You";
+
+  if (s.currentPublishing) {
+    const pub = s.currentPublishing;
+    const typeLabel = pub.type === "admin" ? "admin deal" : pub.type === "co_pub" ? "co-publishing agreement" : "full catalog assignment";
+    out.push({ section: "Industry", isPlayer: true,
+      headline: `${me.toUpperCase()} SIGNS ${typeLabel.toUpperCase()} WITH ${pub.publisherName.toUpperCase()}`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `The ${typeLabel} gives ${pub.type === "full_assignment" ? "the publisher full ownership" : pub.type === "co_pub" ? "shared copyright control" : "collection rights while retaining copyright"}. ${pub.advance > 0 ? `A ${fmtMoney(pub.advance)} advance was part of the package.` : "No advance — just collection services."}` });
+  }
+
+  if (s.pendingPublishingOffers && s.pendingPublishingOffers.length > 0) {
+    out.push({ section: "Industry", isPlayer: true,
+      headline: `${me.toUpperCase()} FIELDING PUBLISHING OFFERS`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `Multiple publishers are circling the catalog. Sources say ${me} is weighing admin deals against co-pub proposals. The decision could reshape royalty flow for years.` });
+  }
+
+  return out;
+}
+
+// ── PLAYER SYNC STORIES ────────────────────────────────────
+function playerSyncStories(s: GameState): NewspaperStory[] {
+  const out: NewspaperStory[] = [];
+  const me = s.artistName || "You";
+
+  if (s.pendingSyncOffers && s.pendingSyncOffers.length > 0) {
+    for (const sync of s.pendingSyncOffers) {
+      const tone = sync.showType === "prestige" ? "prestigious" : sync.showType === "embarrassing" ? "controversial" : "lucrative";
+      out.push({ section: sync.showType === "prestige" ? "Front Page" : "Industry", isPlayer: true,
+        headline: `${sync.showName.toUpperCase()} WANTS ${me.toUpperCase()} FOR ${tone.toUpperCase()} SYNC PLACEMENT`,
+        byline: `By ${pick(REPORTERS)}`,
+        body: `"${sync.songTitle}" is under consideration for ${sync.showName}. The ${tone} placement would pay ${fmtMoney(sync.payout)} and ${sync.showType === "prestige" ? "elevate the artist's profile significantly." : sync.showType === "embarrassing" ? "has some fans questioning the move." : "provide steady income without much reputational risk."}` });
+    }
+  }
+
+  return out;
+}
+
+// ── PLAYER BRAND / SELLOUT STORIES ─────────────────────────
+function playerBrandStories(s: GameState): NewspaperStory[] {
+  const out: NewspaperStory[] = [];
+  const me = s.artistName || "You";
+  const sellout = s.selloutScore || 0;
+
+  if (sellout > 60) {
+    out.push({ section: "Scene", isPlayer: true,
+      headline: `FANS QUESTION ${me.toUpperCase()}'S AUTHENTICITY AMID BRAND DEALS`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `Social media is buzzing with accusations that ${me} has "sold out." The sellout meter is reading ${Math.round(sellout)}%, and the hardcore fanbase is starting to push back. "Used to be real," one comment read. "Now it's just ads."` });
+  } else if (sellout > 30) {
+    out.push({ section: "Scene", isPlayer: true,
+      headline: `${me.toUpperCase()} WALKS THE LINE BETWEEN ART AND COMMERCE`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `The brand deals are piling up, but ${me} hasn't crossed the line yet. Purists are watching closely. "One more truck commercial and I'm out," a longtime fan posted.` });
+  }
+
+  const activeBrands = s.activeBrandDeals || [];
+  if (activeBrands.length > 0) {
+    const bigDeal = activeBrands[activeBrands.length - 1];
+    out.push({ section: "Industry", isPlayer: true,
+      headline: `${me.toUpperCase()} INKS DEAL WITH ${bigDeal.name.toUpperCase()}`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `The ${bigDeal.name} partnership adds ${fmtMoney(bigDeal.weeklyIncome)} weekly to the balance sheet. ${sellout > 40 ? "Some fans are calling it a cash grab." : "Fans seem supportive of the alignment."}` });
+  }
+
+  return out;
+}
+
+// ── PLAYER MANAGER STORIES ─────────────────────────────────
+function playerManagerStories(s: GameState): NewspaperStory[] {
+  const out: NewspaperStory[] = [];
+  const me = s.artistName || "You";
+
+  if (s.currentManager) {
+    const mgr = s.currentManager;
+    const def = MANAGERS.find(m => m.id === mgr.managerId);
+    if (def) {
+      let clash = false;
+      if (def.type === "aggressive" && s.rep < 30) clash = true;
+      if (def.type === "legend" && s.fame < 60) clash = true;
+      if (def.type === "old_school" && s.themeCounts && Object.keys(s.themeCounts).some(t => t === "experimental")) clash = true;
+
+      if (clash) {
+        out.push({ section: "Industry", isPlayer: true,
+          headline: `TENSIONS RISE BETWEEN ${me.toUpperCase()} AND MANAGER ${def.name.toUpperCase()}`,
+          byline: `By ${pick(REPORTERS)}`,
+          body: `Sources close to the camp describe "creative differences" between ${me} and ${def.name}. The manager's aggressive approach is reportedly clashing with the artist's vision. "They're butting heads on every decision," one insider said.` });
+      } else {
+        out.push({ section: "Industry", isPlayer: true,
+          headline: `${me.toUpperCase()} AND ${def.name.toUpperCase()} BUILDING STRONG PARTNERSHIP`,
+          byline: `By ${pick(REPORTERS)}`,
+          body: `${def.name} is reportedly opening doors that were previously closed. The manager's industry connections are paying off, with better tour slots and label meetings on the horizon.` });
+      }
+    }
+  }
+
+  if (s.pendingManagerOffers && s.pendingManagerOffers.length > 0) {
+    out.push({ section: "Industry", isPlayer: true,
+      headline: `MANAGERS COURTING ${me.toUpperCase()}`,
+      byline: `By ${pick(REPORTERS)}`,
+      body: `Multiple management firms are making pitches. The right manager could accelerate ${me}'s trajectory significantly — or derail it if the fit is wrong.` });
+  }
+
+  return out;
+}
+
 // ── PLAYER RECORDING STORIES ───────────────────────────────
 function playerRecordingStories(s: GameState): NewspaperStory[] {
   const out: NewspaperStory[] = [];
@@ -620,10 +731,14 @@ export function generateNashvilleTimes(s: GameState): NewspaperIssue {
     return true;
   }
 
-  // Player stories (capped at 3 — recording, releases, milestones)
+  // Player stories (capped at 4 — recording, releases, milestones, business)
   const player = playerStories(s);
   const rec = playerRecordingStories(s);
-  for (const st of [...rec, ...player].slice(0, 3)) tryAdd(st);
+  const pub = playerPublishingStories(s);
+  const sync = playerSyncStories(s);
+  const brand = playerBrandStories(s);
+  const mgr = playerManagerStories(s);
+  for (const st of [...rec, ...player, ...pub, ...sync, ...brand, ...mgr].slice(0, 4)) tryAdd(st);
 
   // Always one chart/trend story
   tryAdd(pick(CHART_STORIES)(s));

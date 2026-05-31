@@ -46,6 +46,11 @@ import {
   VENUE_PERKS,
   FESTIVALS,
   OPENING_ACT_HEADLINERS,
+  // Publishing & Sync
+  generatePublishingOffers, generateSyncOffers, runPublishingAccounting,
+  type PublishingOffer, type SyncOffer,
+  // Brand deals v2
+  BRAND_DEALS_V2, getBrandDealSellout,
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
 
@@ -207,6 +212,13 @@ function refreshInboundOffers(s: GameState): void {
     if (offers.length) {
       s.pendingLabelOffers = offers;
       s.log.unshift({ week: s.week, msg: `${offers.length} label${offers.length > 1 ? "s" : ""} sent offers.`, type: "good" });
+    }
+  }
+  if (!s.currentPublishing && (!s.pendingPublishingOffers || s.pendingPublishingOffers.length === 0)) {
+    const offers = generatePublishingOffers(s);
+    if (offers.length) {
+      s.pendingPublishingOffers = offers;
+      s.log.unshift({ week: s.week, msg: `${offers.length} publishing offer${offers.length > 1 ? "s" : ""} on the table.`, type: "good" });
     }
   }
 }
@@ -455,8 +467,18 @@ function advance(prev:GameState): GameState {
   // Manager: weekly retainer + small rep accrual
   if (s.currentManager) {
     s.money -= s.currentManager.weeklyFee;
+    let clashPenalty = 1.0;
+    const mgr = MANAGERS.find(m => m.id === s.currentManager!.managerId);
+    if (mgr) {
+      if (mgr.type === "aggressive" && s.rep < 30) clashPenalty = 0.75;
+      if (mgr.type === "legend" && s.fame < 60) clashPenalty = 0.85;
+      if (mgr.type === "old_school" && s.themeCounts && Object.keys(s.themeCounts).some(t => t === "experimental")) clashPenalty = 0.8;
+    }
+    if (clashPenalty < 1.0) {
+      s.rep = Math.max(0, s.rep - 0.2);
+    }
     if (s.currentManager.repPerWeek > 0) {
-      s.rep = clamp(s.rep + s.currentManager.repPerWeek, 0, 100);
+      s.rep = clamp(s.rep + s.currentManager.repPerWeek * clashPenalty, 0, 100);
     }
   }
 
@@ -470,6 +492,28 @@ function advance(prev:GameState): GameState {
     }
   }
 
+  // ── Publishing Deal Accounting ──
+  const totalStreams = s.catalog.reduce((sum, t) => sum + t.weeklyStreams, 0);
+  const grossPublishingRev = Math.floor(totalStreams * 0.0012);
+  let publishingArtistShare = grossPublishingRev;
+  if (s.currentPublishing) {
+    const acct = runPublishingAccounting(s.currentPublishing, grossPublishingRev);
+    publishingArtistShare = acct.artistShare;
+    s.currentPublishing.advanceRecouped += acct.recouped;
+    s.currentPublishing.isRecouped = acct.isRecouped;
+    if (acct.recouped > 0) {
+      s.log.unshift({ week: s.week, msg: `Publishing recoup: ${fmtMoney(acct.recouped)} · ${fmtMoney(Math.max(0, s.currentPublishing.advance - s.currentPublishing.advanceRecouped))} remaining`, type: "neutral" });
+    }
+    s.currentPublishing.weeksLeft--;
+    if (s.currentPublishing.weeksLeft <= 0) {
+      s.log.unshift({ week: s.week, msg: `Publishing deal with ${s.currentPublishing.publisherName} expired.`, type: "neutral" });
+      s.currentPublishing = null;
+    }
+  }
+  s.money += Math.floor(publishingArtistShare);
+  s.totalEarned += Math.floor(publishingArtistShare);
+  s.totalPublishingRevenue = (s.totalPublishingRevenue || 0) + Math.floor(publishingArtistShare);
+
   // Brand deals
   const brandMult = s.currentManager?.brandDealBoost ?? 1.0;
   let brandInc=0;
@@ -479,6 +523,19 @@ function advance(prev:GameState): GameState {
     return false;
   });
   s.money+=brandInc; s.totalEarned+=brandInc;
+
+  // ── Sellout Score ──
+  if (s.selloutScore === undefined) s.selloutScore = 0;
+  s.selloutScore = Math.max(0, s.selloutScore - 0.5);
+  for (const deal of s.activeBrandDeals) {
+    const selloutHit = getBrandDealSellout(deal.id);
+    if (selloutHit > 0) {
+      s.selloutScore = Math.min(100, s.selloutScore + (selloutHit / deal.weeksLeft));
+    }
+  }
+  if (s.selloutScore > 60) {
+    s.rep = Math.max(0, s.rep - 0.3);
+  }
 
   // Tour show
   let notifMsg:string|null=null, notifType="norm";
@@ -868,6 +925,21 @@ function advance(prev:GameState): GameState {
     }
   }
 
+  // ── Sync Licensing Offers ──
+  if (!s.pendingSyncOffers) s.pendingSyncOffers = [];
+  s.pendingSyncOffers = s.pendingSyncOffers
+    .filter(o => o.weeksToRespond > 0)
+    .map(o => ({ ...o, weeksToRespond: o.weeksToRespond - 1 }));
+  if (s.catalog.length > 0 && s.fame >= 15 && Math.random() < 0.15) {
+    const newSyncs = generateSyncOffers(s);
+    if (newSyncs.length) {
+      s.pendingSyncOffers = [...s.pendingSyncOffers, ...newSyncs];
+      for (const sync of newSyncs) {
+        s.log.unshift({ week: s.week, msg: `📺 Sync offer: ${sync.showName} wants "${sync.songTitle}" — ${fmtMoney(sync.payout)}`, type: "good" });
+      }
+    }
+  }
+
   if (s.week%4===0) {
     s.trends.Country=0.8+Math.random()*0.5; s.trends.Blues=0.8+Math.random()*0.5;
     // Rotate the trending album theme — what Nashville is currently into.
@@ -966,6 +1038,12 @@ export function useGameState() {
       } : null),
       pendingLabelOffers: saved.pendingLabelOffers ?? [],
       pendingManagerOffers: saved.pendingManagerOffers ?? [],
+      currentPublishing: saved.currentPublishing ?? null,
+      pendingPublishingOffers: saved.pendingPublishingOffers ?? [],
+      pendingSyncOffers: saved.pendingSyncOffers ?? [],
+      selloutScore: saved.selloutScore ?? 0,
+      totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
+
       // Feature artist system (added in v1.x)
       pendingFeatureRequests: saved.pendingFeatureRequests ?? [],
       guestCredits: saved.guestCredits ?? [],
@@ -1018,6 +1096,12 @@ export function useGameState() {
     } : null),
     pendingLabelOffers: s.pendingLabelOffers ?? [],
     pendingManagerOffers: s.pendingManagerOffers ?? [],
+    currentPublishing: s.currentPublishing ?? null,
+    pendingPublishingOffers: s.pendingPublishingOffers ?? [],
+    pendingSyncOffers: s.pendingSyncOffers ?? [],
+    selloutScore: s.selloutScore ?? 0,
+    totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
+
     pendingFeatureRequests: s.pendingFeatureRequests ?? [],
     guestCredits: s.guestCredits ?? [],
     featureWorkCounts: s.featureWorkCounts ?? {},
@@ -1053,6 +1137,12 @@ export function useGameState() {
       // Seed the scene with rival artists (#4) so the world feels populated
       // from week 1. They'll release, beef, and chart in parallel.
       rivals: seedRivals(0),
+      currentPublishing: null,
+      pendingPublishingOffers: [],
+      pendingSyncOffers: [],
+      selloutScore: 0,
+      totalPublishingRevenue: 0,
+
     };
     saveToDisk(s); setState(s);
   },[]);
@@ -1623,8 +1713,10 @@ export function useGameState() {
     const b=BRAND_DEALS.find(x=>x.id===id); if(!b) return s;
     s.activeBrandDeals.push({id:b.id,name:b.name,weeklyIncome:b.weeklyIncome,weeksLeft:b.duration});
     if(b.rep)s.rep=clamp(s.rep+Math.floor(b.rep*0.5),0,100); if(b.famePerk)s.fame=clamp(s.fame+Math.floor(b.famePerk*0.5),0,100);
-    s.log.unshift({week:s.week,msg:`Brand deal: ${b.name} — ${fmtMoney(b.weeklyIncome)}/wk`,type:"good"});
-    s.pendingEvent={msg:`Signed with ${b.name}!`,type:"gold"};
+    const selloutHit = getBrandDealSellout(id);
+    if (selloutHit > 0) s.selloutScore = Math.min(100, (s.selloutScore || 0) + selloutHit);
+    s.log.unshift({week:s.week,msg:`Brand deal: ${b.name} — ${fmtMoney(b.weeklyIncome)}/wk${selloutHit > 0 ? ` · +${selloutHit} sellout` : ""}`,type:"good"});
+    s.pendingEvent={msg:`Signed with ${b.name}!${selloutHit > 0 ? " Authenticity taking a hit." : ""}`,type:"gold"};
     return s;
   }),[upd]);
 
@@ -1834,6 +1926,68 @@ export function useGameState() {
 
   const doCloseMilestonePresentation = useCallback(()=>upd(s=>{
     s.milestonePresentation = null;
+    return s;
+  }),[upd]);
+
+
+  // ── PUBLISHING ───────────────────────────────────────────
+  const doAcceptPublishingOffer = useCallback((id:string)=>upd(s=>{
+    const offer = s.pendingPublishingOffers.find(o => o.id === id);
+    if (!offer) return s;
+    s.money += offer.advance;
+    s.currentPublishing = {
+      id: offer.id,
+      publisherName: offer.publisherName,
+      type: offer.type,
+      advance: offer.advance,
+      advanceRecouped: 0,
+      artistSplit: offer.artistSplit,
+      termWeeks: offer.termWeeks,
+      weeksLeft: offer.termWeeks,
+      isRecouped: offer.advance === 0,
+      signedAtWeek: s.week,
+    };
+    s.pendingPublishingOffers = [];
+    s.log.unshift({week:s.week,msg:`Signed publishing deal with ${offer.publisherName}! ${offer.type === "admin" ? "Copyright retained." : offer.type === "co_pub" ? "50/50 split." : "Catalog assigned."} ${fmtMoney(offer.advance)} advance.`,type:"great"});
+    s.pendingEvent = {msg:`Publishing deal signed: ${offer.publisherName}`,type:"gold"};
+    return s;
+  }),[upd]);
+
+  const doDismissPublishingOffers = useCallback(()=>upd(s=>{
+    if (s.pendingPublishingOffers?.length) {
+      s.log.unshift({week:s.week,msg:"Passed on publishing offers.",type:"neutral"});
+    }
+    s.pendingPublishingOffers = [];
+    return s;
+  }),[upd]);
+
+  // ── SYNC LICENSING ───────────────────────────────────────
+  const doAcceptSyncOffer = useCallback((id:string)=>upd(s=>{
+    const offer = s.pendingSyncOffers.find(o => o.id === id);
+    if (!offer) return s;
+    s.money += offer.payout;
+    s.totalEarned += offer.payout;
+    s.fame = clamp(s.fame + offer.fameBonus, 0, 100);
+    s.rep = clamp(s.rep + offer.repBonus, 0, 100);
+    s.selloutScore = Math.min(100, (s.selloutScore || 0) + offer.selloutHit);
+    s.pendingSyncOffers = s.pendingSyncOffers.filter(o => o.id !== id);
+    s.log.unshift({
+      week:s.week,
+      msg:`Sync deal: "${offer.songTitle}" in ${offer.showName} — ${fmtMoney(offer.payout)}${offer.showType === "embarrassing" ? " · Some fans are questioning it." : ""}`,
+      type: offer.showType === "embarrassing" ? "bad" : "good"
+    });
+    s.pendingEvent = {
+      msg:`${offer.showName} sync: ${fmtMoney(offer.payout)}${offer.showType === "embarrassing" ? " · Cred took a hit" : ""}`,
+      type: offer.showType === "embarrassing" ? "bad" : "gold"
+    };
+    return s;
+  }),[upd]);
+
+  const doDismissSyncOffers = useCallback(()=>upd(s=>{
+    if (s.pendingSyncOffers?.length) {
+      s.log.unshift({ week:s.week, msg:"Passed on sync offers.", type:"neutral" });
+    }
+    s.pendingSyncOffers = [];
     return s;
   }),[upd]);
 
@@ -2208,5 +2362,7 @@ export function useGameState() {
     doSetSetlist,
     doAcceptOpeningAct, doDismissOpeningActOffers,
     doAcceptFestival, doDismissFestivalOffers,
+    doAcceptPublishingOffer, doDismissPublishingOffers,
+    doAcceptSyncOffer, doDismissSyncOffers,
   };
 }

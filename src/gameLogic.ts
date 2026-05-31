@@ -4461,3 +4461,180 @@ export function buildChart(catalog: CatalogEntry[], week: number): ChartEntry[] 
   entries.forEach((e, i) => e.pos = i + 1);
   return entries.slice(0, 100);
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// PUBLISHING DEALS
+// ═══════════════════════════════════════════════════════════════
+
+export type PublishingDealType = "admin" | "co_pub" | "full_assignment";
+
+export interface PublishingOffer {
+  id: string;
+  publisherName: string;
+  type: PublishingDealType;
+  advance: number;
+  artistSplit: number;
+  termWeeks: number;
+  recoupRate: number;
+  catalogValue: number;
+  fitNote: string;
+  riskLevel: DealRisk;
+  lawyerNote: string;
+}
+
+export interface SignedPublishing {
+  id: string;
+  publisherName: string;
+  type: PublishingDealType;
+  advance: number;
+  advanceRecouped: number;
+  artistSplit: number;
+  termWeeks: number;
+  weeksLeft: number;
+  isRecouped: boolean;
+  signedAtWeek: number;
+}
+
+export const PUBLISHING_PUBLISHERS = [
+  { name: "Dusty Road Music", type: "admin" as const, minFame: 10, minRep: 8, advance: 0, split: 0.85, term: 104, desc: "Nashville admin shop. They collect, you keep copyright." },
+  { name: "Blue Note Publishing", type: "admin" as const, minFame: 20, minRep: 15, advance: 5000, split: 0.80, term: 156, desc: "Larger admin. Small advance, solid collection." },
+  { name: "Music Row Partners", type: "co_pub" as const, minFame: 25, minRep: 20, advance: 25000, split: 0.50, term: 208, desc: "50/50 split. They co-own the copyrights." },
+  { name: "Southern Copyright", type: "co_pub" as const, minFame: 35, minRep: 28, advance: 60000, split: 0.50, term: 260, desc: "Aggressive co-pub. Strong sync team." },
+  { name: "Global Song Trust", type: "full_assignment" as const, minFame: 40, minRep: 30, advance: 150000, split: 0.00, term: 312, desc: "They own it. You get a big check and a goodbye." },
+  { name: "Major Pub Machine", type: "full_assignment" as const, minFame: 55, minRep: 45, advance: 350000, split: 0.00, term: 364, desc: "The full catalog buyout. Life-changing money." },
+];
+
+export function generatePublishingOffers(s: GameState): PublishingOffer[] {
+  const eligible = PUBLISHING_PUBLISHERS.filter(p => s.fame >= p.minFame && s.rep >= p.minRep);
+  if (!eligible.length) return [];
+  const catalogValue = s.catalog.reduce((sum, c) => sum + c.totalStreams * 0.001, 0);
+  return eligible.slice(0, 2).map(p => {
+    const adv = Math.floor(p.advance * (0.8 + Math.random() * 0.4));
+    const risk: DealRisk = p.type === "full_assignment" ? "predatory" : p.type === "co_pub" ? "moderate" : "low";
+    return {
+      id: "pub_" + p.name.toLowerCase().replace(/\s+/g, "_"),
+      publisherName: p.name,
+      type: p.type,
+      advance: adv,
+      artistSplit: p.split,
+      termWeeks: p.term,
+      recoupRate: 1.0,
+      catalogValue: Math.floor(catalogValue),
+      fitNote: p.type === "admin" ? "You keep copyright. They just collect." : p.type === "co_pub" ? "Shared ownership. Moderate risk." : "They own your songs. Big advance.",
+      riskLevel: risk,
+      lawyerNote: p.type === "full_assignment" ? "Once you sign this, those songs aren't yours anymore." : p.type === "co_pub" ? "Half your publishing income walks out the door." : "Clean deal. Low risk.",
+    };
+  });
+}
+
+export function runPublishingAccounting(pub: SignedPublishing, publishingRevenue: number): { artistShare: number; recouped: number; isRecouped: boolean } {
+  const remaining = pub.advance - pub.advanceRecouped;
+  const artistShare = Math.floor(publishingRevenue * pub.artistSplit);
+  const labelShare = publishingRevenue - artistShare;
+  const recouped = Math.min(labelShare, remaining);
+  const newRemaining = remaining - recouped;
+  return {
+    artistShare,
+    recouped,
+    isRecouped: newRemaining <= 0,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SYNC LICENSING
+// ═══════════════════════════════════════════════════════════════
+
+export interface SyncOffer {
+  id: string;
+  songId: string;
+  songTitle: string;
+  showName: string;
+  showType: "prestige" | "embarrassing" | "neutral";
+  payout: number;
+  fameBonus: number;
+  repBonus: number;
+  selloutHit: number;
+  weeksToRespond: number;
+  description: string;
+}
+
+export const SYNC_SHOWS = [
+  { name: "Yellowstone", type: "prestige" as const, basePay: 25000, fame: 8, rep: 5, sellout: 0 },
+  { name: "Nashville", type: "prestige" as const, basePay: 18000, fame: 6, rep: 4, sellout: 0 },
+  { name: "Heartland", type: "prestige" as const, basePay: 12000, fame: 4, rep: 3, sellout: 0 },
+  { name: "Indie Film", type: "prestige" as const, basePay: 8000, fame: 5, rep: 8, sellout: 0 },
+  { name: "Documentary", type: "prestige" as const, basePay: 6000, fame: 3, rep: 6, sellout: 0 },
+  { name: "Car Commercial", type: "neutral" as const, basePay: 35000, fame: 5, rep: 0, sellout: 5 },
+  { name: "Beer Commercial", type: "neutral" as const, basePay: 22000, fame: 4, rep: -2, sellout: 8 },
+  { name: "Teen Drama", type: "embarrassing" as const, basePay: 8000, fame: 3, rep: -8, sellout: 15 },
+  { name: "Reality Show", type: "embarrassing" as const, basePay: 5000, fame: 2, rep: -12, sellout: 20 },
+  { name: "Soap Opera", type: "embarrassing" as const, basePay: 4000, fame: 1, rep: -6, sellout: 12 },
+];
+
+export function generateSyncOffers(s: GameState): SyncOffer[] {
+  if (s.catalog.length === 0 || s.fame < 15) return [];
+  if (Math.random() > 0.15) return [];
+  const offers: SyncOffer[] = [];
+  const count = Math.random() < 0.3 ? 2 : 1;
+  for (let i = 0; i < count; i++) {
+    const song = s.catalog[Math.floor(Math.random() * s.catalog.length)];
+    const show = SYNC_SHOWS[Math.floor(Math.random() * SYNC_SHOWS.length)];
+    const pay = Math.floor(show.basePay * (0.7 + Math.random() * 0.6));
+    offers.push({
+      id: "sync_" + Date.now() + "_" + i,
+      songId: song.id,
+      songTitle: song.title,
+      showName: show.name,
+      showType: show.type,
+      payout: pay,
+      fameBonus: show.fame,
+      repBonus: show.rep,
+      selloutHit: show.sellout,
+      weeksToRespond: 3,
+      description: show.name + " wants "" + song.title + "" for their next season. " + (show.type === "prestige" ? "Prestige placement." : show.type === "embarrassing" ? "Might hurt your cred." : "Straight commercial deal."),
+    });
+  }
+  return offers;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BRAND DEALS — SELLOUT ENHANCEMENT
+// ═══════════════════════════════════════════════════════════════
+
+export interface BrandDealV2 {
+  id: string;
+  name: string;
+  fameReq: number;
+  repReq: number;
+  weeklyIncome: number;
+  duration: number;
+  desc: string;
+  rep?: number;
+  famePerk?: number;
+  selloutHit: number;
+  category: string;
+}
+
+export const BRAND_DEALS_V2: BrandDealV2[] = [
+  {id:"boot_barn",    name:"Boot Barn Co-op",       fameReq:12, repReq:0,  weeklyIncome:300,   duration:8,  desc:"Local western wear store wants you to post wearing their boots.", rep:2, selloutHit:2, category:"apparel"},
+  {id:"wrangler",     name:"Wrangler Jeans",         fameReq:22, repReq:8,  weeklyIncome:800,   duration:12, desc:"The classic denim brand. Authenticity is the whole pitch.", rep:3, selloutHit:3, category:"apparel"},
+  {id:"martin_guitar",name:"Martin Guitar",          fameReq:28, repReq:22, weeklyIncome:1400,  duration:10, desc:"Endorsement from the most storied name in acoustic guitars.", rep:5, famePerk:3, selloutHit:4, category:"guitar"},
+  {id:"bourbon_brand",name:"Two-Lane Bourbon",       fameReq:35, repReq:20, weeklyIncome:2500,  duration:12, desc:"Craft bourbon with a country soul. Your face on the bottle.", rep:2, famePerk:5, selloutHit:12, category:"whiskey"},
+  {id:"chevy_trucks", name:"Chevy Trucks",           fameReq:50, repReq:28, weeklyIncome:6000,  duration:16, desc:"The most country ad deal possible. Massive fame bump.", rep:1, famePerk:10, selloutHit:18, category:"truck"},
+  {id:"gibson",       name:"Gibson Custom Shop",     fameReq:60, repReq:45, weeklyIncome:10000, duration:20, desc:"Gibson puts your name on a signature guitar. Legendary.", rep:8, famePerk:5, selloutHit:6, category:"guitar"},
+  {id:"fender",       name:"Fender Guitars",         fameReq:35, repReq:25, weeklyIncome:3000,  duration:12, desc:"Your name on a Telecaster. Real cred, real money.", rep:3, famePerk:4, selloutHit:5, category:"guitar"},
+  {id:"jack_daniels", name:"Jack Daniel's",          fameReq:40, repReq:20, weeklyIncome:4500,  duration:14, desc:"Old No. 7 wants your face on a bottle.", rep:-2, famePerk:5, selloutHit:15, category:"whiskey"},
+  {id:"ford_trucks",  name:"Ford Trucks",            fameReq:50, repReq:30, weeklyIncome:7000,  duration:18, desc:"Built Ford Tough. Built you famous.", rep:0, famePerk:8, selloutHit:20, category:"truck"},
+];
+
+// Helper to get sellout hit for a brand deal id
+export function getBrandDealSellout(id: string): number {
+  const deal = BRAND_DEALS_V2.find(b => b.id === id);
+  return deal?.selloutHit ?? 0;
+}
+
+// Helper to get brand deal v2 by id
+export function getBrandDealV2(id: string): BrandDealV2 | undefined {
+  return BRAND_DEALS_V2.find(b => b.id === id);
+}

@@ -7,9 +7,9 @@ export default function App() {
   const game = useGameState();
   return (
     <div className="app-shell">
-      {game.screen === "menu" && <MenuScreen {...game} />}
-      {game.screen === "setup" && <SetupScreen {...game} />}
-      {game.screen === "game" && <GameScreen {...game} />}
+      {game.state.screen === "menu" && <MenuScreen {...game} />}
+      {game.state.screen === "setup" && <SetupScreen {...game} />}
+      {game.state.screen === "game" && <GameScreen {...game} />}
     </div>
   );
 }

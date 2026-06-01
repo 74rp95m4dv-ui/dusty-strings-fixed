@@ -19,7 +19,7 @@ export default function SetupScreen(game: any) {
   };
 
   return (
-    <div style={{ padding: "24px 16px 40px", minHeight: "100dvh" }}>
+    <div style={{ padding: "24px 16px 100px", minHeight: "100dvh", overflowY: "auto" }}>
       <div className="animate-fadeIn">
         <div className="pg-title" style={{ marginBottom: 16 }}>New Career</div>
 

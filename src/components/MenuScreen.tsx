@@ -2,7 +2,7 @@ import type { useGameState } from "../useGameState";
 
 export default function MenuScreen(game: ReturnType<typeof useGameState>) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", minHeight: "100dvh", padding: "40px 20px" }}>
+    <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", minHeight: "100dvh", padding: "40px 20px 100px", overflowY: "auto" }}>
       <div className="animate-fadeInUp">
         <div style={{ fontFamily: "var(--head)", fontSize: 42, fontWeight: 900, fontStyle: "italic", color: "var(--amber)", marginBottom: 8, textShadow: "0 0 40px var(--amber-glow)" }}>
           Dusty Strings

@@ -259,27 +259,42 @@ export function NewspaperModal({ state, dismissNewspaper }: any) {
   } catch {
     return null;
   }
+
+  // Generic display: show ALL string properties
+  const entries = Object.entries(news).filter(([k, v]) => 
+    typeof v === "string" && v.length > 0 && k !== "week" && k !== "issueWeek"
+  );
+  const week = news.week || news.issueWeek || state.week;
+
   return (
     <div className="modal-overlay" onClick={dismissNewspaper}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">📰 Nashville Times</div>
-        <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 8, fontFamily: "var(--mono)" }}>
-          Week {news.week || state.week}
+        <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 12, fontFamily: "var(--mono)" }}>
+          Week {week}
         </div>
-        {news.headline && (
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--head)", fontStyle: "italic", marginBottom: 8, lineHeight: 1.3 }}>
-            {news.headline}
+        {entries.length > 0 ? (
+          <div>
+            {entries.map(([key, value]: [string, any], i: number) => (
+              <div key={i} style={{ marginBottom: i === 0 ? 12 : 8 }}>
+                {i === 0 ? (
+                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--head)", fontStyle: "italic", lineHeight: 1.3 }}>
+                    {value}
+                  </div>
+                ) : i === 1 ? (
+                  <div style={{ fontSize: 13, color: "var(--muted2)", fontStyle: "italic" }}>
+                    {value}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+                    {value}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        )}
-        {news.subhead && (
-          <div style={{ fontSize: 13, color: "var(--muted2)", marginBottom: 12, fontStyle: "italic" }}>
-            {news.subhead}
-          </div>
-        )}
-        {news.body && (
-          <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
-            {news.body}
-          </div>
+        ) : (
+          <div className="tip-text">No article content available.</div>
         )}
         <div className="modal-footer">
           <button className="btn btn-lime btn-block" onClick={dismissNewspaper}>Continue</button>

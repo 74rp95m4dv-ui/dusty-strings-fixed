@@ -1,64 +1,300 @@
 import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, getBurnoutTier } from "../gameLogic";
+import type { DrawerType } from "./GameScreen";
 
-export default function DashboardTab(game: any) {
-  const s = game.state;
+interface DashboardProps {
+  state: any;
+  advance: () => void;
+  onOpenDrawer: (d: DrawerType) => void;
+  onSwitchTab: (tab: string) => void;
+  doTakeVacation: () => void;
+  doAbortTour: () => void;
+  doFinishProject: () => void;
+  doScrubProject: () => void;
+  doDismissLabelOffers: () => void;
+  doDismissManagerOffers: () => void;
+  doAcceptManagerOffer: (id: string) => void;
+  doAcceptFeatureRequest: (id: string) => void;
+  doDismissFeatureRequests: () => void;
+  doAcceptOpeningAct: (id: string) => void;
+  doDismissOpeningActOffers: () => void;
+  doAcceptFestival: (id: string) => void;
+  doDismissFestivalOffers: () => void;
+  doAcceptPublishingOffer: (id: string) => void;
+  doDismissPublishingOffers: () => void;
+  doAcceptSyncOffer: (id: string) => void;
+  doDismissSyncOffers: () => void;
+}
+
+export default function DashboardTab(props: DashboardProps) {
+  const s = props.state;
   const tier = CAREER_TIERS[getCareerTierIdx(s.fame)];
   const burn = getBurnoutTier(s.burnout ?? 0);
 
+  const quickActions: { id: DrawerType; icon: string; label: string; highlight?: boolean }[] = [
+    { id: "studio", icon: "🎙", label: "Record" },
+    { id: "unreleased", icon: "📀", label: "Release" },
+    { id: "tour", icon: "🚐", label: "Tour" },
+    { id: "catalog", icon: "📢", label: "Promote" },
+    { id: "grind", icon: "⚡", label: "Hustle" },
+    { id: "offers", icon: "📋", label: "Deals" },
+    { id: "merch", icon: "👕", label: "Merch" },
+  ];
+
+  const totalPending =
+    (s.pendingLabelOffers?.length || 0) +
+    (s.pendingManagerOffers?.length || 0) +
+    (s.pendingFeatureRequests?.length || 0) +
+    (s.pendingOpeningActOffers?.length || 0) +
+    (s.pendingFestivalOffers?.length || 0) +
+    (s.pendingPublishingOffers?.length || 0) +
+    (s.pendingSyncOffers?.length || 0);
+
   return (
-    <div>
-      <div className="pg-hd">
-        <div className="pg-title">{tier.name}</div>
-        <div className="pg-sub">{tier.tagline}</div>
-      </div>
-      <div className="gstat">
-        <div className="card bigstat"><div className="bigstat-num" style={{ color: "var(--amber)" }}>{fmtMoney(s.money)}</div><div className="bigstat-lbl">Cash</div></div>
-        <div className="card bigstat"><div className="bigstat-num" style={{ color: "var(--sage)" }}>{fmt(s.fans)}</div><div className="bigstat-lbl">Fans</div></div>
-        <div className="card bigstat"><div className="bigstat-num" style={{ color: "var(--gold)" }}>{fmt(s.superfans ?? 0)}</div><div className="bigstat-lbl">Superfans</div></div>
-        <div className="card bigstat"><div className="bigstat-num" style={{ color: "var(--denim)" }}>{s.totalReleases}</div><div className="bigstat-lbl">Releases</div></div>
-      </div>
-      <div className="card">
-        <div className="card-title">Vitals</div>
-        <StatBar name="Fame" val={s.fame} max={100} color="f-lime" />
-        <StatBar name="Rep" val={s.rep} max={100} color="f-green" />
-        <StatBar name="Energy" val={s.energy} max={100} color="f-blue" />
-        <StatBar name="Hype" val={s.hype} max={100} color="f-purple" />
-        <StatBar name="Burnout" val={s.burnout ?? 0} max={100} color="f-orange" />
-        <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 6, fontStyle: "italic" }}>{burn.desc}</div>
-      </div>
-      {s.tourActive && (
-        <div className="card" style={{ borderColor: "var(--amber)" }}>
-          <div className="card-title">On Tour</div>
-          <div style={{ fontSize: 13 }}>Show {s.tourActive.progress + 1} of {s.tourActive.shows.length} • {s.tourActive.shows[s.tourActive.progress]?.cityName ?? "Wrapping up"}</div>
-          <button className="btn btn-danger btn-sm btn-block" style={{ marginTop: 10 }} onClick={game.doAbortTour}>Abort Tour</button>
+    <div className="animate-fadeIn">
+      {/* Big Stats */}
+      <div className="bigstat-row stagger-1">
+        <div className="bigstat">
+          <div className="bigstat-num">{fmtMoney(s.money)}</div>
+          <div className="bigstat-lbl">Cash</div>
         </div>
-      )}
-      {s.project && (
-        <div className="card">
-          <div className="card-title">In the Studio</div>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>{s.project.title}</div>
-          <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>{s.project.type} • {s.project.tracks.length} track{s.project.tracks.length === 1 ? "" : "s"} • {s.project.weeksLeft}wk left</div>
+        <div className="bigstat">
+          <div className="bigstat-num sage">{fmt(s.fans)}</div>
+          <div className="bigstat-lbl">Fans</div>
         </div>
-      )}
-      <div className="card">
-        <div className="card-title">Active Deals</div>
-        {s.activeBrandDeals.length === 0 && <div style={{ fontSize: 12, color: "var(--muted2)" }}>No brand deals.</div>}
-        {s.activeBrandDeals.map((d: any) => (
-          <div key={d.id} style={{ fontSize: 12, marginBottom: 4 }}><span className="tag t-lime">{d.name}</span> {d.weeksLeft}wk left • {fmtMoney(d.weeklyIncome)}/wk</div>
+        <div className="bigstat">
+          <div className="bigstat-num gold">{fmt(s.superfans ?? 0)}</div>
+          <div className="bigstat-lbl">Superfans</div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="quick-actions">
+        {quickActions.map((a) => (
+          <button
+            key={a.id}
+            className={`quick-action-btn ${a.highlight ? "highlight" : ""}`}
+            onClick={() => a.id && props.onOpenDrawer(a.id)}
+          >
+            <span className="qa-icon">{a.icon}</span>
+            <span>{a.label}</span>
+          </button>
         ))}
-        {s.currentLabel && <div style={{ fontSize: 12, marginTop: 6 }}><span className="tag t-gold">Label</span> {s.currentLabel.name} • {s.currentLabel.weeksLeft}wk left</div>}
-        {s.currentManager && <div style={{ fontSize: 12, marginTop: 6 }}><span className="tag t-blue">Manager</span> {s.currentManager.name}</div>}
+        <button
+          className="quick-action-btn"
+          onClick={props.doTakeVacation}
+          disabled={(s.vacationCooldown ?? 0) > 0 || s.money < 2200}
+        >
+          <span className="qa-icon">🏖</span>
+          <span>Vacation</span>
+        </button>
       </div>
-      <button className="btn btn-lime btn-block" onClick={game.advance} style={{ marginTop: 10 }}>End Week</button>
-      <div className="sec-div">Recent Log</div>
-      <div>
-        {s.log.slice(0, 8).map((entry: any, i: number) => (
-          <div className="ev-item" key={i}>
-            <div className="ev-wk">W{entry.week}</div>
-            <div style={{ color: entry.type === "bad" ? "var(--danger)" : entry.type === "great" ? "var(--success)" : "var(--text)" }}>{entry.msg}</div>
+
+      {/* Active Situation Cards */}
+      <div className="stagger-1">
+        {/* In Studio */}
+        {s.project && (
+          <div className="card card-active animate-fadeInUp">
+            <div className="card-title">🎙 In Studio</div>
+            <div className="rel-title" style={{ marginBottom: 4 }}>{s.project.title}</div>
+            <div className="rel-meta">
+              {s.project.type} • {s.project.tracks.length} track{s.project.tracks.length === 1 ? "" : "s"} • {s.project.weeksLeft}wk left
+              {s.project.mode && s.project.mode !== "standard" && (
+                <span style={{ marginLeft: 8, color: "var(--amber)" }}>
+                  • {s.project.mode}
+                </span>
+              )}
+            </div>
+            <div className="sbar-track" style={{ marginTop: 10 }}>
+              <div
+                className="sbar-fill f-lime"
+                style={{
+                  width: `${((s.project.totalWeeks - s.project.weeksLeft) / Math.max(1, s.project.totalWeeks)) * 100}%`,
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn btn-sm btn-lime" onClick={props.doFinishProject}>
+                Finish
+              </button>
+              <button className="btn btn-sm btn-danger" onClick={props.doScrubProject}>
+                Scrub
+              </button>
+            </div>
           </div>
-        ))}
-        {s.log.length === 0 && <div className="empty-state">No events yet.</div>}
+        )}
+
+        {/* On Tour */}
+        {s.tourActive && (
+          <div className="card card-active animate-fadeInUp">
+            <div className="card-title">🚐 On Tour</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>
+              Show {s.tourActive.progress + 1} of {s.tourActive.shows.length}
+            </div>
+            <div className="tip-text" style={{ marginTop: 4 }}>
+              Next: {s.tourActive.shows[s.tourActive.progress]?.cityName ?? "Wrapping up..."}
+            </div>
+            <div className="sbar-track" style={{ marginTop: 10 }}>
+              <div
+                className="sbar-fill f-gold"
+                style={{
+                  width: `${(s.tourActive.progress / Math.max(1, s.tourActive.shows.length)) * 100}%`,
+                }}
+              />
+            </div>
+            <button className="btn btn-sm btn-danger" style={{ marginTop: 12 }} onClick={props.doAbortTour}>
+              Abort Tour
+            </button>
+          </div>
+        )}
+
+        {/* Pending Offers */}
+        {totalPending > 0 && (
+          <div className="card animate-fadeInUp">
+            <div className="card-title">📋 Pending Offers ({totalPending})</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {s.pendingLabelOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                  <div>
+                    <div className="pick-name">🏢 {s.pendingLabelOffers.length} Label Offer{s.pendingLabelOffers.length > 1 ? "s" : ""}</div>
+                    <div className="pick-meta">Tap to review in Office</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingManagerOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                  <div>
+                    <div className="pick-name">👔 {s.pendingManagerOffers.length} Manager Offer{s.pendingManagerOffers.length > 1 ? "s" : ""}</div>
+                    <div className="pick-meta">Tap to review in Office</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingFeatureRequests?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onOpenDrawer("offers")}>
+                  <div>
+                    <div className="pick-name">🎤 Feature Request</div>
+                    <div className="pick-meta">From {s.pendingFeatureRequests[0]?.featureName || "an artist"}</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingOpeningActOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("live")}>
+                  <div>
+                    <div className="pick-name">🎤 Opening Act Offer</div>
+                    <div className="pick-meta">{s.pendingOpeningActOffers[0]?.headlinerName}</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingFestivalOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("live")}>
+                  <div>
+                    <div className="pick-name">🎪 Festival Offer</div>
+                    <div className="pick-meta">{s.pendingFestivalOffers[0]?.festivalName}</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingPublishingOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                  <div>
+                    <div className="pick-name">📚 Publishing Offer</div>
+                    <div className="pick-meta">{s.pendingPublishingOffers[0]?.publisherName}</div>
+                  </div>
+                </div>
+              )}
+              {s.pendingSyncOffers?.length > 0 && (
+                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                  <div>
+                    <div className="pick-name">📺 Sync Offer</div>
+                    <div className="pick-meta">{s.pendingSyncOffers[0]?.showName}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Festival Reminder */}
+        {s.festivalBookings?.filter((b: any) => !b.completed).length > 0 && (
+          <div className="card animate-fadeInUp">
+            <div className="card-title">🎪 Upcoming Festivals</div>
+            {s.festivalBookings.filter((b: any) => !b.completed).map((b: any) => (
+              <div key={b.festivalId} className="tip-text" style={{ marginBottom: 4 }}>
+                {b.festivalName} — Week {b.performanceWeek} • {b.stage} stage
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Vitals */}
+        <div className="card">
+          <div className="card-title">Vitals</div>
+          <StatBar name="Fame" val={s.fame} max={100} color="f-lime" />
+          <StatBar name="Rep" val={s.rep} max={100} color="f-green" />
+          <StatBar name="Energy" val={s.energy} max={100} color="f-blue" />
+          <StatBar name="Hype" val={s.hype} max={100} color="f-purple" />
+          <StatBar name="Burnout" val={s.burnout ?? 0} max={100} color="f-orange" />
+          <div className="tip-text" style={{ marginTop: 6, fontStyle: "italic" }}>
+            {burn.desc}
+          </div>
+        </div>
+
+        {/* Active Deals Summary */}
+        <div className="card">
+          <div className="card-title">Active Deals</div>
+          {s.activeBrandDeals.length === 0 && s.currentLabel == null && s.currentManager == null && (
+            <div className="tip-text">No active deals. Build your rep to get offers.</div>
+          )}
+          {s.activeBrandDeals.map((d: any) => (
+            <div key={d.id} style={{ fontSize: 12, marginBottom: 4 }}>
+              <span className="tag t-lime">{d.name}</span>
+              <span className="tip-text" style={{ marginLeft: 8 }}>
+                {d.weeksLeft}wk left • {fmtMoney(d.weeklyIncome)}/wk
+              </span>
+            </div>
+          ))}
+          {s.currentLabel && (
+            <div style={{ fontSize: 12, marginTop: 6 }}>
+              <span className="tag t-gold">Label</span>
+              <span className="tip-text" style={{ marginLeft: 8 }}>
+                {s.currentLabel.name} • {s.currentLabel.weeksLeft}wk left
+              </span>
+            </div>
+          )}
+          {s.currentManager && (
+            <div style={{ fontSize: 12, marginTop: 6 }}>
+              <span className="tag t-blue">Manager</span>
+              <span className="tip-text" style={{ marginLeft: 8 }}>
+                {s.currentManager.name}
+              </span>
+            </div>
+          )}
+          {s.currentPublishing && (
+            <div style={{ fontSize: 12, marginTop: 6 }}>
+              <span className="tag t-purple">Publishing</span>
+              <span className="tip-text" style={{ marginLeft: 8 }}>
+                {s.currentPublishing.publisherName}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* End Week */}
+        <button className="btn btn-end-week btn-block" onClick={props.advance}>
+          ⏭ End Week
+        </button>
+
+        {/* News Feed */}
+        <div className="sec-div">Recent News</div>
+        <div className="news-feed">
+          {s.log.slice(0, 8).map((entry: any, i: number) => (
+            <div className={`news-item type-${entry.type || "neutral"}`} key={i}>
+              <div className="news-week">W{entry.week}</div>
+              <div className="news-text">{entry.msg}</div>
+            </div>
+          ))}
+          {s.log.length === 0 && (
+            <div className="empty-state">No events yet. Start your career!</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -68,8 +304,13 @@ function StatBar({ name, val, max, color }: { name: string; val: number; max: nu
   const pct = Math.min(100, Math.max(0, (val / max) * 100));
   return (
     <div className="sbar">
-      <div className="sbar-row"><span className="sbar-name">{name}</span><span className="sbar-val">{val.toFixed(0)}</span></div>
-      <div className="sbar-track"><div className={`sbar-fill ${color}`} style={{ width: `${pct}%` }} /></div>
+      <div className="sbar-row">
+        <span className="sbar-name">{name}</span>
+        <span className="sbar-val">{val.toFixed(0)}</span>
+      </div>
+      <div className="sbar-track">
+        <div className={`sbar-fill ${color}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

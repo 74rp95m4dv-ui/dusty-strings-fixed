@@ -1,4 +1,4 @@
-import { fmt, fmtMoney } from "../gameLogic";
+import { fmt, fmtMoney, RANDOM_SCENARIOS } from "../gameLogic";
 
 export function ReleaseModal({ state, doCloseReleasePresentation }: any) {
   const pres = state.releasePresentation;

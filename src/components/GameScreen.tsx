@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getCareerTierIdx, CAREER_TIERS } from "../gameLogic";
+import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
 import OfficeTab from "./OfficeTab";
@@ -137,7 +137,7 @@ export default function GameScreen(game: any) {
           </div>
         </div>
       )}
-      {s.pendingScenarioId && <ScenarioModal {...game} />}
+      {s.pendingScenarioId && <ScenarioModal {...game} scenario={RANDOM_SCENARIOS.find(sc => sc.id === s.pendingScenarioId)} />}
       {s.pendingNewspaperJson && <NewspaperModal {...game} />}
       {s.releasePresentation && <ReleaseModal {...game} />}
       {s.tourWrapPresentation && <TourWrapModal {...game} />}

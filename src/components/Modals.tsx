@@ -1,4 +1,4 @@
-import { fmt, fmtMoney } from "../gameLogic";
+import { fmt, fmtMoney, RANDOM_SCENARIOS, STORY_ARCS } from "../gameLogic";
 
 export function ReleaseModal({ state, doCloseReleasePresentation }: any) {
   const pres = state.releasePresentation;
@@ -91,13 +91,13 @@ export function TourWrapModal({ state, doCloseTourWrapPresentation }: any) {
         {pres.bestShow && (
           <div className="card-sm" style={{ marginBottom: 8, borderColor: "var(--sage)" }}>
             <div className="tip-text">🏆 Best Show</div>
-            <div style={{ fontSize: 13 }}>{pres.bestShow.city} @ {pres.bestShow.venue} — {pres.bestShow.attendancePct}% full</div>
+            <div style={{ fontSize: 13 }}>{pres.bestShow.city} @ {pres.bestShow.venue} -- {pres.bestShow.attendancePct}% full</div>
           </div>
         )}
         {pres.worstShow && (
           <div className="card-sm" style={{ marginBottom: 12, borderColor: "var(--rust)" }}>
             <div className="tip-text">💀 Worst Show</div>
-            <div style={{ fontSize: 13 }}>{pres.worstShow.city} @ {pres.worstShow.venue} — {pres.worstShow.attendancePct}% full</div>
+            <div style={{ fontSize: 13 }}>{pres.worstShow.city} @ {pres.worstShow.venue} -- {pres.worstShow.attendancePct}% full</div>
           </div>
         )}
         <div className="modal-footer">
@@ -233,18 +233,28 @@ export function MilestoneModal({ state, doCloseMilestonePresentation }: any) {
 export function ScenarioModal({ state, doResolveScenario }: any) {
   const id = state.pendingScenarioId;
   if (!id) return null;
-  // Find the scenario from the imported RANDOM_SCENARIOS
-  // Since we can't import it here, we'll use a generic render
+  const scenario = RANDOM_SCENARIOS.find((s) => s.id === id);
+  if (!scenario) return null;
   return (
     <div className="modal-overlay">
       <div className="modal-box">
-        <div className="modal-title">Scenario</div>
-        <div className="tip-text" style={{ marginBottom: 12 }}>
-          A situation requires your attention. Choose wisely.
+        <div className="modal-title">{scenario.emoji} {scenario.title}</div>
+        <div className="tip-text" style={{ marginBottom: 12, lineHeight: 1.6 }}>
+          {scenario.body}
         </div>
         <div className="modal-footer">
-          <button className="btn btn-lime btn-block" onClick={() => doResolveScenario(id, 0)}>Option A</button>
-          <button className="btn btn-ghost btn-block" onClick={() => doResolveScenario(id, 1)}>Option B</button>
+          {scenario.choices.map((choice, i) => (
+            <button
+              key={i}
+              className={i === 0 ? "btn btn-lime btn-block" : "btn btn-ghost btn-block"}
+              onClick={() => doResolveScenario(id, i)}
+            >
+              <div>{choice.label}</div>
+              {choice.sub && (
+                <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 400, marginTop: 2 }}>{choice.sub}</div>
+              )}
+            </button>
+          ))}
         </div>
       </div>
     </div>
@@ -260,10 +270,8 @@ export function NewspaperModal({ state, dismissNewspaper }: any) {
     return null;
   }
 
-  // Generic display: show ALL string properties
-  const entries = Object.entries(news).filter(([k, v]) => 
-    typeof v === "string" && v.length > 0 && k !== "week" && k !== "issueWeek"
-  );
+  const stories: any[] = news.stories || [];
+  const letters: any[] = news.letters || [];
   const week = news.week || news.issueWeek || state.week;
 
   return (
@@ -271,30 +279,40 @@ export function NewspaperModal({ state, dismissNewspaper }: any) {
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">📰 Nashville Times</div>
         <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 12, fontFamily: "var(--mono)" }}>
-          Week {week}
+          Week {week}{news.weather ? ` • ${news.weather}` : ""}
         </div>
-        {entries.length > 0 ? (
+        {stories.length > 0 ? (
           <div>
-            {entries.map(([key, value]: [string, any], i: number) => (
-              <div key={i} style={{ marginBottom: i === 0 ? 12 : 8 }}>
-                {i === 0 ? (
-                  <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--head)", fontStyle: "italic", lineHeight: 1.3 }}>
-                    {value}
-                  </div>
-                ) : i === 1 ? (
-                  <div style={{ fontSize: 13, color: "var(--muted2)", fontStyle: "italic" }}>
-                    {value}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                    {value}
-                  </div>
-                )}
+            {stories.map((story: any, i: number) => (
+              <div key={i} style={{ marginBottom: 16, paddingBottom: i < stories.length - 1 ? 16 : 0, borderBottom: i < stories.length - 1 ? "1px dashed var(--border)" : "none" }}>
+                <div style={{ fontSize: 11, color: "var(--amber)", fontFamily: "var(--mono)", textTransform: "uppercase", marginBottom: 4 }}>
+                  {story.section}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--head)", fontStyle: "italic", lineHeight: 1.3, marginBottom: 4 }}>
+                  {story.headline}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 6 }}>
+                  {story.byline}
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6 }}>{story.body}</div>
               </div>
             ))}
           </div>
         ) : (
           <div className="tip-text">No article content available.</div>
+        )}
+        {letters.length > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border)" }}>
+            <div className="tip-text" style={{ marginBottom: 8 }}>Letters to the Editor</div>
+            {letters.map((letter: any, i: number) => (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, lineHeight: 1.6, fontStyle: "italic" }}>{letter.body}</div>
+                <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>
+                  -- {letter.signature}, {letter.city}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         <div className="modal-footer">
           <button className="btn btn-lime btn-block" onClick={dismissNewspaper}>Continue</button>
@@ -306,16 +324,34 @@ export function NewspaperModal({ state, dismissNewspaper }: any) {
 
 export function ArcModal({ state, doResolveArcChoice }: any) {
   if (!state.pendingArcChoice) return null;
+  const { arcId, stepIndex } = state.pendingArcChoice;
+  const arc = STORY_ARCS.find((a) => a.id === arcId);
+  if (!arc) return null;
+  const step = arc.steps[stepIndex];
+  if (!step) return null;
   return (
     <div className="modal-overlay">
       <div className="modal-box">
-        <div className="modal-title">Story Arc</div>
-        <div className="tip-text" style={{ marginBottom: 12 }}>
-          A story arc choice awaits. Choose your path.
+        <div className="modal-title">{arc.emoji} {step.title}</div>
+        <div style={{ fontSize: 11, color: "var(--amber)", fontFamily: "var(--mono)", marginBottom: 8 }}>
+          {arc.title}
+        </div>
+        <div className="tip-text" style={{ marginBottom: 12, lineHeight: 1.6 }}>
+          {step.body}
         </div>
         <div className="modal-footer">
-          <button className="btn btn-lime btn-block" onClick={() => doResolveArcChoice(state.pendingArcChoice.arcId, 0)}>Choose Path A</button>
-          <button className="btn btn-ghost btn-block" onClick={() => doResolveArcChoice(state.pendingArcChoice.arcId, 1)}>Choose Path B</button>
+          {step.choices.map((choice, i) => (
+            <button
+              key={i}
+              className={i === 0 ? "btn btn-lime btn-block" : "btn btn-ghost btn-block"}
+              onClick={() => doResolveArcChoice(arcId, i)}
+            >
+              <div>{choice.label}</div>
+              {choice.sub && (
+                <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 400, marginTop: 2 }}>{choice.sub}</div>
+              )}
+            </button>
+          ))}
         </div>
       </div>
     </div>

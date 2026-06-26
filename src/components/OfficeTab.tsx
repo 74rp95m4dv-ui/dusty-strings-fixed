@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  BRAND_DEALS, AWARDS, CAREER_TIERS, fmtMoney, RIVALS, fmtPercent,
+  BRAND_DEALS, AWARDS, CAREER_TIERS, fmtMoney, RIVALS, fmtPercent, fmt,
   recoupProgress, get360Summary, getRiskLabel, getLabel, getManager,
   MANAGERS, type LabelOffer,
 } from "../gameLogic";
@@ -43,7 +43,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       {sub === "deals" && (
         <div className="stagger-1">
           {/* Label Contract */}
-          <LabelContractCard state={state} onDrop={doDropLabel} onSign={doSignLabel} onView={onViewLabelOffer} />
+          <LabelContractCard state={state} onDrop={doDropLabel} onSign={doSignLabel} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
 
           {/* Management */}
           <div className="card">
@@ -312,8 +312,8 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
 }
 
 /* ─── Label Contract Card ─── */
-function LabelContractCard({ state, onDrop, onSign, onView }: {
-  state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView: (offer: LabelOffer) => void;
+function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
+  state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView: (offer: LabelOffer) => void; onDismiss: () => void;
 }) {
   if (state.currentLabel) {
     const lbl = state.currentLabel;
@@ -432,7 +432,7 @@ function LabelContractCard({ state, onDrop, onSign, onView }: {
         );
       })}
       {state.pendingLabelOffers.length > 0 && (
-        <button className="btn btn-sm btn-ghost" style={{ marginTop: 8 }} onClick={doDismissLabelOffers}>
+        <button className="btn btn-sm btn-ghost" style={{ marginTop: 8 }} onClick={onDismiss}>
           Decline All
         </button>
       )}

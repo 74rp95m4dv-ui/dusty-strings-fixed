@@ -127,7 +127,7 @@ function ActiveProject({ state, doUpdateProject, doAddTrack, doRemoveTrack, doFi
   const prod = PRODUCERS.find((pr: any) => pr.id === p.producerId);
   const studio = STUDIOS.find((st: any) => st.id === p.studioId);
   const rel = prod ? getProducerRelationship(prod.id, state.producerWorkCounts) : null;
-  const modeCfg = RECORDING_MODE_CONFIG[p.mode ?? "standard"];
+  const modeCfg = RECORDING_MODE_CONFIG[(p.mode ?? "standard") as RecordingMode];
   const canFinish = p.tracks.length >= p.minTracks && p.weeksLeft <= 0;
 
   const addTrack = () => {

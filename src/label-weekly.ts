@@ -13,6 +13,7 @@ import {
   generateLabelOffers,
   getLabel,
   fmtMoney,
+  fmtDuration,
   recoupProgress,
   clamp,
 } from "./gameLogic";

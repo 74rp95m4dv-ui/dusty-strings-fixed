@@ -4308,6 +4308,14 @@ export interface GameState {
   completedFestivals: string[];
   lastBusBreakdownWeek: number;
 
+  // ── Publishing & Sync ──
+  currentPublishing: any;
+  pendingPublishingOffers: any[];
+  pendingSyncOffers: any[];
+  selloutScore: number;
+  totalPublishingRevenue: number;
+  distributorFee: number;
+
 }
 
 export const INITIAL_STATE: GameState = {
@@ -4404,6 +4412,14 @@ export const INITIAL_STATE: GameState = {
   pendingFestivalOffers: [],
   completedFestivals: [],
   lastBusBreakdownWeek: 0,
+
+  // ── Publishing & Sync defaults ──
+  currentPublishing: null,
+  pendingPublishingOffers: [],
+  pendingSyncOffers: [],
+  selloutScore: 0,
+  totalPublishingRevenue: 0,
+  distributorFee: 0,
 
 };
 

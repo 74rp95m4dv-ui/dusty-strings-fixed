@@ -2,9 +2,9 @@ import React from "react";
 import {
   type GameState,
   type SignedLabel,
-  getRecordingFundStatus,
   fmtMoney,
 } from "../gameLogic";
+import { getRecordingFundStatus } from "../recording-fund";
 
 interface RecordingFundBannerProps {
   state: GameState;

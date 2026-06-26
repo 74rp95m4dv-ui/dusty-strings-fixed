@@ -79,7 +79,7 @@ function calcFill(demand:number, cap:number, mult:number) {
 }
 function calcCrewCost(tier:number) { return ({1:120,2:180,3:280,4:450,5:750,6:1500,7:3500} as Record<number,number>)[tier]??120; }
 
-function calcStreamRevenue(catalog:CatalogEntry[], streamCut:number) {
+function calcStreamRevenue(catalog: CatalogEntry[], streamCut: number, platformMix?: Record<string, number>, geoDist?: Record<string, number>, premiumRatio?: number, distributorFee?: number) {
   const total = catalog.reduce((s,t)=>s+t.weeklyStreams,0);
   // Real-world blended streaming rate: ~$0.0032/stream after platform variance
   // Distributor takes ~15% off the top, then label takes their cut
@@ -700,11 +700,11 @@ function advance(prev:GameState): GameState {
     if (!s.regional[show.region]) s.regional[show.region]=0;
     s.regional[show.region]++;
     if (!s.tourHistory) s.tourHistory=[];
+    const gross = doorGross;
     s.tourHistory.unshift({
       week:s.week, cityName:show.cityName, venueName:show.venueName,
       venueCap:show.venueCap, seats, attendancePct:Math.floor(fill*100),
       ticket, gross, crew, travelCost:show.travelCost, labelCut, net,
-      totalExpenses,
     });
     if (s.tourHistory.length>50) s.tourHistory.length=50;
     const sfNote = sfG > 0 ? ` · +${fmt(sfG)} superfans` : "";

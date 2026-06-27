@@ -719,7 +719,7 @@ function advance(prev:GameState): GameState {
       const completedCount = s.tourActive.progress;
       const recentHistory = (s.tourHistory ?? []).slice(0, completedCount);
       const totalGross = recentHistory.reduce((a, h) => a + h.gross, 0);
-      const totalExp   = recentHistory.reduce((a, h) => a + h.totalExpenses + h.labelCut, 0);
+      const totalExp   = recentHistory.reduce((a, h) => a + (h.crew ?? 0) + h.travelCost + h.labelCut, 0);
       const totalNet   = recentHistory.reduce((a, h) => a + h.net, 0);
       const avgFill    = recentHistory.length > 0 ? recentHistory.reduce((a, h) => a + h.attendancePct, 0) / recentHistory.length : 0;
       const bestH  = recentHistory.length > 0 ? recentHistory.reduce((a, b) => b.net > a.net ? b : a) : null;
@@ -1021,7 +1021,7 @@ export function useGameState() {
       // Migrate older saves to the rich label/manager system.
       currentLabel: saved.currentLabel ?? (saved.labelSigned ? {
         labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-        streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
+        streamingCut:0.18, tourGrossCut:0.10, marketingBoost:1.3,
         advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
         royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
         marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,

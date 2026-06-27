@@ -2172,13 +2172,42 @@ export interface GrindEffect {
   fame?: number; rep?: number; hype?: number; fans?: number;
   money?: number; money_pct?: number; playlist?: boolean; sync_chance?: boolean;
   festival_chance?: boolean; radio?: boolean; satReduce?: number;
+  superfans?: number; burnout?: number; energyBoost?: number; platformBoost?: string;
+  qBonus?: number; // quality bonus for writing-focused activities
+  collabChance?: boolean; // triggers a random collaboration event
 }
+
+// ── #2 ACTIVE STREAMING ENGAGEMENT ───────────────────────────
+// Playlists that players can pitch to and manage, with active minigame mechanics.
+export interface PlaylistPitch {
+  id: string;
+  name: string;
+  platform: "spotify" | "apple" | "youtube" | "amazon";
+  followers: number;
+  genre: "country" | "blues" | "americana" | "rock" | "pop";
+  engagementRate: number; // 0..1 — % of followers who actively stream per week
+  curatorNote: string;      // flavor text about the playlist's vibe
+  status: "pitched" | "accepted" | "rejected" | "rotated_out";
+  addedWeek: number | null; // week track was added (null if not yet accepted)
+  weeklyListeners: number;  // derived from follower count × engagement rate
+}
+
 export interface GrindReq {
   fame?: number; rep?: number; fans?: number; releases?: number; money?: number;
+  tourActive?: boolean; noTour?: boolean; catalogMin?: number; genre?: "Country" | "Blues";
 }
-export interface GrindAction {
-  id: string; name: string; desc: string;
+
+// Dynamic activities that rotate based on game state
+export interface DynamicActivity {
+  id: string; name: string; desc: string; emoji: string;
   e: number; cd: number; mc?: number;
+  eff: GrindEffect; req: GrindReq;
+  weight: number; // Higher = more likely to appear in rotation
+  category: "creative" | "promotional" | "performance" | "business" | "wellness" | "competitive";
+}
+
+export interface GrindAction {
+  id: string; name: string; desc: string; e: number; cd: number; mc?: number;
   eff: GrindEffect; req: GrindReq;
 }
 
@@ -2202,6 +2231,177 @@ export const GRIND_ACTIONS: GrindAction[] = [
   {id:"festival",  name:"Apply to a Festival",          desc:"Submit to regional music festivals. Big exposure if accepted.",                  e:20, cd:6, eff:{festival_chance:true},             req:{fame:15,releases:1}},
   {id:"lay_low",   name:"Lay Low — Let It Breathe",    desc:"Step back from releasing. Give the market time to miss you. Drops saturation fast.", e:10, cd:3, eff:{satReduce:22},                req:{}},
 ];
+
+// ═══════════════════════════════════════════════════════════════
+// DYNAMIC ACTIVITY POOL — Rotates based on game state (#1 Improvement)
+// ═══════════════════════════════════════════════════════════════
+// These activities appear in a rotating pool, giving different options
+// each week based on your career phase, recent activity, and current situation.
+
+export interface DynamicActivityPool {
+  activities: DynamicActivity[];
+  rotationSeed: number; // Deterministic seed for weekly rotation
+}
+
+function getSeasonWeek(week: number): string {
+  const month = ((week % 52) % 12) + 1;
+  if (month >= 3 && month <= 5) return "spring";
+  if (month >= 6 && month <= 8) return "summer";
+  if (month >= 9 && month <= 11) return "fall";
+  return "winter";
+}
+
+function getCareerPhase(fame: number, totalReleases: number): "discovery" | "confidence" | "mastery" | "legacy" {
+  if (fame < 20 && totalReleases < 3) return "discovery";
+  if (fame < 50 && totalReleases < 10) return "confidence";
+  if (fame < 80) return "mastery";
+  return "legacy";
+}
+
+// Seasonal activities that feel fresh and time-sensitive
+const SEASONAL_ACTIVITIES: DynamicActivity[] = [
+  // Spring
+  {id:"spring_festival_prep", name:"🌸 Spring Festival Circuit", desc:"Regional festivals are booking up. Hit the local circuit and build buzz.", emoji:"🌸", e:25, cd:4, mc:500, eff:{fans:600,fame:3,hype:12,festival_chance:true}, weight:3, category:"performance", req:{}},
+  {id:"song_swap", name:"📝 Songwriter Swap Meet", desc:"Local writers gather to trade songs. Cross-pollinate ideas.", emoji:"📝", e:15, cd:3, eff:{rep:4,fans:200,hype:6}, weight:4, category:"creative", req:{}},
+  // Summer
+  {id:"summer_tour_micro", name:"☀️ Micro Tour Weekend", desc:"Three overnight gigs in neighboring towns. Great for superfans.", emoji:"☀️", e:35, cd:5, mc:800, eff:{fans:1200,fame:5,superfans:150,money_pct:0.04}, weight:3, category:"performance", req:{noTour:true}},
+  {id:"outdoor_gig", name:"🌅 Outdoor Sunset Gig", desc:"Intimate outdoor show. Great content, great vibes.", emoji:"🌅", e:12, cd:2, eff:{fans:400,fame:2,hype:15,money_pct:0.03}, weight:4, category:"performance", req:{}},
+  // Fall
+  {id:"halloween_special", name:"🎃 Halloween Special Show", desc:"Themed performance. Draws a different crowd every time.", emoji:"🎃", e:20, cd:4, mc:300, eff:{fans:500,fame:3,hype:18}, weight:2, category:"performance", req:{}},
+  {id:"fall_collection", name:"🍂 Fall Collection Writing", desc:"Seasonal writing retreat. Produce 3 new songs in one session.", emoji:"🍂", e:40, cd:6, eff:{rep:6,hype:10,qBonus:5}, weight:3, category:"creative", req:{releases:2}},
+  // Winter
+  {id:"winter_residency", name:"❄️ Winter Residency Planning", desc:"Book a weekly residency. Steady income, steady fanbase.", emoji:"❄️", e:10, cd:7, eff:{money_pct:0.12,rep:2,satReduce:5}, weight:3, category:"business", req:{}},
+  {id:"indie_fest_winter", name:"🎵 Indie Winter Festival", desc:"Underground festival circuit. Less glamour, more credibility.", emoji:"🎵", e:30, cd:5, eff:{rep:8,fame:4,fans:800}, weight:2, category:"performance", req:{releases:1}},
+];
+
+// Career-phase specific activities
+const CAREER_PHASE_ACTIVITIES: Record<string, DynamicActivity[]> = {
+  discovery: [
+    {id:"coffee_shop_tour", name:"☕ Coffee Shop Circuit", desc:"Play every coffee shop in town. Small crowds, big hearts.", emoji:"☕", e:10, cd:2, eff:{fans:200,rep:3,hype:5}, weight:5, category:"performance", req:{}},
+    {id:"open_call_collab", name:"🤝 Open Call Collaboration", desc:"Anyone can play. Find your next collaborator.", emoji:"🤝", e:15, cd:3, eff:{fans:300,rep:2,hype:8,collabChance:true}, weight:4, category:"creative", req:{}},
+    {id:"street_perform_art", name:"🎨 Street Performance Art", desc:"Not just busking — art. Draws a different crowd each time.", emoji:"🎨", e:12, cd:2, eff:{fans:250,fame:1,hype:8}, weight:4, category:"performance", req:{}},
+    {id:"demo_swap_local", name:"📼 Demo Swap with Locals", desc:"Trade demos with other artists. Learn the scene.", emoji:"📼", e:8, cd:2, eff:{rep:2,fans:150}, weight:3, category:"creative", req:{}},
+  ],
+  confidence: [
+    {id:"local_feat_chain", name:"🔗 Local Feature Chain", desc:"Guest on 3 local tracks in one week. Cross-pollination.", emoji:"🔗", e:30, cd:5, mc:200, eff:{fans:500,fame:4,rep:3}, weight:3, category:"promotional", req:{releases:1}},
+    {id:"genre_experiment", name:"🎭 Genre Experiment Night", desc:"Step outside your comfort. Play something unexpected.", emoji:"🎭", e:20, cd:3, eff:{fame:3,hype:15,rep:-1,fans:300}, weight:4, category:"creative", req:{}},
+    {id:"community_workshop", name:"🏫 Community Music Workshop", desc:"Teach kids and seniors. The rep boost is real.", emoji:"🏫", e:15, cd:4, eff:{rep:6,fans:200,hype:5,money_pct:0.02}, weight:3, category:"business", req:{}},
+    {id:"local_press_run", name:"📰 Local Press Run", desc:"Radio station, newspaper, TV — the full hometown tour.", emoji:"📰", e:18, cd:3, mc:150, eff:{fame:5,rep:4,fans:600}, weight:4, category:"promotional", req:{releases:1}},
+  ],
+  mastery: [
+    {id:"master_class", name:"🎓 Master Class Series", desc:"Teach your process. Attracts serious fans and aspiring artists.", emoji:"🎓", e:20, cd:5, mc:400, eff:{rep:8,fans:300,superfans:80,money_pct:0.06}, weight:3, category:"business", req:{releases:3}},
+    {id:"cross_genre_collab", name:"🎸 Cross-Genre Collaboration", desc:"Work with someone from a different scene. Fresh perspective.", emoji:"🎸", e:25, cd:4, mc:600, eff:{fans:700,fame:5,hype:12}, weight:3, category:"creative", req:{releases:2}},
+    {id:"documentary_pitch", name:"📹 Documentary Pitch", desc:"Get your story told. Costs money but the exposure is real.", emoji:"📹", e:30, cd:8, mc:1500, eff:{fame:8,rep:6,fans:1200,hype:15}, weight:2, category:"promotional", req:{releases:4}},
+    {id:"charity_benefit", name:"💛 Charity Benefit Concert", desc:"Play for a cause. The fans show up and stay.", emoji:"💛", e:25, cd:5, eff:{rep:5,fans:600,superfans:100,hype:8}, weight:3, category:"performance", req:{}},
+  ],
+  legacy: [
+    {id:"mentor_young_talent", name:"🌟 Mentor Young Talent", desc:"Take on an apprentice. The scene respects this.", emoji:"🌟", e:10, cd:4, eff:{rep:8,fame:3,hype:5}, weight:4, category:"business", req:{}},
+    {id:"archive_series", name:"📻 Archive Series Release", desc:"Release old gems. Longtime fans love this.", emoji:"📻", e:15, cd:6, eff:{fans:500,rep:5,superfans:200}, weight:3, category:"creative", req:{}},
+    {id:"hall_of_fame_run", name:"🏆 Hall of Fame Campaign", desc:"Strategic promo push. You're making your case.", emoji:"🏆", e:35, cd:10, mc:2000, eff:{fame:6,rep:8,fans:1500,superfans:300}, weight:2, category:"promotional", req:{}},
+    {id:"legacy_written", name:"✍️ Oral History Project", desc:"Tell your story for the record. Rep gold.", emoji:"✍️", e:12, cd:5, eff:{rep:10,fame:4,hype:8}, weight:3, category:"business", req:{}},
+  ],
+};
+
+// State-responsive activities (appear based on current game conditions)
+const STATE_RESPONSIVE_ACTIVITIES: DynamicActivity[] = [
+  {id:"comeback_pitch", name:"🔄 Comeback Pitch Session", desc:"Your older tracks deserve another shot. Revive a deep cut.", emoji:"🔄", e:15, cd:4, eff:{hype:8,fans:400,fame:2}, weight:3, category:"promotional", req:{catalogMin:2}},
+  {id:"fan_concert", name:"💌 Fan Meetup Concert", desc:"Intimate show for your superfans. Converts casuals at high rate.", emoji:"💌", e:18, cd:3, mc:200, eff:{superfans:120,fans:300,hype:10}, weight:4, category:"performance", req:{fans:100}},
+  {id:"controversy_play", name:"⚡ Controversial Set Choice", desc:"Play something that sparks conversation. Risky but memorable.", emoji:"⚡", e:20, cd:5, eff:{fame:5,hype:15,fans:500,rep:-3}, weight:2, category:"competitive", req:{}},
+  {id:"impromptu_session", name:"🎤 Impromptu Livestream", desc:"No planning, no polish. Just play.", emoji:"🎤", e:8, cd:1, eff:{fans:350,hype:20,fame:1}, weight:5, category:"promotional", req:{}},
+  {id:"studio_burnout_work", name:"🔥 Burnout Recovery Session", desc:"Write something personal and quiet. Good for you AND your art.", emoji:"🔥", e:10, cd:3, eff:{rep:2,hype:5,burnout:-8}, weight:4, category:"wellness", req:{}},
+];
+
+// Competitive activities (rival-related, see rival improvements below)
+const COMPETITIVE_ACTIVITIES: DynamicActivity[] = [
+  {id:"call_out_song", name:"📢 Call-Out Song", desc:"Write a song aimed at your rival. The scene will talk.", emoji:"📢", e:25, cd:6, eff:{fame:4,hype:18,rep:-2,fans:600}, weight:3, category:"competitive", req:{releases:1}},
+  {id:"cover_response", name:"🎵 Cover Response", desc:"Your rival released something? You cover their angle faster.", emoji:"🎵", e:15, cd:4, eff:{fame:3,hype:12,fans:400}, weight:3, category:"competitive", req:{releases:1}},
+  {id:"booking_raid", name:"🏃 Booking Raid", desc:"Snatch a venue your rival wants. Direct confrontation.", emoji:"🏃", e:20, cd:5, mc:500, eff:{fans:500,fame:3,hype:8}, weight:2, category:"competitive", req:{releases:1}},
+  {id:"producer_war", name:"⚔️ Producer War", desc:"Book the same producer your rival loves. Show who's better.", emoji:"⚔️", e:35, cd:7, mc:1000, eff:{fame:6,rep:4,fans:700}, weight:2, category:"competitive", req:{releases:2}},
+];
+
+// Generate the weekly rotating activity pool
+export function generateWeeklyActivities(
+  stateWeek: number,
+  fame: number,
+  totalReleases: number,
+  burnout: number,
+  hasTour: boolean,
+  catalogCount: number,
+  genre: "Country" | "Blues",
+  rivalActive: boolean
+): DynamicActivity[] {
+  const season = getSeasonWeek(stateWeek);
+  const phase = getCareerPhase(fame, totalReleases);
+  const highBurnout = burnout > 60;
+
+  const pool: DynamicActivity[] = [];
+
+  // Always include baseline activities (subset, rotated by seed)
+  const baselineSeed = (stateWeek % 52);
+  for (let i = 0; i < SEASONAL_ACTIVITIES.length; i++) {
+    if ((i + baselineSeed) % 3 === 0 || (i + baselineSeed) % 7 === 0) {
+      pool.push(SEASONAL_ACTIVITIES[i]);
+    }
+  }
+
+  // Career phase activities (pick 2-3 based on week rotation)
+  const phaseActivities = CAREER_PHASE_ACTIVITIES[phase];
+  for (let i = 0; i < phaseActivities.length; i++) {
+    if ((i + baselineSeed) % 2 === 0) {
+      pool.push(phaseActivities[i]);
+    }
+  }
+
+  // State-responsive activities appear based on conditions
+  if (catalogCount >= 2) pool.push(...STATE_RESPONSIVE_ACTIVITIES.filter(a => a.id === "comeback_pitch" || a.id === "fan_concert"));
+  if (highBurnout) {
+    const wellnessOpts = STATE_RESPONSIVE_ACTIVITIES.find(a => a.id === "studio_burnout_work");
+    if (wellnessOpts) pool.push(wellnessOpts);
+  }
+
+  // Competitive activities when rivals are relevant
+  if (rivalActive && fame > 15) {
+    pool.push(...COMPETITIVE_ACTIVITIES.filter(a => (a.req?.releases ?? 0) <= totalReleases));
+  }
+
+  // Add wellness option if burnout is moderate
+  if (burnout > 30 && burnout <= 60) {
+    const recovery = {
+      id: "detox_weekend",
+      name: "🧘 Detox Weekend Retreat",
+      desc: "Two days away from the grind. Reset your head.",
+      emoji: "🧘",
+      e:8, cd:3, mc:600,
+      eff:{burnout:-15,energyBoost:20,hype:3},
+      weight:4, category:"wellness" as const,
+      req:{}
+    };
+    pool.push(recovery);
+  }
+
+  // Deduplicate by id and limit to 8 activities
+  const seen = new Set<string>();
+  const unique = pool.filter(a => {
+    if (seen.has(a.id)) return false;
+    seen.add(a.id);
+    return true;
+  });
+
+  // Weighted shuffle: pick up to 8
+  const shuffled = [...unique].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 8);
+}
+
+// Category labels for UI display
+export const ACTIVITY_CATEGORIES = {
+  creative:    { label: "Creative",   emoji: "🎨" },
+  promotional: { label: "Promotional", emoji: "📢" },
+  performance: { label: "Performance", emoji: "🎤" },
+  business:    { label: "Business",   emoji: "💼" },
+  wellness:    { label: "Wellness",   emoji: "🧘" },
+  competitive: { label: "Competitive", emoji: "⚔️" },
+};
+
 
 // ── BRAND DEALS ────────────────────────────────────────────
 export interface BrandDeal {
@@ -4654,3 +4854,418 @@ export function getBrandDealSellout(id: string): number {
 export function getBrandDealV2(id: string): BrandDealV2 | undefined {
   return BRAND_DEALS_V2.find(b => b.id === id);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// #7 FEATURE ARTIST RELATIONSHIP DEPTH — Beyond transactional fees
+// ═══════════════════════════════════════════════════════════════
+// Each feature artist has a trust meter (-100 to +100), personality traits,
+// relationship history, and periodic events that test or strengthen bonds.
+// Working with the same person repeatedly builds chemistry (quality synergy)
+// but can create dramatic tension if trust is low.
+
+export type FeaturePersonality = "creative" | "competitive" | "supportive" | "volatile" | "business";
+export interface FeatureArtistRelationship {
+  featureId: string;                    // which feature artist
+  trust: number;                        // -100 (hostile) to +100 (best friends)
+  chemistry: number;                    // 0-100 — how well you two create together
+  lastCollabWeek: number;
+  totalCollabs: number;
+  personality: FeaturePersonality;
+  recentMood: "warm" | "neutral" | "distant" | "tense";
+}
+
+// Personality-driven events triggered when working with a feature artist
+export interface FeatureEvent {
+  id: string;
+  title: string;
+  triggerCondition: (rel: FeatureArtistRelationship, playerFame: number) => boolean;
+  emoji: string;
+  body: string;
+  choices: Array<{
+    label: string;
+    sub: string;
+    effect: { trustDelta?: number; chemistryDelta?: number; qualityBonus?: number; fameBonus?: number; moneyCost?: number };
+  }>;
+}
+
+const FEATURE_EVENTS: FeatureEvent[] = [
+  // Trust-based events (low trust)
+  {
+    id: "feature_disagreement",
+    title: "Studio Disagreement",
+    triggerCondition: (rel) => rel.trust < -20 && rel.totalCollabs >= 1,
+    emoji: "⚡",
+    body: "The feature artist pushes back on your creative direction during the session. Their ego is at odds with yours.",
+    choices: [
+      { label:"Yield to their vision for this track", sub:"Protect the relationship, lose some face", effect:{ trustDelta:15, chemistryDelta:5, fameBonus:-2 } },
+      { label:"Stand your ground. You're the leader.", sub:"Assert dominance, risk lasting damage", effect:{ trustDelta:-10, chemistryDelta:-5, fameBonus:3, qualityBonus:2 } },
+      { label:"Find a compromise — blend both ideas", sub:"Harder work, better art either way", effect:{ trustDelta:5, chemistryDelta:10, qualityBonus:4 } },
+    ],
+  },
+  // Trust-based events (high trust)
+  {
+    id: "feature_loyalty_pivot",
+    title: "Loyalty Test",
+    triggerCondition: (rel) => rel.trust > 60 && rel.totalCollabs >= 2,
+    emoji: "🤝",
+    body: "Your feature artist hears another label is courting them away. They ask what your real connection is.",
+    choices: [
+      { label:"You're family — we build together, period", sub:"Deep emotional investment", effect:{ trustDelta:15, chemistryDelta:8, qualityBonus:3 } },
+      { label:"It's professional. The music speaks for itself.", sub:"Keep it clean and honest", effect:{ trustDelta:5, chemistryDelta:5, fameBonus:2 } },
+    ],
+  },
+  // Chemistry-based events (high chemistry)
+  {
+    id: "creative_flow_state",
+    title: "Flow State Session",
+    triggerCondition: (rel) => rel.chemistry > 70 && rel.totalCollabs >= 3,
+    emoji: "✨",
+    body: "Something magical happens in the studio. Hours pass like minutes. Both of you are creating your best work.",
+    choices: [
+      { label:"Don't stop — ride the wave for hours", sub:"Maximum creativity but exhausting", effect:{ trustDelta:10, chemistryDelta:5, qualityBonus:8, fameBonus:3 } },
+      { label:"Capture the magic and know when to stop", sub:"Smart — keep the spark alive", effect:{ trustDelta:5, chemistryDelta:8, qualityBonus:5 } },
+    ],
+  },
+  // Personality-driven events (volatile)
+  {
+    id: "volatile_outburst",
+    title: "Creative Outburst",
+    triggerCondition: (rel) => rel.personality === "volatile" && rel.totalCollabs >= 1,
+    emoji: "💥",
+    body: "Your feature artist has a dramatic creative outburst — sometimes it's brilliant, sometimes it's chaos.",
+    choices: [
+      { label:"Let them express it. Genius needs space.", sub:"High risk, high reward", effect:{ trustDelta:Math.random()>0.5?10:-15, chemistryDelta:Math.random()>0.5?10:-5, qualityBonus:Math.random()>0.5?8:-3 } },
+      { label:"Calm them down gently", sub:"De-escalate without confrontation", effect:{ trustDelta:8, chemistryDelta:2, qualityBonus:2 } },
+    ],
+  },
+  // Business personality events
+  {
+    id: "business_suggestion",
+    title: "Business Proposition",
+    triggerCondition: (rel) => rel.personality === "business" && rel.totalCollabs >= 2,
+    emoji: "💼",
+    body: "Your feature artist comes with a business idea — a co-branded merch line, tour bundle, or label intro.",
+    choices: [
+      { label:"Absolutely — let's make it happen", sub:"Leverage the partnership", effect:{ trustDelta:10, moneyCost:-2000, fameBonus:5, fansBonus:1000 } },
+      { label:"Interesting. Let me think about it.", sub:"Keep options open", effect:{ trustDelta:3, chemistryDelta:2 } },
+    ],
+  },
+];
+
+// Generate feature event for a specific relationship if conditions are met
+export function getFeatureEventForRelationship(
+  rel: FeatureArtistRelationship,
+  playerFame: number
+): FeatureEvent | null {
+  return FEATURE_EVENTS.find(e => e.triggerCondition(rel, playerFame)) ?? null;
+}
+
+// Update chemistry based on collaborative history and archetype synergy
+export function computeChemistry(base: number, arch1: string, arch2: string): number {
+  // Same archetype family = natural chemistry boost
+  const archSynergy: Record<string, string[]> = {
+    outlaw: ["outlaw", "honky_tonk"],
+    storyteller: ["storyteller", "nashville_sound"],
+    delta_blues: ["electric_blues", "soul_blues", "chicago_blues"],
+    blues_rock: ["blues_rock", "electric_blues"],
+  };
+  const synergies = archSynergy[arch1] ?? [];
+  let bonus = base;
+  if (synergies.includes(arch2)) bonus += 15;
+  return clamp(bonus, 0, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// #8 LABEL CONTRACT EVOLUTION — Active relationship post-signing
+// ═══════════════════════════════════════════════════════════════
+// Labels aren't just background math. They have:
+// • A&R check-ins that present real choices each quarter
+// • Negotiation moments (album budget increases, single approvals)
+// • Relationship meter with the exec
+// • Events where the label wants something you don't
+
+export type LabelRelationshipMood = "supportive" | "neutral" | "frustrated" | "hostile";
+
+export interface SignedLabelV2 extends SignedLabel {
+  // New fields for relationship tracking
+  aRExecName: string;            // A&R executive's full name (or use existing exec)
+  execRelationship: number;      // -100 to +100 with your A&R
+  labelMood: LabelRelationshipMood;
+  lastCheckInWeek: number;       // when was the last A&R check-in?
+  negotiationHistory: LabelNegotiation[];
+
+  // Quarterly "check-in" events that present real choices
+  pendingCheckIns: LabelCheckIn[];
+}
+
+export interface LabelCheckIn {
+  id: string;
+  weekOffered: number;
+  quarter: number;              // which label quarter (1-4)
+  type: "budget_increase" | "single_approval" | "creative_disagreement" | "festival_push" | "cross_genre";
+  title: string;
+  description: string;
+  emoji: string;
+  choices: Array<{
+    label: string;
+    sub: string;
+    effect: {
+      execRelationshipDelta?: number;
+      labelMoodChange?: LabelRelationshipMood;
+      recordingFundBonus?: number;
+      marketingBonus?: number;
+      creativeRisk?: number;     // -10 to +10 quality risk
+      careerRisk?: number;       // -10 to +10 career risk
+    };
+  }>;
+}
+
+export interface LabelNegotiation {
+  week: number;
+  type: string;
+  outcome: string;
+  relationshipChange: number;
+}
+
+// A&R executives that manage your label relationship
+const AR_EXECUTIVES = [
+  { name: "Diane Moreland", personality: "supportive", emoji: "👩‍💼", blurb: "Genuinely believes in artists. Fights for you internally." },
+  { name: "Rick Vasquez", personality: "neutral", emoji: "🤵", blurb: "Professional, pragmatic. Cares about numbers more than art." },
+  { name: "Tanya Crossfield", personality: "frustrated", emoji: "💅", blurb: "Impatient. Wants bigger hits, less artist development." },
+  { name: "Marcus Chen", personality: "hostile", emoji: "😤", blurb: "Thinks you're past your prime. Looking for reasons to shake you." },
+];
+
+// Generate quarterly check-in events
+export function generateLabelCheckIn(
+  label: SignedLabel,
+  currentWeek: number,
+  playerFame: number,
+  playerRep: number,
+): LabelCheckIn | null {
+  const quarter = Math.floor(currentWeek / 13) % 4;
+  // Generate check-ins based on game state
+  if (label.albumsDelivered < label.albumsCommitted && quarter === 0) {
+    return {
+      id: "checkin_deliver",
+      weekOffered: currentWeek,
+      quarter,
+      type: "creative_disagreement",
+      title: "Album Delivery Pressure",
+      description: "Your label wants to know about the next album. They're pushing for a faster turnaround.",
+      emoji: "📅",
+      choices: [
+        { label:"Give them what they want — fast track it", sub:"More money, less quality control", effect:{ creativeRisk:-5, marketingBonus:5000 } },
+        { label:"Respectfully push back — take the time you need", sub:"Protect the art, risk tension", effect:{ creativeRisk:+3 } },
+      ],
+    };
+  }
+  if (playerFame > 50 && Math.random() < 0.4) {
+    return {
+      id: "checkin_festival",
+      weekOffered: currentWeek,
+      quarter,
+      type: "festival_push",
+      title: "Festival Push Request",
+      description: "The label wants you to play a major festival slot — but they want you to change your setlist for 'radio appeal.'",
+      emoji: "🎪",
+      choices: [
+        { label:"Comply — play the radio hits", sub:"Label happy, fans maybe not", effect:{ marketingBonus:10000 } },
+        { label:"Play what you want", sub:"Artistic integrity over corporate wants", effect:{ creativeRisk:+2 } },
+      ],
+    };
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// #9 MARKET SATURATION STRATEGIC OPPORTUNITIES — Beyond penalty
+// ═══════════════════════════════════════════════════════════════
+// Saturation isn't just a number that hurts you. It creates:
+// • Competitive intel (know what other artists are dropping)
+// • Strategic timing windows (when the market is empty vs crowded)
+// • Opportunity events (when saturation is LOW, you get 'golden weeks')
+// • Brand deal shifts (brands want fresh artists when saturated)
+
+export interface SaturationEvent {
+  id: string;
+  type: "golden_week" | "competitive_drop" | "market_gap" | "brand_shift";
+  emoji: string;
+  title: string;
+  description: string;
+  triggerCondition: (saturation: number, week: number) => boolean;
+  choices: Array<{
+    label: string;
+    sub: string;
+    effect: { fansBonus?: number; fameBonus?: number; moneyBonus?: number; repBonus?: number; qualityBonus?: number };
+  }>;
+}
+
+const SATURATION_EVENTS: SaturationEvent[] = [
+  // Golden weeks when saturation is LOW — rare opportunities
+  {
+    id: "golden_week",
+    type: "golden_week",
+    emoji: "🌟",
+    title: "Golden Week Opportunity",
+    description: "The market is quiet right now. Few new releases. This is a prime window to launch something big.",
+    triggerCondition: (sat) => sat < 15,
+    choices: [
+      { label:"Drop a single NOW — catch the wave", sub:"Maximum discovery in an empty market", effect:{ fansBonus:2000, fameBonus:5, qualityBonus:5 } },
+      { label:"Save the momentum for later", sub:"Keep your powder dry", effect:{} },
+    ],
+  },
+  // Competitive intel — what other artists are doing
+  {
+    id: "competitive_drop",
+    type: "competitive_drop",
+    emoji: "📰",
+    title: "Competitor Alert",
+    description: "Another artist in your genre just announced a big release. The market will be crowded.",
+    triggerCondition: (sat) => sat > 40,
+    choices: [
+      { label:"Release EARLY — beat their drop", sub:"Aggressive timing play", effect:{ fansBonus:800, fameBonus:3 } },
+      { label:"Hold back and let them absorb the attention", sub:"Wait for the dust to settle", effect:{ fansBonus:-500, repBonus:2 } },
+    ],
+  },
+  // Market gap — opportunity in empty genre space
+  {
+    id: "market_gap",
+    type: "market_gap",
+    emoji: "🔑",
+    title: "Genre Gap Detected",
+    description: "Nobody's been dropping [genre] style lately. There's a hungry audience waiting.",
+    triggerCondition: (sat, week) => sat > 30 && Math.random() < 0.2,
+    choices: [
+      { label:"Pivot your next release to fill the gap", sub:"Strategic genre shift", effect:{ fansBonus:1500, fameBonus:4, qualityBonus:-2 } },
+      { label:"Stay true to your sound", sub:"Don't chase trends", effect:{ repBonus:3 } },
+    ],
+  },
+  // Brand deals shift when market is saturated
+  {
+    id: "brand_shift",
+    type: "brand_shift",
+    emoji: "📋",
+    title: "Brand Market Shift",
+    description: "Brands are shifting away from oversaturated artists. They want fresher faces.",
+    triggerCondition: (sat) => sat > 60,
+    choices: [
+      { label:"Accept a lower-profile deal to stay relevant", sub:"Maintain presence, sacrifice income", effect:{ moneyBonus:-2000, repBonus:5 } },
+      { label:"Ignore it — your core fans don't care about brands", sub:"Focus on music, not marketing", effect:{ fameBonus:2, fansBonus:500 } },
+    ],
+  },
+];
+
+// Get available saturation events for current game state
+export function getSaturationEvents(saturation: number, week: number): SaturationEvent[] {
+  return SATURATION_EVENTS.filter(e => e.triggerCondition(saturation, week));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// #10 ARTIST MATURITY / GENRE EVOLUTION — Dynamic artistic growth
+// ═══════════════════════════════════════════════════════════════
+// Players can evolve their sound over time through:
+// • Maturity tracks (how your artistry deepens with experience)
+// • Genre evolution paths (Country → Americana, Blues → Soul-Blues, etc.)
+// • Fan reaction to evolution (some fans love it, others abandon)
+// • Archetype shift opportunities (unlock new archetypes through play style)
+
+export type EvolutionStage = "emerging" | "developing" | "mature" | "master" | "legendary";
+
+export interface ArtistEvolution {
+  stage: EvolutionStage;
+  genreMaturity: Record<string, number>;    // genreId -> maturity level (0-100)
+  styleDrift: string | null;                // new genre/style they're evolving toward
+  fanReactionHistory: Array<{ week: number; deltaFans: number; reason: string }>;
+  unlockedArchetypes: string[];             // additional archetypes unlocked through play
+  originalArchetype: string;
+}
+
+// Evolution stages and their unlocks
+const EVOLUTION_STAGES: Record<EvolutionStage, { minExperience: number; label: string; unlocks: string[] }> = {
+  emerging:    { minExperience: 0,     label: "Emerging Voice",      unlocks: [] },
+  developing:  { minExperience: 50,    label: "Developing Sound",    unlocks: ["Genre experimentation unlocked"] },
+  mature:      { minExperience: 150,   label: "Mature Artist",       unlocks: ["Archetype shifts available", "Collaborative production"] },
+  master:      { minExperience: 300,   label: "Master Craftsman",    unlocks: ["Signature style recognized", "Cross-genre appeal"] },
+  legendary:   { minExperience: 600,   label: "Legendary Voice",     unlocks: ["Style defines the genre", "Influence spreads to newcomers"] },
+};
+
+// Genre evolution paths — what genres you can evolve toward based on current genre
+const GENRE_EVOLUTION_PATHS: Record<string, Array<{ targetGenre: string; name: string; description: string; fanRisk: number; qualityBonus: number }>> = {
+  Country: [
+    { targetGenre: "Americana", name: "Americana Deepening", description: "Your songwriting gains depth and folk authenticity.", fanRisk: -500, qualityBonus: 8 },
+    { targetGenre: "Rock-Inflected", name: "Rock Crossover", description: "Your sound gains electric edge and broader appeal.", fanRisk: 1200, qualityBonus: 3 },
+    { targetGenre: "Folk", name: "Folk Roots", description: "Stripped-back authenticity. Purists respect you.", fanRisk: -800, qualityBonus: 6 },
+  ],
+  Blues: [
+    { targetGenre: "Soul-Blues", name: "Soul Integration", description: "Your blues gains gospel depth and emotional range.", fanRisk: -300, qualityBonus: 7 },
+    { targetGenre: "Jazz-Blues", name: "Jazz Inflection", description: "Complex harmonies elevate your sophisticated sound.", fanRisk: 600, qualityBonus: 4 },
+    { targetGenre: "R&B-Blues", name: "R&B Fusion", description: "Your blues picks up groove and mainstream appeal.", fanRisk: 1500, qualityBonus: 2 },
+  ],
+};
+
+// Fan reaction to genre/style evolution
+export function getFanReactionToEvolution(currentGenre: string, newStyle: string, fanCount: number): { deltaFans: number; reason: string } {
+  // If evolving toward a different genre entirely
+  if (currentGenre !== newStyle) {
+    const coreFans = Math.floor(fanCount * 0.7);   // 70% stay
+    const lostFans = Math.floor(fanCount * 0.2);   // 20% leave
+    const newFans = Math.floor(fanCount * 0.15);   // 15% new fans
+    return {
+      deltaFans: -lostFans + newFans,
+      reason: `Your core fans follow you, but some expected more of the old sound. New listeners are intrigued.`,
+    };
+  }
+  // Same genre, different style within it
+  const minorDrift = Math.floor(fanCount * 0.05);  // 5% minor churn either way
+  return {
+    deltaFans: Math.random() > 0.5 ? minorDrift : -minorDrift,
+    reason: "Your fans are adaptable. A few are confused but most respect the evolution.",
+  };
+}
+
+// Check if player can unlock a new archetype based on play style
+export function checkArchetypeUnlocks(
+  currentArchetype: string,
+  totalReleases: number,
+  genre: Genre,
+): string[] {
+  const unlocks: string[] = [];
+
+  // Storyteller → Nashville Sound (industry recognition)
+  if (currentArchetype === "storyteller" && totalReleases >= 5 && genre === "Country") {
+    unlocks.push("nashville_sound");
+  }
+
+  // Delta Blues → Electric Blues (amplification)
+  if (currentArchetype === "delta_blues" && totalReleases >= 8 && genre === "Blues") {
+    unlocks.push("electric_blues");
+  }
+
+  // Honky Tonk → Country (radio polish)
+  if (currentArchetype === "honky_tonk" && totalReleases >= 10 && genre === "Country") {
+    unlocks.push("radio_country");
+  }
+
+  return unlocks;
+}
+
+// Get the current evolution stage based on experience (total weeks active + releases)
+export function getEvolutionStage(totalWeeks: number, totalReleases: number): EvolutionStage {
+  const experience = totalWeeks + (totalReleases * 10);
+  if (experience >= 600) return "legendary";
+  if (experience >= 300) return "master";
+  if (experience >= 150) return "mature";
+  if (experience >= 50)  return "developing";
+  return "emerging";
+}
+
+// Compute genre maturity score based on releases in that genre
+export function computeGenreMaturity(genre: Genre, catalog: CatalogEntry[]): number {
+  const genreReleases = catalog.filter(c => c.genre === genre).length;
+  return clamp(genreReleases * 8 + Math.random() * 5, 0, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Add new state fields for all improvements to GameState
+// (These extend the existing GameState interface below)
+// ═══════════════════════════════════════════════════════════════

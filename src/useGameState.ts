@@ -1077,9 +1077,10 @@ export function useGameState() {
     themeCounts: s.themeCounts ?? {},
     currentTrendTheme: s.currentTrendTheme ?? pickTrendTheme(null),
     producerWorkCounts: s.producerWorkCounts ?? {},
-    currentLabel: s.currentLabel ?? (s.labelSigned ? {
+    currentLabel: s.currentLabel ?? (s.labelSigned ?? false ? {
       labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-      streamingCut:0.18, tourGrossCut:0.10, tourCut:0.10, marketingBoost:1.3,
+       streamingCut:0.18, tourGrossCut:0.10, marketingBoost:1.3,
+       tourCut:0.10,
       advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
       royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
       marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,

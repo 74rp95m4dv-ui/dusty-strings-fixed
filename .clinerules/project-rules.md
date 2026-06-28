@@ -45,6 +45,16 @@ Do not modify anything outside that scope unless you first ask the user for perm
 
 If a proposed edit changes existing gameplay, game balance, save compatibility, or a working feature that the user did not request, stop and ask for approval before continuing.
 
+When creating or modifying UI:
+
+Never hardcode layouts for one screen size.
+
+Always build responsive components that automatically adapt to desktop, laptop, tablet, and mobile.
+
+Favor reusable layouts over one-off fixes.
+
+If a responsive architecture already exists, extend it instead of creating another one.
+
 ## TypeScript
 
 - Never use `any` unless requested.

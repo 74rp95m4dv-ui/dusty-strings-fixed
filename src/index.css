@@ -1861,3 +1861,220 @@ hr {
   border: 2px solid var(--bg);
   animation: pulse 2s ease infinite;
 }
+
+/* ─── CINEMATIC COMPONENTS ───────────────────────────────────── */
+.cinematic-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.cinematic-fade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  transition: opacity 1.5s ease-in-out;
+}
+
+.cinematic-fade.fade-out {
+  opacity: 1;
+}
+
+.cinematic-fade.fade-in {
+  opacity: 0;
+}
+
+.cinematic-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: white;
+  z-index: 1001;
+}
+
+.cinematic-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  opacity: 0.8;
+}
+
+.cinematic-info {
+  margin-bottom: 40px;
+  animation: fadeIn 1s ease-in-out;
+}
+
+.week-number {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.tour-name {
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+}
+
+.city-name {
+  font-size: 1.8rem;
+  margin-bottom: 10px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.venue-name {
+  font-size: 2.5rem;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
+
+.cinematic-marquee {
+  position: relative;
+  margin: 40px 0;
+  animation: slideInUp 1s ease-in-out;
+}
+
+.marquee-border {
+  position: relative;
+  width: 600px;
+  height: 120px;
+  border: 3px solid #fff;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+.marquee-light {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #333;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+.marquee-light.lit {
+  background-color: #ffcc00;
+  box-shadow: 0 0 15px #ffcc00, 0 0 30px #ffcc00;
+  animation: pulse 1s infinite;
+}
+
+/* Position lights around the border */
+.marquee-light:nth-child(1) { top: 5px; left: 5px; }
+.marquee-light:nth-child(2) { top: 5px; right: 5px; }
+.marquee-light:nth-child(3) { bottom: 5px; right: 5px; }
+.marquee-light:nth-child(4) { bottom: 5px; left: 5px; }
+.marquee-light:nth-child(5) { top: 50%; left: 5px; transform: translateY(-50%); }
+
+.marquee-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 100%;
+  padding: 0 20px;
+}
+
+.artist-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #ffcc00;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+}
+
+.tour-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.live-today {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #ffcc00;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+}
+
+.city {
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+}
+
+.date {
+  font-size: 1.1rem;
+  color: #ccc;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+.cinematic-crowd,
+.cinematic-bus {
+  margin-top: 40px;
+  animation: fadeInUp 1s ease-in-out;
+}
+
+.crowd-activity,
+.bus-arrival {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #ffcc00;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
+}
+
+.crowd-sound,
+.bus-excitement {
+  font-size: 1.2rem;
+  color: #fff;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+}
+
+/* Animation keyframes for cinematic effects */
+@keyframes slideInUp {
+  from { 
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

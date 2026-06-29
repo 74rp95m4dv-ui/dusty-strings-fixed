@@ -7,7 +7,7 @@ import LiveTab from "./LiveTab";
 import {
   ReleaseModal, TourWrapModal, SigningModal, AwardModal,
   MilestoneModal, ScenarioModal, NewspaperModal, ArcModal,
-  FeatureModal, ManagerOfferModal, PressingModal,
+  FeatureModal, ManagerOfferModal, PressingModal, SignComponent,
 } from "./Modals";
 import LabelOfferModal from "./LabelOfferModal";
 import StudioDrawer from "./drawers/StudioDrawer";
@@ -17,6 +17,7 @@ import OffersDrawer from "./drawers/OffersDrawer";
 import CatalogDrawer from "./drawers/CatalogDrawer";
 import UnreleasedDrawer from "./drawers/UnreleasedDrawer";
 import TourPlannerDrawer from "./drawers/TourPlannerDrawer";
+import { IntroCinematic } from "./IntroCinematic";
 
 const TABS = [
   { id: "home", label: "Home", icon: "🏠" },
@@ -36,10 +37,11 @@ export type DrawerType =
   | null;
 
 export default function GameScreen(game: any) {
-  const [tab, setTab] = useState("home");
-  const [drawer, setDrawer] = useState<DrawerType>(null);
-  const [viewingOffer, setViewingOffer] = useState<any>(null);
-  const s = game.state;
+const [tab, setTab] = useState("home");
+const [drawer, setDrawer] = useState<DrawerType>(null);
+const [viewingOffer, setViewingOffer] = useState<any>(null);
+const [inTourIntro, setInTourIntro] = useState(false);
+const s = game.state;
 
   const openDrawer = (d: DrawerType) => setDrawer(d);
   const closeDrawer = () => setDrawer(null);
@@ -159,6 +161,23 @@ export default function GameScreen(game: any) {
       )}
       {s.pendingManagerOffers?.length > 0 && <ManagerOfferModal {...game} />}
       {s.pendingPressing && <PressingModal {...game} />}
+      
+      {/* Tour Intro Cinematic */}
+      {inTourIntro && (
+        <IntroCinematic 
+          onStart={() => {}}
+          onEnd={() => setInTourIntro(false)} 
+          isTourIntro={true}
+        />
+      )}
+      
+      {/* Debug: Tour intro trigger */}
+      <button 
+        onClick={() => setInTourIntro(true)}
+        style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 2000 }}
+      >
+        Show Tour Intro
+      </button>
     </div>
   );
 }

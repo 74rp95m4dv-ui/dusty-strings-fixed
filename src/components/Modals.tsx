@@ -1,4 +1,5 @@
 import { fmt, fmtMoney, RANDOM_SCENARIOS, STORY_ARCS } from "../gameLogic";
+import SignComponent from "./SignComponent";
 
 export function ReleaseModal({ state, doCloseReleasePresentation }: any) {
   const pres = state.releasePresentation;
@@ -418,3 +419,5 @@ export function PressingModal({ state, doDismissPressing }: any) {
     </div>
   );
 }
+
+export { SignComponent };

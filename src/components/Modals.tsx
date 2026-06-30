@@ -263,66 +263,71 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
   );
 }
 
-export function NewspaperModal({ state, dismissNewspaper }: any) {
-  if (!state.pendingNewspaperJson) return null;
-  let news: any = {};
-  try {
-    news = JSON.parse(state.pendingNewspaperJson);
-  } catch {
-    return null;
-  }
+ export function NewspaperModal({ state, dismissNewspaper }: any) {
+   if (!state.pendingNewspaperJson) return null;
+   let news: any = {};
+   try {
+     news = JSON.parse(state.pendingNewspaperJson);
+   } catch {
+     return null;
+   }
 
-  const stories: any[] = news.stories || [];
-  const letters: any[] = news.letters || [];
-  const week = news.week || news.issueWeek || state.week;
+   const stories: any[] = news.stories || [];
+   const letters: any[] = news.letters || [];
+   const week = news.week || news.issueWeek || state.week;
 
-  return (
-    <div className="modal-overlay" onClick={dismissNewspaper}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">📰 Nashville Times</div>
-        <div style={{ fontSize: 12, color: "var(--muted2)", marginBottom: 12, fontFamily: "var(--mono)" }}>
-          Week {week}{news.weather ? ` • ${news.weather}` : ""}
-        </div>
-        {stories.length > 0 ? (
-          <div>
-            {stories.map((story: any, i: number) => (
-              <div key={i} style={{ marginBottom: 16, paddingBottom: i < stories.length - 1 ? 16 : 0, borderBottom: i < stories.length - 1 ? "1px dashed var(--border)" : "none" }}>
-                <div style={{ fontSize: 11, color: "var(--amber)", fontFamily: "var(--mono)", textTransform: "uppercase", marginBottom: 4 }}>
-                  {story.section}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--head)", fontStyle: "italic", lineHeight: 1.3, marginBottom: 4 }}>
-                  {story.headline}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted2)", marginBottom: 6 }}>
-                  {story.byline}
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.6 }}>{story.body}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="tip-text">No article content available.</div>
-        )}
-        {letters.length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border)" }}>
-            <div className="tip-text" style={{ marginBottom: 8 }}>Letters to the Editor</div>
-            {letters.map((letter: any, i: number) => (
-              <div key={i} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 12, lineHeight: 1.6, fontStyle: "italic" }}>{letter.body}</div>
-                <div style={{ fontSize: 11, color: "var(--muted2)", marginTop: 2 }}>
-                  -- {letter.signature}, {letter.city}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="modal-footer">
-          <button className="btn btn-lime btn-block" onClick={dismissNewspaper}>Continue</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+   return (
+     <div className="modal-overlay" onClick={dismissNewspaper}>
+       <div className="modal-box newspaper-modal" onClick={(e) => e.stopPropagation()}>
+         <div className="modal-title">📰 Nashville Times</div>
+         <div className="newspaper-header">
+           <div className="newspaper-issue">Issue {news.issue || 1}, Week {week}</div>
+           <div className="newspaper-date">{news.weather || "No weather report"}</div>
+         </div>
+         {stories.length > 0 ? (
+           <div className="newspaper-stories">
+             {stories.map((story: any, i: number) => (
+               <div key={i} className="newspaper-story">
+                 <div className="newspaper-section">
+                   {story.section}
+                 </div>
+                 <div className="newspaper-headline">
+                   {story.headline}
+                 </div>
+                 <div className="newspaper-byline">
+                   {story.byline}
+                 </div>
+                 <div className="newspaper-body">
+                   {story.body}
+                 </div>
+               </div>
+             ))}
+           </div>
+         ) : (
+           <div className="tip-text">No article content available.</div>
+         )}
+         {letters.length > 0 && (
+           <div className="newspaper-letters-section">
+             <div className="newspaper-section-divider">Letters to the Editor</div>
+             {letters.map((letter: any, i: number) => (
+               <div key={i} className="newspaper-letter">
+                 <div className="newspaper-letter-body">
+                   {letter.body}
+                 </div>
+                 <div className="newspaper-letter-signature">
+                   -- {letter.signature}, {letter.city}
+                 </div>
+               </div>
+             ))}
+           </div>
+         )}
+         <div className="modal-footer">
+           <button className="btn btn-lime btn-block" onClick={dismissNewspaper}>Continue</button>
+         </div>
+       </div>
+     </div>
+   );
+ }
 
 export function ArcModal({ state, doResolveArcChoice }: any) {
   if (!state.pendingArcChoice) return null;

@@ -1041,51 +1041,164 @@ input[type="range"] {
 
 .chart-pos.top3 { color: var(--gold); }
 
-/* ─── MODAL / DRAWER SYSTEM ────────────────────────────────── */
-.drawer-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
-  backdrop-filter: blur(4px);
-  z-index: var(--z-drawer);
-  animation: drawerOverlay 0.2s ease;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
+ /* ─── MODAL / DRAWER SYSTEM ────────────────────────────────── */
+ .drawer-overlay {
+   position: fixed;
+   inset: 0;
+   background: rgba(0,0,0,0.75);
+   backdrop-filter: blur(4px);
+   z-index: var(--z-drawer);
+   animation: drawerOverlay 0.2s ease;
+   display: flex;
+   align-items: flex-end;
+   justify-content: center;
+ }
 
-.drawer {
-  background: var(--bg2);
-  border: 1px solid var(--border2);
-  border-top: 2px solid var(--amber);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
-  width: 100%;
-  max-width: 480px;
-  max-height: 85vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  animation: drawerUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
-  position: relative;
-}
+ .drawer {
+   background: var(--bg2);
+   border: 1px solid var(--border2);
+   border-top: 2px solid var(--amber);
+   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+   padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+   width: 100%;
+   max-width: 480px;
+   max-height: 85vh;
+   overflow-y: auto;
+   -webkit-overflow-scrolling: touch;
+   animation: drawerUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+   position: relative;
+ }
 
-.drawer-handle {
-  width: 40px;
-  height: 4px;
-  background: var(--border3);
-  border-radius: var(--radius-full);
-  margin: 0 auto var(--space-4);
-  flex-shrink: 0;
-}
+ .drawer-handle {
+   width: 40px;
+   height: 4px;
+   background: var(--border3);
+   border-radius: var(--radius-full);
+   margin: 0 auto var(--space-4);
+   flex-shrink: 0;
+ }
 
-.drawer-title {
-  font-family: var(--head);
-  font-size: 20px;
-  font-weight: 900;
-  font-style: italic;
-  margin-bottom: var(--space-4);
-  color: var(--text);
-}
+ .drawer-title {
+   font-family: var(--head);
+   font-size: 20px;
+   font-weight: 900;
+   font-style: italic;
+   margin-bottom: var(--space-4);
+   color: var(--text);
+ }
+
+ /* ─── NEWSPAPER MODAL STYLING ──────────────────────────────── */
+ .newspaper-modal {
+   max-width: 800px !important; /* Allow wider view on PC */
+   width: 95% !important;
+   margin: 10px auto;
+ }
+
+ .newspaper-header {
+   text-align: center;
+   padding: var(--space-3) var(--space-4);
+   border-bottom: 2px solid var(--amber);
+   margin-bottom: var(--space-4);
+ }
+
+ .newspaper-issue {
+   font-family: var(--head);
+   font-size: 18px;
+   font-weight: 900;
+   color: var(--amber);
+   letter-spacing: -0.5px;
+   margin-bottom: 4px;
+ }
+
+ .newspaper-date {
+   font-family: var(--mono);
+   font-size: 12px;
+   color: var(--muted2);
+   text-transform: uppercase;
+   letter-spacing: 0.8px;
+ }
+
+ .newspaper-stories {
+   margin-bottom: var(--space-4);
+ }
+
+ .newspaper-story {
+   padding: var(--space-3) 0;
+   border-bottom: 1px dashed var(--border);
+ }
+
+ .newspaper-story:last-child {
+   border-bottom: none;
+ }
+
+ .newspaper-section {
+   font-family: var(--mono);
+   font-size: 11px;
+   text-transform: uppercase;
+   letter-spacing: 1.2px;
+   color: var(--amber);
+   font-weight: 800;
+   margin-bottom: var(--space-1);
+ }
+
+ .newspaper-headline {
+   font-family: var(--head);
+   font-size: 18px;
+   font-weight: 900;
+   font-style: italic;
+   line-height: 1.3;
+   color: var(--text);
+   margin-bottom: var(--space-2);
+ }
+
+ .newspaper-byline {
+   font-family: var(--mono);
+   font-size: 11px;
+   color: var(--muted2);
+   margin-bottom: var(--space-2);
+ }
+
+ .newspaper-body {
+   font-size: 14px;
+   line-height: 1.6;
+   color: var(--text2);
+ }
+
+ .newspaper-letters-section {
+   margin-top: var(--space-4);
+   padding-top: var(--space-4);
+   border-top: 1px solid var(--border);
+ }
+
+ .newspaper-section-divider {
+   font-family: var(--mono);
+   font-size: 12px;
+   text-transform: uppercase;
+   letter-spacing: 0.8px;
+   color: var(--amber);
+   font-weight: 800;
+   margin-bottom: var(--space-3);
+   text-align: center;
+ }
+
+ .newspaper-letter {
+   margin-bottom: var(--space-4);
+ }
+
+ .newspaper-letter-body {
+   font-size: 13px;
+   line-height: 1.6;
+   font-style: italic;
+   color: var(--text2);
+   margin-bottom: var(--space-2);
+ }
+
+ .newspaper-letter-signature {
+   font-family: var(--mono);
+   font-size: 11px;
+   color: var(--muted2);
+   text-align: right;
+ }
 
 /* Full-screen modal */
 .modal-overlay {
@@ -1335,6 +1448,39 @@ hr {
   .nav-btn { min-width: 80px; padding: var(--space-2) var(--space-3); }
   .nav-btn .nav-icon { font-size: 24px; }
   .nav-btn { font-size: 10px; }
+}
+
+@media (min-width: 1024px) {
+  /* Enhance newspaper modal on larger screens */
+  .newspaper-modal {
+    max-width: 900px !important;
+    width: 90% !important;
+  }
+  
+  .newspaper-header {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .newspaper-issue {
+    font-size: 20px;
+  }
+
+  .newspaper-stories {
+    margin-bottom: var(--space-5);
+  }
+
+  .newspaper-story {
+    padding: var(--space-4) 0;
+  }
+
+  .newspaper-headline {
+    font-size: 20px;
+  }
+
+  .newspaper-body {
+    font-size: 15px;
+    line-height: 1.7;
+  }
 }
 
 @media (min-width: 1024px) {

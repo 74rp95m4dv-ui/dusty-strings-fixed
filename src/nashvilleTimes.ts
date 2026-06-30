@@ -718,58 +718,58 @@ function milestone(me: string, title: string, body: string): NewspaperStory {
     body };
 }
 
-// ── GENERATOR ──────────────────────────────────────────────
-export function generateNashvilleTimes(s: GameState): NewspaperIssue {
-  const stories: NewspaperStory[] = [];
-  const used = new Set<string>();
+   // ── GENERATOR ──────────────────────────────────────────────
+   export function generateNashvilleTimes(s: GameState): NewspaperIssue {
+     const stories: NewspaperStory[] = [];
+     const used = new Set<string>();
 
-  function tryAdd(story: NewspaperStory): boolean {
-    const key = story.headline.slice(0, 40);
-    if (used.has(key)) return false;
-    used.add(key);
-    stories.push(story);
-    return true;
-  }
+     function tryAdd(story: NewspaperStory): boolean {
+       const key = story.headline.slice(0, 40);
+       if (used.has(key)) return false;
+       used.add(key);
+       stories.push(story);
+       return true;
+     }
 
-  // Player stories (capped at 4 — recording, releases, milestones, business)
-  const player = playerStories(s);
-  const rec = playerRecordingStories(s);
-  const pub = playerPublishingStories(s);
-  const sync = playerSyncStories(s);
-  const brand = playerBrandStories(s);
-  const mgr = playerManagerStories(s);
-  for (const st of [...rec, ...player, ...pub, ...sync, ...brand, ...mgr].slice(0, 4)) tryAdd(st);
+     // Player stories (capped at 8 — recording, releases, milestones, business)
+     const player = playerStories(s);
+     const rec = playerRecordingStories(s);
+     const pub = playerPublishingStories(s);
+     const sync = playerSyncStories(s);
+     const brand = playerBrandStories(s);
+     const mgr = playerManagerStories(s);
+     for (const st of [...rec, ...player, ...pub, ...sync, ...brand, ...mgr].slice(0, 8)) tryAdd(st);
 
-  // Always one chart/trend story
-  tryAdd(pick(CHART_STORIES)(s));
+     // Always one chart/trend story
+     tryAdd(pick(CHART_STORIES)(s));
 
-  // ── GUARANTEED NPC WORLD STORIES ───────────────────────────
-  // Each issue always has at least one rivalry/feud, one personal/comeback,
-  // and one oddball — so the paper feels like a real publication.
-  const npcSpotlightPools = [NPC_RIVALRY_STORIES, NPC_COMEBACK_STORIES, NPC_PERSONAL_STORIES, NPC_LEGAL_STORIES, NPC_ODD_STORIES];
-  // Pick 3 distinct NPC spotlight stories from different categories
-  const shuffledNpc = [...npcSpotlightPools].sort(() => Math.random() - 0.5);
-  for (const pool of shuffledNpc.slice(0, 3)) {
-    let added = false, att = 0;
-    while (!added && att++ < 6) added = tryAdd(pick(pool)(s));
-  }
+     // ── GUARANTEED NPC WORLD STORIES ───────────────────────────
+     // Each issue always has at least one rivalry/feud, one personal/comeback,
+     // and one oddball — so the paper feels like a real publication.
+     const npcSpotlightPools = [NPC_RIVALRY_STORIES, NPC_COMEBACK_STORIES, NPC_PERSONAL_STORIES, NPC_LEGAL_STORIES, NPC_ODD_STORIES];
+     // Pick 4 distinct NPC spotlight stories from different categories (increased from 3)
+     const shuffledNpc = [...npcSpotlightPools].sort(() => Math.random() - 0.5);
+     for (const pool of shuffledNpc.slice(0, 4)) {
+       let added = false, att = 0;
+       while (!added && att++ < 6) added = tryAdd(pick(pool)(s));
+     }
 
-  // ── GENRE / INDUSTRY / SCENE FILLER ───────────────────────
-  // Fill remaining slots with the classic pools
-  const fillerPools = [COUNTRY_STORIES, BLUES_STORIES, INDUSTRY_STORIES, SCENE_STORIES, LOCAL_STORIES];
-  const target = 9; // aim for ~9 total stories per issue
-  let attempts = 0;
-  while (stories.length < target && attempts++ < 40) {
-    tryAdd(pick(pick(fillerPools))(s));
-  }
+     // ── GENRE / INDUSTRY / SCENE FILLER ───────────────────────
+     // Fill remaining slots with the classic pools
+     const fillerPools = [COUNTRY_STORIES, BLUES_STORIES, INDUSTRY_STORIES, SCENE_STORIES, LOCAL_STORIES];
+     const target = 18; // aim for ~18 total stories per issue (increased from 9)
+     let attempts = 0;
+     while (stories.length < target && attempts++ < 60) { // increased attempts
+       tryAdd(pick(pick(fillerPools))(s));
+     }
 
-  const monthsIn = Math.floor(s.week / 4);
-  return {
-    volume: 1 + Math.floor(monthsIn / 12),
-    issue: (monthsIn % 12) + 1,
-    week: s.week,
-    weather: pick(WEATHER),
-    stories,
-    letters: generateLetters(s),
-  };
-}
+     const monthsIn = Math.floor(s.week / 4);
+     return {
+       volume: 1 + Math.floor(monthsIn / 12),
+       issue: (monthsIn % 12) + 1,
+       week: s.week,
+       weather: pick(WEATHER),
+       stories,
+       letters: generateLetters(s),
+     };
+   }

@@ -8,6 +8,7 @@ import {
   ReleaseModal, TourWrapModal, SigningModal, AwardModal,
   MilestoneModal, ScenarioModal, NewspaperModal, ArcModal,
   FeatureModal, ManagerOfferModal, PressingModal, SignComponent,
+  ReleaseCinematic
 } from "./Modals";
 import LabelOfferModal from "./LabelOfferModal";
 import StudioDrawer from "./drawers/StudioDrawer";
@@ -141,8 +142,8 @@ const s = game.state;
       )}
       {s.pendingScenarioId && <ScenarioModal {...game} scenario={RANDOM_SCENARIOS.find(sc => sc.id === s.pendingScenarioId)} />}
       {s.pendingNewspaperJson && <NewspaperModal {...game} />}
-      {s.releasePresentation && <ReleaseModal {...game} />}
-      {s.tourWrapPresentation && <TourWrapModal {...game} />}
+      {s.releasePresentation && <ReleaseCinematic {...game} isTourWrap={false} />}
+      {s.tourWrapPresentation && <ReleaseCinematic {...game} isTourWrap={true} />}
       {s.signingPresentation && <SigningModal {...game} />}
       {s.awardPresentation && <AwardModal {...game} />}
       {s.milestonePresentation && <MilestoneModal {...game} />}

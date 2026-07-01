@@ -718,7 +718,7 @@ function milestone(me: string, title: string, body: string): NewspaperStory {
     body };
 }
 
-   // ── GENERATOR ──────────────────────────────────────────────
+   // ─── GENERATOR ──────────────────────────────────────────────
    export function generateNashvilleTimes(s: GameState): NewspaperIssue {
      const stories: NewspaperStory[] = [];
      const used = new Set<string>();

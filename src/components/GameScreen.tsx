@@ -172,13 +172,6 @@ const s = game.state;
         />
       )}
       
-      {/* Debug: Tour intro trigger */}
-      <button 
-        onClick={() => setInTourIntro(true)}
-        style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 2000 }}
-      >
-        Show Tour Intro
-      </button>
     </div>
   );
 }

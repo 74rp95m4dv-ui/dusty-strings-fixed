@@ -129,6 +129,74 @@ body::before {
   z-index: 0;
 }
 
+/* Mobile viewport fixes */
+@media (max-width: 480px) {
+  .cinematic-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw;
+    max-height: 100vh;
+  }
+  
+  .cinematic-content {
+    padding: 5px !important;
+  }
+  
+  .week-number {
+    font-size: 4.5vw !important;
+  }
+  
+  .tour-name {
+    font-size: 6.5vw !important;
+  }
+  
+  .city-name {
+    font-size: 4vw !important;
+  }
+  
+  .venue-name {
+    font-size: 5.5vw !important;
+  }
+  
+  .marquee-border {
+    width: 90vw !important;
+    height: 22vh !important;
+  }
+  
+  .artist-name {
+    font-size: 2.8vw !important;
+  }
+  
+  .tour-title {
+    font-size: 3.5vw !important;
+  }
+  
+  .live-today {
+    font-size: 2.8vw !important;
+  }
+  
+  .city {
+    font-size: 3vw !important;
+  }
+  
+  .date {
+    font-size: 2.5vw !important;
+  }
+  
+  .crowd-activity,
+  .bus-arrival {
+    font-size: 3.5vw !important;
+  }
+  
+  .crowd-sound,
+  .bus-excitement {
+    font-size: 2.8vw !important;
+  }
+}
+
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(210,175,100,0.12); border-radius: 2px; }
@@ -2181,8 +2249,8 @@ hr {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   z-index: 1000;
   overflow: hidden;
 }
@@ -2218,6 +2286,8 @@ hr {
   text-align: center;
   color: white;
   z-index: 1001;
+  padding: 10px;
+  box-sizing: border-box;
 }
 
 .cinematic-background {
@@ -2231,46 +2301,52 @@ hr {
 }
 
 .cinematic-info {
-  margin-bottom: 40px;
+  margin-bottom: 20px;
   animation: fadeIn 1s ease-in-out;
+  max-width: 90vw;
 }
 
 .week-number {
-  font-size: 2rem;
+  font-size: 4vw;
   font-weight: bold;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  line-height: 1.2;
 }
 
 .tour-name {
-  font-size: 3rem;
+  font-size: 6vw;
   font-weight: bold;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   text-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+  line-height: 1.2;
 }
 
 .city-name {
-  font-size: 1.8rem;
-  margin-bottom: 10px;
+  font-size: 3.6vw;
+  margin-bottom: 5px;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  line-height: 1.2;
 }
 
 .venue-name {
-  font-size: 2.5rem;
+  font-size: 5vw;
   font-weight: bold;
   text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  line-height: 1.2;
 }
 
 .cinematic-marquee {
   position: relative;
-  margin: 40px 0;
+  margin: 20px 0;
   animation: slideInUp 1s ease-in-out;
+  max-width: 90vw;
 }
 
 .marquee-border {
   position: relative;
-  width: 600px;
-  height: 120px;
+  width: 80vw;
+  height: 20vh;
   border: 3px solid #fff;
   border-radius: 8px;
   background-color: rgba(0, 0, 0, 0.7);
@@ -2280,8 +2356,8 @@ hr {
 
 .marquee-light {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 1.5vw;
+  height: 1.5vw;
   background-color: #333;
   border-radius: 50%;
   box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
@@ -2294,11 +2370,11 @@ hr {
 }
 
 /* Position lights around the border */
-.marquee-light:nth-child(1) { top: 5px; left: 5px; }
-.marquee-light:nth-child(2) { top: 5px; right: 5px; }
-.marquee-light:nth-child(3) { bottom: 5px; right: 5px; }
-.marquee-light:nth-child(4) { bottom: 5px; left: 5px; }
-.marquee-light:nth-child(5) { top: 50%; left: 5px; transform: translateY(-50%); }
+.marquee-light:nth-child(1) { top: 1.2vw; left: 1.2vw; }
+.marquee-light:nth-child(2) { top: 1.2vw; right: 1.2vw; }
+.marquee-light:nth-child(3) { bottom: 1.2vw; right: 1.2vw; }
+.marquee-light:nth-child(4) { bottom: 1.2vw; left: 1.2vw; }
+.marquee-light:nth-child(5) { top: 50%; left: 1.2vw; transform: translateY(-50%); }
 
 .marquee-text {
   position: absolute;
@@ -2311,52 +2387,53 @@ hr {
 }
 
 .artist-name {
-  font-size: 1.2rem;
+  font-size: 2.4vw;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 1.6vw;
   color: #ffcc00;
   text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
 }
 
 .tour-title {
-  font-size: 1.5rem;
+  font-size: 3vw;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 1.6vw;
   color: #fff;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
 }
 
 .live-today {
-  font-size: 1.2rem;
+  font-size: 2.4vw;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 1.6vw;
   color: #ffcc00;
   text-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
 }
 
 .city {
-  font-size: 1.3rem;
+  font-size: 2.6vw;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 1.6vw;
   color: #fff;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
 }
 
 .date {
-  font-size: 1.1rem;
+  font-size: 2.2vw;
   color: #ccc;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 .cinematic-crowd,
 .cinematic-bus {
-  margin-top: 40px;
+  margin-top: 20px;
   animation: fadeInUp 1s ease-in-out;
+  max-width: 90vw;
 }
 
 .crowd-activity,
 .bus-arrival {
-  font-size: 1.5rem;
+  font-size: 3vw;
   font-weight: bold;
   margin-bottom: 10px;
   color: #ffcc00;
@@ -2365,7 +2442,7 @@ hr {
 
 .crowd-sound,
 .bus-excitement {
-  font-size: 1.2rem;
+  font-size: 2.4vw;
   color: #fff;
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
 }

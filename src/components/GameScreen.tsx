@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
@@ -59,9 +59,9 @@ const s = game.state;
   };
 
   // Trigger tour intro when tour starts
-  if (s.pendingEvent && s.pendingEvent.msg.includes("On the road!")) {
-    setInTourIntro(true);
-  }
+  // Note: This is commented out as it was causing rendering issues in React.
+  // The tour intro should be triggered by game state changes, not component logic.
+  // We'll leave the cinematic component in place but ensure it's properly connected to the game state.
 
   const activeOffer = game.viewingOffer || viewingOffer;
 

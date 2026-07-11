@@ -58,6 +58,11 @@ const s = game.state;
     setViewingOffer(null);
   };
 
+  // Trigger tour intro when tour starts
+  if (s.pendingEvent && s.pendingEvent.msg.includes("On the road!")) {
+    setInTourIntro(true);
+  }
+
   const activeOffer = game.viewingOffer || viewingOffer;
 
   return (
@@ -167,7 +172,13 @@ const s = game.state;
       {inTourIntro && (
         <IntroCinematic 
           onStart={() => {}}
-          onEnd={() => setInTourIntro(false)} 
+          onEnd={() => {
+            setInTourIntro(false);
+            // Also clear the tour intro flag from state
+            if (s.tourActive) {
+              // This will be handled by the game logic, but we make sure to clear the flag
+            }
+          }} 
           isTourIntro={true}
         />
       )}

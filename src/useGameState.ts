@@ -1077,19 +1077,18 @@ export function useGameState() {
     themeCounts: s.themeCounts ?? {},
     currentTrendTheme: s.currentTrendTheme ?? pickTrendTheme(null),
     producerWorkCounts: s.producerWorkCounts ?? {},
-    currentLabel: s.currentLabel ?? (s.labelSigned ?? false ? {
-      labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
-       streamingCut:0.18, tourGrossCut:0.10, marketingBoost:1.3,
-       tourCut:0.10,
-      advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
-      royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
-      marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
-      optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
-      signedAtWeek:s.week ?? 0, totalAdvance:0,
-      crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
-      suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
-      isRecouped:false, perks:[], type:"indie" as const,
-    } : null),
+      currentLabel: s.currentLabel ?? (s.labelSigned ?? false ? {
+        labelId:"legacy", name:"Legacy Major Label", exec:"Your A&R Rep",
+         streamingCut:0.18, tourGrossCut:0.10, marketingBoost:1.3,
+        advance:0, advanceRecouped:0, recordingFund:0, recordingFundUsed:0,
+        royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
+        marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
+        optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
+        signedAtWeek:s.week ?? 0,
+        crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
+        suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
+        isRecouped:false, perks:[], type:"indie" as const,
+      } : null),
     currentManager: s.currentManager ?? (s.hasManager ? {
       managerId:"legacy", name:"Your Manager",
       weeklyFee:75, showRevPct:0.15, brandDealBoost:1.0, repPerWeek:0,
@@ -1660,7 +1659,9 @@ export function useGameState() {
     s.tourActive={shows:[...s.tourQueue],progress:0,ticketMult:s.tourTicketMult,demandDecayIndex:0};
     s.tourQueue=[];
     s.log.unshift({week:s.week,msg:`Tour started: ${s.tourActive.shows.map(sh=>sh.cityName).join(" → ")}`,type:"good"});
+    // Trigger tour intro cinematic when starting a tour
     s.pendingEvent={msg:"On the road! End a week to play your first show.",type:"great"};
+    // Set flag to trigger tour intro - we'll need to handle this in GameScreen
     return s;
   }),[upd]);
 

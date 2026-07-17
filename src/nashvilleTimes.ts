@@ -291,6 +291,16 @@ const NPC_RIVALRY_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       headline:`${a.toUpperCase()} AND ${b.toUpperCase()} PATCH THINGS UP ONSTAGE AT ${pick(VENUES).toUpperCase()}`,
       byline:`By ${pick(REPORTERS)}`,
       body:`After ${num(1,4)} years of very public silence, the two appeared side by side for a surprise closing number at ${pick(FESTIVALS)}. They sang a Hank Williams cover and left separately. Industry insiders called it "progress, maybe."`}; },
+  () => { const a=pick(NPC_ARTISTS), b=pickOther(NPC_ARTISTS,a);
+    return { section:"Front Page",
+      headline:`${a.toUpperCase()} AND ${b.toUpperCase()} BOOKED FOR SAME BENEFIT CONCERT`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`The pair will share a bill at a flood-relief benefit in ${pick(CITIES)} after organizers reportedly convinced them to leave old grudges at the door. Rehearsals are being described as "cordial, with supervision."`}; },
+  () => { const a=pick(NPC_ARTISTS), b=pickOther(NPC_ARTISTS,a);
+    return { section:"Industry",
+      headline:`${a.toUpperCase()} DENIES REPLACING ${b.toUpperCase()} ON NEW RECORD`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`Rumors spread after a studio photo showed ${a} holding a lyric sheet that fans recognized from ${b}'s shelved project. Both camps insist the collaboration was never finalized. The internet remains unconvinced.`}; },
 ];
 
 // ── NPC COMEBACK STORIES ────────────────────────────────────
@@ -320,6 +330,16 @@ const NPC_COMEBACK_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       headline:`${a.toUpperCase()}'S UNEXPECTED LIVESTREAM DRAWS ${num(80,600)}K VIEWERS`,
       byline:`By ${pick(REPORTERS)}`,
       body:`With no announcement, no promotion, and no set list, ${a} played ${num(2,4)} hours from what appeared to be a kitchen in ${pick(CITIES)}. The stream became the most-clipped music moment of the month.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Front Page",
+      headline:`${a.toUpperCase()} RETURNS TO STUDIO WITH ORIGINAL ROAD BAND`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`The reunion session brings back the players from ${a}'s first ${pick(["two","three","four"])} records. A source says the room has been "laughing more than working," but the first takes sound promising.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Blues",
+      headline:`${a.toUpperCase()} TURNS ABANDONED THEATER INTO POP-UP VENUE`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`The one-night event in ${pick(CITIES)} featured local openers, a borrowed PA, and ${num(300,900)} fans on folding chairs. ${a} says the space may become a permanent room if the city approves the permits.`}; },
 ];
 
 // ── NPC PERSONAL LIFE STORIES ──────────────────────────────
@@ -354,6 +374,16 @@ const NPC_PERSONAL_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       headline:`${a.toUpperCase()} RETURNS TO HOMETOWN FOR FIRST SHOW IN ${num(10,35)} YEARS`,
       byline:`By ${pick(REPORTERS)}`,
       body:`The sold-out show at a ${num(200,600)}-seat venue in ${pick(CITIES)} lasted ${num(2,4)} hours. Childhood friends filled the first three rows. The encore was a song the artist has never performed live before.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Local",
+      headline:`${a.toUpperCase()} PAYS OFF EVERY TAB AT FAVORITE ROADHOUSE`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`After a surprise late-night stop in ${pick(CITIES)}, ${a} covered the room's entire bar tab and left a note asking the owner to "keep the music loud." Regulars say nobody checked whether the receipt was real until morning.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Scene",
+      headline:`${a.toUpperCase()} OPENS WRITERS RETREAT FOR UNSIGNED ARTISTS`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`The three-day retreat outside ${pick(CITIES)} offers a bunk, a meal, and a quiet room to ${num(8,16)} emerging songwriters. There is no fee and, according to the invitation, "no pitch deck required."`}; },
 ];
 
 // ── NPC LEGAL & BUSINESS STORIES ───────────────────────────
@@ -378,6 +408,16 @@ const NPC_LEGAL_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       headline:`${a.toUpperCase()}'S ESTATE DISPUTE GOES PUBLIC`,
       byline:`By ${pick(REPORTERS)}`,
       body:`Family members and former management are fighting over royalty rights to ${num(3,6)} decades of recordings. A court date has been set. The music, meanwhile, continues to stream.`}; },
+  () => { const a=pick(NPC_ARTISTS), l=pick(LABELS);
+    return { section:"Industry",
+      headline:`${a.toUpperCase()} WINS RIGHT TO REISSUE FIRST ALBUM`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`A judge ruled that ${a} may remaster and re-release the debut after a contract dispute with ${l}. The new edition will include ${num(3,7)} demos and a handwritten essay about the record's chaotic sessions.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Industry",
+      headline:`${a.toUpperCase()} HIRES ACCOUNTANT AFTER ROYALTY SURPRISE`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`An audit reportedly uncovered years of missing performance royalties from regional radio and college stations. The artist's team would not name the total, calling it "enough to make the phone call worthwhile."`}; },
 ];
 
 // ── NPC ODDBALL / COLOR STORIES ────────────────────────────
@@ -407,6 +447,21 @@ const NPC_ODD_STORIES: ((s:GameState)=>NewspaperStory)[] = [
       headline:`${a.toUpperCase()} RECORDS ENTIRE ALBUM IN ONE TAKE, IN A GAS STATION`,
       byline:`By ${pick(REPORTERS)}`,
       body:`A mobile recording rig, two microphones, and a cooperative clerk in ${pick(CITIES)} produced what ${a} is calling "the only honest record I've made in years." Release date TBD; the artist says they're "still deciding if the world deserves it."`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Local",
+      headline:`${a.toUpperCase()} FINDS LOST DEMO TAPES IN ATTIC`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`The tapes, recorded on a four-track in ${pick(CITIES)} nearly ${num(12,30)} years ago, contain six songs the artist had forgotten entirely. A rough mix of one track is already making the rounds among collectors.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Scene",
+      headline:`MYSTERY GUITAR APPEARS ON ${a.toUpperCase()} TOUR BUS`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`A sunburst electric guitar with no case, note, or obvious owner was found behind the drum riser after a show at ${pick(VENUES)}. The band has posted a photo asking the public for help. Nobody has claimed it yet.`}; },
+  () => { const a=pick(NPC_ARTISTS);
+    return { section:"Blues",
+      headline:`${a.toUpperCase()} PLAYS THREE-HOUR ENCORE AFTER POWER CUT`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`When the lights failed at ${pick(VENUES)}, ${a} kept the room quiet with an unplugged set and stories from the road. The audience held up phone lights until the grid came back.`}; },
 ];
 
 

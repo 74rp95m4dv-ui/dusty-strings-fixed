@@ -3302,9 +3302,10 @@ const TW = {
 };
 
 const ANAME = {
-  pre:["Lonesome","Dusty","Hard","Golden","Midnight","Lost","Southern","Raw","Hollow","Last","First","Heavy","Deep","Low","Crooked","Broken","Fading","Troubled","Wandering","Restless","Backroads","Bleeding","Burning","Dark","Dead","Devil's","Drunk","Forgotten","Gravel","Iron"],
-  noun:["Miles","Highway","River","Fields","Gospel","Bottle","Porch","Smoke","Crossroads","Delta","Gravel","Holler","County","Blues","Dirt","Road","Hymns","Letters","Nights","Prayer","Confessions","Dispatches","Sermons","Sunsets","Thunder","Regrets","Revelations","Whiskey","Wire","Years"],
-  suf:["Vol. 1","Vol. 2","Sessions","Recordings","Live","Acoustic","The Album","Tape","Archives","Collection","Revisited","Uncut","Deluxe","From the Road","From the Porch","Remastered","The Lost Tapes","After Midnight","At the Crossroads","Down Home"],
+  pre:["Lonesome","Dusty","Hard","Golden","Midnight","Lost","Southern","Raw","Hollow","Last","First","Heavy","Deep","Low","Crooked","Broken","Fading","Troubled","Wandering","Restless","Backroads","Bleeding","Burning","Dark","Dead","Devil's","Drunk","Forgotten","Gravel","Iron","Velvet","Mercy","Porcelain","Neon","Riverborn","Weathered","Unquiet","Honeyed","Cinder","Moonlit","Open","Electric","Sacred","Borrowed","Honest","Wildwood","Blue-Eyed","Afterglow","Westbound","Paper-Thin","Golden-Hour","Halfway","Undone","Wayward","Tender","Rattling","Homegrown"],
+  noun:["Miles","Highway","River","Fields","Gospel","Bottle","Porch","Smoke","Crossroads","Delta","Gravel","Holler","County","Blues","Dirt","Road","Hymns","Letters","Nights","Prayer","Confessions","Dispatches","Sermons","Sunsets","Thunder","Regrets","Revelations","Whiskey","Wire","Years","Lanterns","Ashes","Kindness","Static","Bones","August","Weather","Orchard","Silence","Radio","Roses","Shadows","Magnolia","Cigarettes","Midtown","Echoes","Embers","Porcelain","Motel","Map","Fever","Moonlight","Daylight","Wreckage","Pines","Gold","Ravens","Rainwater","Sinners","Saints","Promises","Dust","Rooms","Windows","Fences","Wildflowers","Mercy","Firelight","Keepsakes","Horses","Velvet","Driftwood"],
+  suf:["Vol. 1","Vol. 2","Sessions","Recordings","Live","Acoustic","The Album","Tape","Archives","Collection","Revisited","Uncut","Deluxe","From the Road","From the Porch","Remastered","The Lost Tapes","After Midnight","At the Crossroads","Down Home","Side A","Side B","In Stereo","The Demos","A Field Guide","Home Recordings","The B-Sides","No. 3","The Last Cut","Under the Lights","Early Takes","Songs for Later","The Quiet Version","Outtakes","The Long Mix","In Black & White","The Companion Piece","Weather Report","A Love Letter","The Road Edition"],
+  connector:["&","and","of","from","in","under","after","before","beside"],
 };
 
 // ── ARTIST NAME GENERATOR ──────────────────────────────────
@@ -3650,6 +3651,10 @@ export function genAlbumName(artistName = ""): string {
     () => rnd(ANAME.noun) + " " + rnd(ANAME.suf),
     () => rnd(ANAME.pre) + " " + rnd(ANAME.noun) + " " + rnd(ANAME.suf),
     () => (artistName ? artistName + "'s " : "") + rnd(ANAME.noun),
+    () => "The " + rnd(ANAME.pre) + " " + rnd(ANAME.noun),
+    () => rnd(ANAME.noun) + " " + rnd(ANAME.connector) + " " + rnd(ANAME.noun),
+    () => rnd(ANAME.pre) + " " + rnd(ANAME.noun) + " " + rnd(ANAME.connector) + " " + rnd(ANAME.noun),
+    () => (artistName ? artistName + " — " : "") + rnd(ANAME.noun) + " " + rnd(ANAME.suf),
   ];
   return rnd(pats)();
 }

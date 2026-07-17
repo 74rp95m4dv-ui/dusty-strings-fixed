@@ -1,186 +1,116 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+
+export interface TourCinematicDetails {
+  artistName: string;
+  cityName: string;
+  venueName: string;
+  showNumber: number;
+  totalShows: number;
+  week: number;
+}
 
 interface CinematicProps {
   onStart: () => void;
   onEnd: () => void;
-  isTourIntro?: boolean;
+  tour: TourCinematicDetails;
 }
 
-export function CinematicFramework({ onStart, onEnd, isTourIntro = false }: CinematicProps) {
-  const [cinematicState, setCinematicState] = useState<'setup' | 'fadeout' | 'display' | 'fadein'>('setup');
-  const [showInfo, setShowInfo] = useState(false);
-  const [showMarquee, setShowMarquee] = useState(false);
-  const [marqueeLights, setMarqueeLights] = useState<number[]>([]);
-  const [showCrowd, setShowCrowd] = useState(false);
-  const [showBus, setShowBus] = useState(false);
+const STAGE_DURATIONS = [750, 1100, 1300, 1150, 1550, 2400];
 
-  // Setup cinematic sequence
-  useEffect(() => {
-    if (cinematicState === 'setup') {
-      const timer = setTimeout(() => {
-        setCinematicState('fadeout');
-        onStart();
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [cinematicState, onStart]);
+export function CinematicFramework({ onStart, onEnd, tour }: CinematicProps) {
+  const [stage, setStage] = useState(0);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const ended = useRef(false);
 
-  // Handle fade out
-  useEffect(() => {
-    if (cinematicState === 'fadeout') {
-      const timer = setTimeout(() => {
-        setCinematicState('display');
-        setShowInfo(true);
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [cinematicState]);
+  const finish = () => {
+    if (ended.current) return;
+    ended.current = true;
+    setIsLeaving(true);
+    window.setTimeout(onEnd, 700);
+  };
 
-  // Handle display info
   useEffect(() => {
-    if (cinematicState === 'display' && showInfo) {
-      const timer = setTimeout(() => {
-        setShowMarquee(true);
-        setMarqueeLights([]);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [cinematicState, showInfo]);
+    onStart();
+  }, [onStart]);
 
-  // Handle marquee animation
   useEffect(() => {
-    if (showMarquee && marqueeLights.length === 0) {
-      const timer = setTimeout(() => {
-        setMarqueeLights([1]);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showMarquee, marqueeLights]);
+    if (isLeaving) return;
+    const duration = STAGE_DURATIONS[stage];
+    const timer = window.setTimeout(() => {
+      if (stage === STAGE_DURATIONS.length - 1) finish();
+      else setStage((current) => current + 1);
+    }, duration);
 
-  // Animate marquee lights
-  useEffect(() => {
-    if (showMarquee && marqueeLights.length < 8) {
-      const timer = setTimeout(() => {
-        setMarqueeLights(prev => [...prev, prev.length + 1]);
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    } else if (showMarquee && marqueeLights.length === 8) {
-      // After lights are done, show text
-      const timer = setTimeout(() => {
-        setShowCrowd(true);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [marqueeLights]);
+    return () => window.clearTimeout(timer);
+  }, [stage, isLeaving]);
 
-  // Handle crowd animation
-  useEffect(() => {
-    if (showCrowd) {
-      const timer = setTimeout(() => {
-        setShowBus(true);
-      }, 3000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showCrowd]);
-
-  // Handle bus arrival
-  useEffect(() => {
-    if (showBus) {
-      const timer = setTimeout(() => {
-        setCinematicState('fadein');
-      }, 4000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [showBus]);
-
-  // Handle fade in
-  useEffect(() => {
-    if (cinematicState === 'fadein') {
-      const timer = setTimeout(() => {
-        onEnd();
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [cinematicState, onEnd]);
+  const city = tour.cityName.split(",")[0].toUpperCase();
 
   return (
-    <div className="cinematic-container">
-      {/* Fade overlay */}
-      {cinematicState === 'fadeout' && (
-        <div className="cinematic-fade fade-out" />
-      )}
-      
-      {cinematicState === 'fadein' && (
-        <div className="cinematic-fade fade-in" />
-      )}
+    <section
+      className={`tour-intro ${isLeaving ? "tour-intro--leaving" : ""} ${stage >= 1 ? "tour-intro--sky" : ""} ${stage >= 2 ? "tour-intro--venue-in" : ""} ${stage >= 3 ? "tour-intro--marquee-in" : ""} ${stage >= 4 ? "tour-intro--lights-on" : ""} ${stage >= 5 ? "tour-intro--crowd-in" : ""}`}
+      aria-label={`Tour arrival: ${tour.cityName}, ${tour.venueName}`}
+    >
+      <div className="tour-intro__grain" />
+      <div className="tour-intro__moon" />
+      <div className="tour-intro__horizon tour-intro__horizon--far" />
+      <div className="tour-intro__horizon tour-intro__horizon--near" />
+      <div className="tour-intro__road" />
+      <div className="tour-intro__fog" />
 
-      {/* Main cinematic content */}
-      {cinematicState === 'display' && (
-        <div className="cinematic-content">
-          <div className="cinematic-background" />
-          
-          {/* Info display */}
-          {showInfo && (
-            <div className="cinematic-info">
-              <div className="week-number">WEEK {isTourIntro ? "1" : "0"}</div>
-              <div className="tour-name">Midnight Highway Tour</div>
-              <div className="city-name">Nashville, TN</div>
-              <div className="venue-name">Ryman Auditorium</div>
-            </div>
-          )}
+      <header className="tour-intro__topline">
+        <span>Dusty Strings presents</span>
+        <span>Week {tour.week}</span>
+      </header>
 
-          {/* Marquee display */}
-          {showMarquee && (
-            <div className="cinematic-marquee">
-              <div className="marquee-border">
-                {/* Marquee lights - animate from outside in */}
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((light) => (
-                  <div 
-                    key={light} 
-                    className={`marquee-light ${marqueeLights.includes(light) ? 'lit' : ''}`}
-                  />
-                ))}
-              </div>
-              
-              {/* Marquee text */}
-              {marqueeLights.length === 8 && (
-                <div className="marquee-text">
-                  <div className="artist-name">Dusty Strings</div>
-                  <div className="tour-title">Midnight Highway Tour</div>
-                  <div className="live-today">LIVE TONIGHT</div>
-                  <div className="city">NASHVILLE</div>
-                  <div className="date">AUGUST 12</div>
-                </div>
-              )}
-            </div>
-          )}
+      <button className="tour-intro__skip" onClick={finish} type="button">
+        Skip intro <span aria-hidden="true">&rarr;</span>
+      </button>
 
-          {/* Crowd animation */}
-          {showCrowd && (
-            <div className="cinematic-crowd">
-              <div className="crowd-activity">Fans gathering...</div>
-              <div className="crowd-sound">🔊 Crowd noise building</div>
-            </div>
-          )}
+      <div className="tour-intro__location" aria-live="polite">
+        <span className="tour-intro__eyebrow">First stop</span>
+        <strong>{tour.cityName}</strong>
+        <span>{tour.venueName}</span>
+      </div>
 
-          {/* Tour bus */}
-          {showBus && (
-            <div className="cinematic-bus">
-              <div className="bus-arrival">Tour bus arriving...</div>
-              <div className="bus-excitement">🎉 Increased excitement</div>
-            </div>
-          )}
+      <div className="tour-intro__venue">
+        <div className="tour-intro__blade">
+          <span>{tour.venueName}</span>
+          <b>LIVE</b>
         </div>
-      )}
-    </div>
+        <div className="tour-intro__facade">
+          <div className="tour-intro__windows" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, index) => <i key={index} />)}
+          </div>
+          <div className="tour-intro__awning" />
+          <div className="tour-intro__doors" aria-hidden="true"><i /><i /><i /></div>
+        </div>
+
+        <div className="tour-intro__marquee">
+          <div className="tour-intro__marquee-frame">
+            <div className="tour-intro__bulbs" aria-hidden="true">
+              {Array.from({ length: 42 }, (_, index) => <i key={index} />)}
+            </div>
+            <div className="tour-intro__sign-copy">
+              <span className="tour-intro__sign-kicker">One night only</span>
+              <strong>{tour.artistName}</strong>
+              <span className="tour-intro__sign-detail">LIVE IN {city}</span>
+              <span className="tour-intro__sign-detail">SHOW {tour.showNumber} OF {tour.totalShows}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="tour-intro__crowd" aria-hidden="true">
+        {Array.from({ length: 24 }, (_, index) => <i key={index} />)}
+      </div>
+      <div className="tour-intro__bus" aria-hidden="true"><i /><i /><i /></div>
+
+      <footer className="tour-intro__footer">
+        <span>Doors are open</span>
+        <span className="tour-intro__pulse" />
+        <span>Let&apos;s play</span>
+      </footer>
+    </section>
   );
 }

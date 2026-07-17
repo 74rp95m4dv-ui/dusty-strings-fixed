@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
@@ -19,6 +19,7 @@ import CatalogDrawer from "./drawers/CatalogDrawer";
 import UnreleasedDrawer from "./drawers/UnreleasedDrawer";
 import TourPlannerDrawer from "./drawers/TourPlannerDrawer";
 import { IntroCinematic } from "./IntroCinematic";
+import { TourCinematicDetails } from "./CinematicFramework";
 
 const TABS = [
   { id: "home", label: "Home", icon: "🏠" },
@@ -41,8 +42,31 @@ export default function GameScreen(game: any) {
 const [tab, setTab] = useState("home");
 const [drawer, setDrawer] = useState<DrawerType>(null);
 const [viewingOffer, setViewingOffer] = useState<any>(null);
-const [inTourIntro, setInTourIntro] = useState(false);
+const [tourIntro, setTourIntro] = useState<TourCinematicDetails | null>(null);
+const hasMounted = useRef(false);
+const wasOnTour = useRef(false);
 const s = game.state;
+
+  useEffect(() => {
+    const isOnTour = Boolean(s.tourActive);
+
+    if (hasMounted.current && !wasOnTour.current && s.tourActive) {
+      const stop = s.tourActive.shows[s.tourActive.progress];
+      if (stop) {
+        setTourIntro({
+          artistName: s.artistName,
+          cityName: stop.cityName,
+          venueName: stop.venueName,
+          showNumber: s.tourActive.progress + 1,
+          totalShows: s.tourActive.shows.length,
+          week: s.week,
+        });
+      }
+    }
+
+    wasOnTour.current = isOnTour;
+    hasMounted.current = true;
+  }, [s.tourActive, s.artistName, s.week]);
 
   const openDrawer = (d: DrawerType) => setDrawer(d);
   const closeDrawer = () => setDrawer(null);
@@ -169,17 +193,13 @@ const s = game.state;
       {s.pendingPressing && <PressingModal {...game} />}
       
       {/* Tour Intro Cinematic */}
-      {inTourIntro && (
+      {tourIntro && (
         <IntroCinematic 
           onStart={() => {}}
           onEnd={() => {
-            setInTourIntro(false);
-            // Also clear the tour intro flag from state
-            if (s.tourActive) {
-              // This will be handled by the game logic, but we make sure to clear the flag
-            }
+            setTourIntro(null);
           }} 
-          isTourIntro={true}
+          tour={tourIntro}
         />
       )}
       

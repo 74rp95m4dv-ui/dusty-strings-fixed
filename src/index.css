@@ -2605,6 +2605,76 @@ hr {
   .home-advance { padding: 0 10px; font-size: 9px; }
 }
 
+/* ─── SIMPLIFIED CAREER BAR ────────────────────────────────────────────── */
+.app-header {
+  align-items: center;
+  min-height: 86px;
+  padding: max(18px, env(safe-area-inset-top)) var(--space-4) 17px;
+}
+
+.header-artist {
+  max-width: 52vw;
+  font-size: clamp(19px, 5.5vw, 25px);
+  line-height: 1.05;
+}
+
+.header-artist::before {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 8px;
+}
+
+.header-meta {
+  gap: 7px;
+  margin-top: 7px;
+  font-size: 10px;
+}
+
+.header-dashboard {
+  align-items: center;
+  gap: 9px;
+}
+
+.header-tier-compact {
+  display: grid;
+  max-width: 74px;
+  min-height: 44px;
+  align-content: center;
+  padding: 6px 8px;
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+.header-advance {
+  display: grid;
+  min-width: 66px;
+  min-height: 52px;
+  padding: 7px 11px;
+  border: 1px solid rgba(232, 176, 74, .52);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #e8b04a, #c98223);
+  color: #171007;
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .25);
+  cursor: pointer;
+  transition: transform .15s ease, filter .15s ease;
+}
+
+.header-advance:hover { filter: brightness(1.07); }
+.header-advance:active { transform: translateY(1px) scale(.98); }
+.header-advance span { font: 800 8px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+.header-advance strong { margin-top: 3px; font: 800 14px/1 var(--head); letter-spacing: .02em; }
+
+.home-hero { align-items: flex-start; }
+.home-advance { display: none; }
+
+@media (max-width: 390px) {
+  .header-artist { max-width: 47vw; font-size: 18px; }
+  .header-tier-compact { display: none; }
+  .header-advance { min-width: 60px; min-height: 50px; }
+}
+
 /* ─── CINEMATIC COMPONENTS ───────────────────────────────────── */
   .cinematic-container {
     position: fixed;

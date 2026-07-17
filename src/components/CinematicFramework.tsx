@@ -74,18 +74,6 @@ export function CinematicFramework({ onStart, onEnd, tour }: CinematicProps) {
       </div>
 
       <div className="tour-intro__venue">
-        <div className="tour-intro__blade">
-          <span>{tour.venueName}</span>
-          <b>LIVE</b>
-        </div>
-        <div className="tour-intro__facade">
-          <div className="tour-intro__windows" aria-hidden="true">
-            {Array.from({ length: 18 }, (_, index) => <i key={index} />)}
-          </div>
-          <div className="tour-intro__awning" />
-          <div className="tour-intro__doors" aria-hidden="true"><i /><i /><i /></div>
-        </div>
-
         <div className="tour-intro__marquee">
           <div className="tour-intro__marquee-frame">
             <div className="tour-intro__bulbs" aria-hidden="true">
@@ -104,7 +92,6 @@ export function CinematicFramework({ onStart, onEnd, tour }: CinematicProps) {
       <div className="tour-intro__crowd" aria-hidden="true">
         {Array.from({ length: 24 }, (_, index) => <i key={index} />)}
       </div>
-      <div className="tour-intro__bus" aria-hidden="true"><i /><i /><i /></div>
 
       <footer className="tour-intro__footer">
         <span>Doors are open</span>

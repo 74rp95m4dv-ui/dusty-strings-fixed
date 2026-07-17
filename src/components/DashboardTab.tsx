@@ -51,6 +51,17 @@ export default function DashboardTab(props: DashboardProps) {
 
   return (
     <div className="animate-fadeIn">
+      <section className="home-hero">
+        <div>
+          <div className="home-eyebrow">Career dashboard</div>
+          <h1>{tier?.name || "Independent Artist"}</h1>
+          <p>{burn.desc}</p>
+        </div>
+        <button className="btn btn-end-week home-advance" onClick={props.advance}>
+          End week
+        </button>
+      </section>
+
       {/* Big Stats */}
       <div className="bigstat-row stagger-1">
         <div className="bigstat">
@@ -68,7 +79,7 @@ export default function DashboardTab(props: DashboardProps) {
       </div>
 
       {/* Quick Actions */}
-      <div className="quick-actions">
+      <div className="quick-actions quick-actions-primary">
         {quickActions.map((a) => (
           <button
             key={a.id}
@@ -89,8 +100,18 @@ export default function DashboardTab(props: DashboardProps) {
         </button>
       </div>
 
+      <details className="home-more-actions">
+        <summary>More actions <span>Hustle, deals, merch, rest</span></summary>
+        <div className="quick-actions quick-actions-secondary">
+          <button className="quick-action-btn" onClick={() => props.onOpenDrawer("grind")}><span>Hustle</span></button>
+          <button className="quick-action-btn" onClick={() => props.onOpenDrawer("offers")}><span>Deals</span></button>
+          <button className="quick-action-btn" onClick={() => props.onOpenDrawer("merch")}><span>Merch</span></button>
+          <button className="quick-action-btn" onClick={props.doTakeVacation} disabled={(s.vacationCooldown ?? 0) > 0 || s.money < 2200}><span>Vacation</span></button>
+        </div>
+      </details>
+
       {/* Active Situation Cards */}
-      <div className="stagger-1">
+      <div className="stagger-1 dashboard-flow">
         {/* In Studio */}
         {s.project && (
           <div className="card card-active animate-fadeInUp">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
+import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
 import OfficeTab from "./OfficeTab";
@@ -105,6 +105,19 @@ const s = game.state;
         <div className="header-tier">
           <span>⭐</span>
           <span>{CAREER_TIERS[getCareerTierIdx(s.fame)]?.name || "Unknown"}</span>
+        </div>
+        <div className="header-dashboard" aria-label="Career summary">
+          <div className="header-stat">
+            <span>Cash</span>
+            <strong>{fmtMoney(s.money)}</strong>
+          </div>
+          <div className="header-stat">
+            <span>Fans</span>
+            <strong>{fmt(s.fans)}</strong>
+          </div>
+          <div className="header-tier header-tier-compact">
+            <span>{CAREER_TIERS[getCareerTierIdx(s.fame)]?.name || "Unknown"}</span>
+          </div>
         </div>
       </header>
 

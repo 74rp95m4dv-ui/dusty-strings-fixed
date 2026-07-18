@@ -1,204 +1,81 @@
 import { useState } from "react";
 import {
-  PRODUCERS, STUDIOS, THEMES, FEATURES, fmtMoney,
-  getProducerEffectiveCost, getProducerRelationship,
-  getFeatureEffectiveCost, getHook, getLyric,
-  computeAlbumWritingMix, genTrackName, genThemedTrackName,
-  type ReleaseType, type HookStyle, type LyricStyle,
-  calculateRecordingWeeks, getStandardRecordingWeeks,
-  RECORDING_MODE_CONFIG, STUDIO_TIME_MODIFIERS,
-  type RecordingMode,
+  FEATURES, PRODUCERS, RECORDING_MODE_CONFIG, SONG_DIRECTION_LABELS, SONG_STAGES, STUDIOS, THEMES,
+  fmtMoney, genThemedTrackName, genTrackName, getFeatureEffectiveCost, getFocusedSessionCost,
+  getProjectPipelineStage, getProducerEffectiveCost, getTrackDevelopment,
+  type RecordingMode, type ReleaseType, type SessionInvestment, type SongDevelopmentStage, type SongDirection, type SongStage,
 } from "../../gameLogic";
 
 type SettingPicker = "producer" | "studio" | "theme" | null;
 
 export default function StudioDrawer(game: any) {
-  const {
-    state, doStartProject, doUpdateProject, doAddTrack, doRemoveTrack,
-    doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough,
-    doCancelStudioChoice, doAutoGenerateTracks, onClose,
-  } = game;
+  const { state, doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onClose } = game;
   const [view, setView] = useState<"new" | "project" | null>(state.project ? "project" : "new");
 
-  if (view === "new") return (
-    <NewProjectForm
-      state={state}
-      doStartProject={doStartProject}
-      onBack={() => { if (!state.project) onClose(); else setView("project"); }}
-      onProjectStarted={() => setView("project")}
-    />
-  );
+  if (view === "new") return <NewProjectForm doStartProject={doStartProject} onBack={() => state.project ? setView("project") : onClose()} onProjectStarted={() => setView("project")} />;
+  if (state.project && view === "project") return <ActiveProject state={state} doUpdateProject={doUpdateProject} doAddTrack={doAddTrack} doRemoveTrack={doRemoveTrack} doConfigureTrackStage={doConfigureTrackStage} doFinishProject={doFinishProject} doScrubProject={doScrubProject} doTakeStudioBreak={doTakeStudioBreak} doPushThrough={doPushThrough} doCancelStudioChoice={doCancelStudioChoice} doAutoGenerateTracks={doAutoGenerateTracks} onBack={() => state.unreleased.length ? setView(null) : onClose()} onClose={onClose} />;
 
-  if (state.project && view === "project") return (
-    <ActiveProject
-      state={state}
-      doUpdateProject={doUpdateProject}
-      doAddTrack={doAddTrack}
-      doRemoveTrack={doRemoveTrack}
-      doFinishProject={doFinishProject}
-      doScrubProject={doScrubProject}
-      doTakeStudioBreak={doTakeStudioBreak}
-      doPushThrough={doPushThrough}
-      doCancelStudioChoice={doCancelStudioChoice}
-      doAutoGenerateTracks={doAutoGenerateTracks}
-      onBack={() => { if (state.unreleased.length > 0) setView(null); else onClose(); }}
-      onClose={onClose}
-    />
-  );
-
-  return (
-    <div className="drawer-overlay" onClick={onClose}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="drawer-handle" />
-        <div className="drawer-title">Studio</div>
-        {!state.project && <button className="btn btn-lime btn-block" onClick={() => setView("new")}>Start New Project</button>}
-        {state.project && <button className="btn btn-lime btn-block" onClick={() => setView("project")}>Continue Recording</button>}
-        <button className="btn btn-ghost btn-block" onClick={onClose} style={{ marginTop: 8 }}>Close</button>
-      </div>
-    </div>
-  );
+  return <div className="drawer-overlay" onClick={onClose}><div className="drawer" onClick={event => event.stopPropagation()}><div className="drawer-handle" /><div className="drawer-title">Studio</div><button className="btn btn-lime btn-block" onClick={() => setView(state.project ? "project" : "new")}>{state.project ? "Continue Recording" : "Start New Project"}</button><button className="btn btn-ghost btn-block" onClick={onClose} style={{ marginTop: 8 }}>Close</button></div></div>;
 }
 
-function NewProjectForm({ state, doStartProject, onBack, onProjectStarted }: any) {
+function NewProjectForm({ doStartProject, onBack, onProjectStarted }: any) {
   const [type, setType] = useState<ReleaseType>("Single");
   const [mode, setMode] = useState<RecordingMode>("standard");
-  const mint: Record<string, number> = { Single: 1, EP: 3, Album: 8, "Live Album": 4 };
-  const trackCount = mint[type] ?? 1;
-  const previewWeeks = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
-  const standardWeeks = getStandardRecordingWeeks(type, trackCount, "home_studio", "self");
-
-  return (
-    <div className="drawer-overlay" onClick={onBack}>
-      <div className="drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="drawer-handle" />
-        <div className="drawer-title">New Project</div>
-        <p className="tip-text studio-intro">Choose the shape and pace. Your release title will be generated when recording begins.</p>
-        <div className="studio-choice-grid" aria-label="Release type">
-          {(["Single", "EP", "Album", "Live Album"] as ReleaseType[]).map((t) => (
-            <button key={t} className={`btn ${type === t ? "btn-lime" : ""}`} onClick={() => setType(t)}>{t}</button>
-          ))}
-        </div>
-        <div className="studio-section-card">
-          <div className="studio-section-eyebrow">Recording pace</div>
-          <div className="studio-choice-grid studio-choice-grid--mode">
-            {(["standard", "rush", "deliberate"] as RecordingMode[]).map((m) => (
-              <button key={m} className={`btn btn-sm ${mode === m ? "btn-lime" : ""}`} onClick={() => setMode(m)}>
-                {RECORDING_MODE_CONFIG[m].label}
-              </button>
-            ))}
-          </div>
-          <div className="tip-text">
-            {mode === "standard" && "Normal pace, cost, and quality."}
-            {mode === "rush" && "50% faster, 1.5× studio cost, −5 quality, and +8 burnout."}
-            {mode === "deliberate" && "50% slower, +4 quality, and +3 burnout per extra week."}
-          </div>
-        </div>
-        <div className="studio-time-preview">
-          <span>Estimated studio time</span>
-          <strong>{previewWeeks} week{previewWeeks === 1 ? "" : "s"}</strong>
-          {mode !== "standard" && <small>Standard pace: {standardWeeks} week{standardWeeks === 1 ? "" : "s"}</small>}
-        </div>
-        <button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onProjectStarted(); }}>Start Recording</button>
-        <button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 8 }}>Back</button>
-      </div>
-    </div>
-  );
+  return <div className="drawer-overlay" onClick={onBack}><div className="drawer" onClick={event => event.stopPropagation()}><div className="drawer-handle" /><div className="drawer-title">New Project</div><p className="tip-text studio-intro">Every song moves through writing, recording, and mixing before the project is finished.</p><div className="studio-choice-grid">{(["Single", "EP", "Album", "Live Album"] as ReleaseType[]).map(option => <button key={option} className={`btn ${type === option ? "btn-lime" : ""}`} onClick={() => setType(option)}>{option}</button>)}</div><div className="studio-section-card"><div className="studio-section-eyebrow">Recording pace</div><div className="studio-choice-grid studio-choice-grid--mode">{(["standard", "rush", "deliberate"] as RecordingMode[]).map(option => <button key={option} className={`btn btn-sm ${mode === option ? "btn-lime" : ""}`} onClick={() => setMode(option)}>{RECORDING_MODE_CONFIG[option].label}</button>)}</div><div className="tip-text">{mode === "rush" ? "Faster sessions, but lower quality and higher burnout." : mode === "deliberate" ? "More time for the work, with a quality lift and extra burnout." : "A balanced production schedule."}</div></div><button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onProjectStarted(); }}>Start Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 8 }}>Back</button></div></div>;
 }
 
-function ActiveProject({ state, doUpdateProject, doAddTrack, doRemoveTrack, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onBack, onClose }: any) {
-  const p = state.project!;
+function ActiveProject({ state, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onBack, onClose }: any) {
+  const project = state.project!;
   const [trackName, setTrackName] = useState("");
-  const [featId, setFeatId] = useState("");
-  const [cowriterId, setCowriterId] = useState("");
-  const [hook, setHook] = useState<HookStyle>("safe");
-  const [lyric, setLyric] = useState<LyricStyle>("heartfelt");
   const [picker, setPicker] = useState<SettingPicker>(null);
-  const [expandedTrack, setExpandedTrack] = useState<number | null>(null);
-  const prod = PRODUCERS.find((pr: any) => pr.id === p.producerId);
-  const studio = STUDIOS.find((st: any) => st.id === p.studioId);
-  const rel = prod ? getProducerRelationship(prod.id, state.producerWorkCounts) : null;
-  const modeCfg = RECORDING_MODE_CONFIG[(p.mode ?? "standard") as RecordingMode];
-  const canFinish = p.tracks.length >= p.minTracks && p.weeksLeft <= 0;
-  const progress = ((p.totalWeeks - p.weeksLeft) / Math.max(1, p.totalWeeks)) * 100;
+  const stage = getProjectPipelineStage(project);
+  const studio = STUDIOS.find(item => item.id === project.studioId);
+  const canFinish = project.weeksLeft <= 0 && stage === "complete";
+  const stageNumber = stage === "complete" ? 3 : SONG_STAGES.indexOf(stage) + 1;
 
   const addTrack = () => {
     if (!trackName.trim()) return;
-    doAddTrack(trackName.trim(), { featId: featId || undefined, hook, lyric, cowriterId: cowriterId || undefined });
-    setTrackName(""); setFeatId(""); setCowriterId(""); setHook("safe"); setLyric("heartfelt");
+    doAddTrack(trackName.trim());
+    setTrackName("");
   };
 
-  const chooseSetting = (change: any) => {
-    doUpdateProject(change);
-    setPicker(null);
+  return <div className="drawer-overlay" onClick={onClose}><div className="drawer studio-drawer song-studio-drawer" onClick={event => event.stopPropagation()}>
+    <div className="drawer-handle" />
+    <header className="studio-project-hero"><div className="studio-project-kicker">In development</div><div className="drawer-title">{project.title}</div><div className="studio-project-meta"><span>{project.type}</span><span>{project.weeksLeft}wk left</span><span>{project.tracks.length}/{project.maxTracks} tracks</span></div><div className="song-phase-meter" aria-label={`Song development stage ${stageNumber} of 3`}>{SONG_STAGES.map((item, index) => <span key={item} className={index < stageNumber ? "done" : ""}>{index + 1}. {item}</span>)}</div></header>
+
+    <ProjectSettings state={state} project={project} picker={picker} setPicker={setPicker} doUpdateProject={doUpdateProject} />
+
+    <section className="studio-tracks-section"><div className="studio-section-heading"><div><div className="studio-section-eyebrow">{stage === "complete" ? "Completed tracks" : `${stage[0].toUpperCase() + stage.slice(1)} pass`}</div><div className="studio-section-note">{stage === "complete" ? "Ratings are locked in. Let the remaining studio time finish the record." : "Set every track’s direction before ending the week."}</div></div>{project.tracks.length < project.maxTracks && stage === "writing" && <button className="btn btn-sm btn-amber" onClick={doAutoGenerateTracks}>Auto-fill</button>}</div>
+      {project.tracks.map((track: any, index: number) => <TrackDevelopmentCard key={`${track.name}-${index}`} index={index} track={track} stage={stage} state={state} studioTier={studio?.tier ?? 0} doConfigureTrackStage={doConfigureTrackStage} doRemoveTrack={doRemoveTrack} />)}
+      {project.tracks.length < project.maxTracks && stage === "writing" && <div className="studio-add-track"><div className="studio-add-track-row"><input value={trackName} placeholder="Track title" onChange={event => setTrackName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") addTrack(); }} /><button className="btn btn-sm" title="Generate track title" onClick={() => setTrackName(project.themeId ? genThemedTrackName(project.themeId) : genTrackName())}>🎲</button><button className="btn btn-sm btn-lime" onClick={addTrack}>Add</button></div></div>}
+    </section>
+
+    <details className="studio-session-details"><summary>Session details</summary><div className="studio-session-content"><div className="studio-mini-panel"><div className="studio-option-label">This week</div><div className="studio-option-buttons"><button className="btn btn-sm" onClick={doTakeStudioBreak}>Take Break</button><button className="btn btn-sm" onClick={doPushThrough}>Push Through</button><button className="btn btn-sm btn-ghost" onClick={doCancelStudioChoice}>Cancel</button></div><div className="tip-text">A focused pass charges when the week ends. Breaks hold progress; pushing through exhaustion hurts every final rating.</div></div><button className="btn btn-danger btn-block" onClick={doScrubProject}>Scrub Project</button></div></details>
+    <button className="btn btn-lime btn-block" disabled={!canFinish} onClick={doFinishProject}>Finish Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>
+  </div></div>;
+}
+
+function ProjectSettings({ state, project, picker, setPicker, doUpdateProject }: any) {
+  const choose = (change: any) => { doUpdateProject(change); setPicker(null); };
+  return <section className="studio-section-card"><div className="studio-section-heading"><div><div className="studio-section-eyebrow">Project settings</div><div className="studio-section-note">Your team supports every track in the pass.</div></div></div><div className="studio-settings-list"><button className={`studio-setting-row ${picker === "producer" ? "active" : ""}`} onClick={() => setPicker(picker === "producer" ? null : "producer")}><span>Producer</span><span>Change</span></button><button className={`studio-setting-row ${picker === "studio" ? "active" : ""}`} onClick={() => setPicker(picker === "studio" ? null : "studio")}><span>Studio</span><span>Change</span></button><button className={`studio-setting-row ${picker === "theme" ? "active" : ""}`} onClick={() => setPicker(picker === "theme" ? null : "theme")}><span>Album theme</span><span>Change</span></button></div>
+    {picker === "producer" && <div className="studio-picker"><div className="studio-picker-title">Choose a producer</div>{PRODUCERS.filter(item => state.money >= getProducerEffectiveCost(item, state.producerWorkCounts) || project.producerId === item.id).map(item => <button key={item.id} className={`studio-picker-option ${project.producerId === item.id ? "selected" : ""}`} onClick={() => choose({ producerId: item.id })}><span>{item.name}</span><small>{fmtMoney(getProducerEffectiveCost(item, state.producerWorkCounts))}</small></button>)}</div>}
+    {picker === "studio" && <div className="studio-picker"><div className="studio-picker-title">Choose a studio</div>{STUDIOS.filter(item => item.tier <= 2 || (state.fame >= item.repReq && state.fans >= item.fanReq)).map(item => <button key={item.id} className={`studio-picker-option ${project.studioId === item.id ? "selected" : ""}`} onClick={() => choose({ studioId: item.id })}><span>{item.name}</span><small>{fmtMoney(item.perWeek)}/wk</small></button>)}</div>}
+    {picker === "theme" && <div className="studio-picker studio-picker--themes"><div className="studio-picker-title">Choose an album theme</div>{THEMES.map(item => <button key={item.id} className={`studio-picker-option ${project.themeId === item.id ? "selected" : ""}`} onClick={() => choose({ themeId: item.id })}><span>{item.icon} {item.name}</span></button>)}</div>}
+  </section>;
+}
+
+function TrackDevelopmentCard({ index, track, stage, state, studioTier, doConfigureTrackStage, doRemoveTrack }: any) {
+  const development = getTrackDevelopment(track);
+  const activeStage = stage === "complete" ? null : stage as SongDevelopmentStage;
+  const active = activeStage ? development[activeStage] : null;
+  const configure = (direction: SongDirection, investment: SessionInvestment, collaborator?: { featId?: string; cowriterId?: string }) => {
+    if (activeStage) doConfigureTrackStage(index, activeStage, direction, investment, collaborator);
   };
-
-  return (
-    <div className="drawer-overlay" onClick={onClose}>
-      <div className="drawer studio-drawer" onClick={(e) => e.stopPropagation()}>
-        <div className="drawer-handle" />
-        <header className="studio-project-hero">
-          <div className="studio-project-kicker">Now recording</div>
-          <div className="drawer-title">{p.title}</div>
-          <div className="studio-project-meta">
-            <span>{p.type}</span><span>{p.tracks.length}/{p.maxTracks} tracks</span><span>{p.weeksLeft}wk left</span>
-            {p.mode && p.mode !== "standard" && <span className={`studio-mode studio-mode--${p.mode}`}>{modeCfg.label}</span>}
-          </div>
-          <div className="studio-progress" aria-label={`${Math.round(progress)}% recording progress`}>
-            <div className="studio-progress-label"><span>Recording progress</span><span>{p.totalWeeks - p.weeksLeft}/{p.totalWeeks} weeks</span></div>
-            <div className="sbar-track"><div className="sbar-fill f-lime" style={{ width: `${progress}%`, background: p.mode === "rush" ? "var(--amber)" : p.mode === "deliberate" ? "var(--sage)" : undefined }} /></div>
-          </div>
-        </header>
-
-        <section className="studio-section-card">
-          <div className="studio-section-heading"><div><div className="studio-section-eyebrow">Project settings</div><div className="studio-section-note">Shape the sound without losing your place.</div></div></div>
-          <div className="studio-settings-list">
-            <button className={`studio-setting-row ${picker === "producer" ? "active" : ""}`} onClick={() => setPicker(picker === "producer" ? null : "producer")}><span>Producer</span><span>Change</span></button>
-            <button className={`studio-setting-row ${picker === "studio" ? "active" : ""}`} onClick={() => setPicker(picker === "studio" ? null : "studio")}><span>Studio</span><span>Change</span></button>
-            <button className={`studio-setting-row ${picker === "theme" ? "active" : ""}`} onClick={() => setPicker(picker === "theme" ? null : "theme")}><span>Album theme</span><span>Change</span></button>
-          </div>
-          {picker === "producer" && <div className="studio-picker" aria-label="Choose producer">
-            <div className="studio-picker-title">Choose a producer</div>
-            {PRODUCERS.filter((pr: any) => state.money >= getProducerEffectiveCost(pr, state.producerWorkCounts) || p.producerId === pr.id).map((pr: any) => <button key={pr.id} className={`studio-picker-option ${p.producerId === pr.id ? "selected" : ""}`} onClick={() => chooseSetting({ producerId: pr.id })}><span>{pr.name}</span><small>{fmtMoney(getProducerEffectiveCost(pr, state.producerWorkCounts))}</small></button>)}
-            {rel && <div className="tip-text studio-picker-hint">Current relationship: {rel.label} · −{Math.round(rel.discountPct * 100)}% fee</div>}
-          </div>}
-          {picker === "studio" && <div className="studio-picker" aria-label="Choose studio">
-            <div className="studio-picker-title">Choose a studio</div>
-            {STUDIOS.filter((st: any) => st.tier <= 2 || (state.fame >= st.repReq && state.fans >= st.fanReq)).map((st: any) => <button key={st.id} className={`studio-picker-option ${p.studioId === st.id ? "selected" : ""}`} onClick={() => chooseSetting({ studioId: st.id })}><span>{st.name}</span><small>{fmtMoney(st.perWeek)}/wk · {Math.round((1 - (STUDIO_TIME_MODIFIERS[st.tier] ?? 1)) * 100)}% faster</small></button>)}
-          </div>}
-          {picker === "theme" && <div className="studio-picker studio-picker--themes" aria-label="Choose album theme">
-            <div className="studio-picker-title">Choose an album theme</div>
-            {THEMES.map((t: any) => <button key={t.id} className={`studio-picker-option ${p.themeId === t.id ? "selected" : ""}`} onClick={() => chooseSetting({ themeId: t.id })}><span>{t.icon} {t.name}</span></button>)}
-          </div>}
-        </section>
-
-        <section className="studio-tracks-section">
-          <div className="studio-section-heading"><div><div className="studio-section-eyebrow">Tracklist</div><div className="studio-section-note">Titles lead; creative credits stay tucked away.</div></div>{p.tracks.length < p.maxTracks && <button className="btn btn-sm btn-amber" onClick={doAutoGenerateTracks}>Auto-fill</button>}</div>
-          {p.tracks.map((t: any, i: number) => <div className="studio-track" key={i}>
-            <div className="studio-track-main"><span className="t-num">{i + 1}</span><span className="t-name">{t.name}</span><button className="studio-track-details" aria-expanded={expandedTrack === i} onClick={() => setExpandedTrack(expandedTrack === i ? null : i)}>Details</button><button className="btn btn-sm btn-danger" aria-label={`Remove ${t.name}`} onClick={() => doRemoveTrack(i)}>Remove</button></div>
-            {expandedTrack === i && <div className="studio-track-extra"><span>{getHook(t.hook)?.icon} {getHook(t.hook)?.name}</span><span>{getLyric(t.lyric)?.icon} {getLyric(t.lyric)?.name}</span>{t.featId && <span>feat. {FEATURES.find((f: any) => f.id === t.featId)?.name}</span>}{t.cowriterId && <span>w/ {FEATURES.find((f: any) => f.id === t.cowriterId)?.name}</span>}</div>}
-          </div>)}
-          {p.tracks.length < p.maxTracks && <div className="studio-add-track">
-            <div className="studio-add-track-row"><input type="text" placeholder="Track title" value={trackName} onChange={(e) => setTrackName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTrack(); }} /><button className="btn btn-sm" aria-label="Generate track title" title="Generate track title" onClick={() => setTrackName(p.themeId ? genThemedTrackName(p.themeId) : genTrackName())}>🎲</button><button className="btn btn-sm btn-lime" onClick={addTrack}>Add</button></div>
-            <details className="studio-song-options"><summary>Song details <span>optional</span></summary><div className="studio-song-options-body">
-              <div className="studio-option-label">Hook</div><div className="studio-option-buttons">{(["safe", "catchy", "experimental"] as HookStyle[]).map((h) => <button key={h} className={`btn btn-sm ${hook === h ? "btn-lime" : ""}`} onClick={() => setHook(h)}>{getHook(h)?.icon} {getHook(h)?.name}</button>)}</div>
-              <div className="studio-option-label">Lyrics</div><div className="studio-option-buttons">{(["party", "heartfelt", "literary"] as LyricStyle[]).map((l) => <button key={l} className={`btn btn-sm ${lyric === l ? "btn-lime" : ""}`} onClick={() => setLyric(l)}>{getLyric(l)?.icon} {getLyric(l)?.name}</button>)}</div>
-              <label className="studio-select-label">Guest artist<select value={featId} onChange={(e) => { setFeatId(e.target.value); setCowriterId(""); }}><option value="">No feature</option>{FEATURES.filter((f: any) => f.genres.includes(state.genre) && state.fame >= f.fameR && state.rep >= f.repR && state.fans >= f.fanR).map((f: any) => <option key={f.id} value={f.id}>{f.name} ({fmtMoney(getFeatureEffectiveCost(f, state.featureWorkCounts))})</option>)}</select></label>
-              <label className="studio-select-label">Co-writer<select value={cowriterId} onChange={(e) => { setCowriterId(e.target.value); setFeatId(""); }}><option value="">No co-writer</option>{FEATURES.filter((f: any) => f.genres.includes(state.genre)).map((f: any) => <option key={f.id} value={f.id}>{f.name} (FREE)</option>)}</select></label>
-            </div></details>
-          </div>}
-        </section>
-
-        <details className="studio-session-details">
-          <summary>Session details</summary>
-          <div className="studio-session-content">
-            {p.tracks.length > 0 && <div className="studio-mini-panel"><div className="studio-option-label">Album mix</div>{(() => { const mix = computeAlbumWritingMix(p.tracks); return <div className="tip-text">Dominant hook: <b>{mix.dominantHook ?? "—"}</b> · Dominant lyric: <b>{mix.dominantLyric ?? "—"}</b><br />Stream mult: {(mix.streamMult * 100).toFixed(0)}% · Fan mult: {(mix.fanMult * 100).toFixed(0)}% · Critic bias: {mix.critRepBonus > 0 ? "+" : ""}{mix.critRepBonus}</div>; })()}</div>}
-            <div className="studio-mini-panel"><div className="studio-option-label">This week</div><div className="studio-option-buttons"><button className="btn btn-sm" onClick={doTakeStudioBreak}>Take Break</button><button className="btn btn-sm" onClick={doPushThrough}>Push Through</button><button className="btn btn-sm btn-ghost" onClick={doCancelStudioChoice}>Cancel</button></div><div className="tip-text">Break recovers energy without progress. Push records while exhausted with a burnout penalty.</div></div>
-            <button className="btn btn-danger btn-block" onClick={doScrubProject}>Scrub Project</button>
-          </div>
-        </details>
-        <button className="btn btn-lime btn-block" disabled={!canFinish} onClick={doFinishProject}>Finish Recording</button>
-        <button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>
-      </div>
-    </div>
-  );
+  const focusedCost = getFocusedSessionCost(studioTier);
+  const quality = development.qualityRating ?? (track.quality ? track.quality / 10 : null);
+  const appeal = development.appealRating ?? null;
+  return <article className="song-development-card"><div className="song-development-heading"><div><span className="t-num">{index + 1}</span><strong>{track.name}</strong></div>{stage === "writing" && <button className="btn btn-sm btn-danger" onClick={() => doRemoveTrack(index)}>Remove</button>}{stage === "complete" && quality !== null && <div className="song-score-pair"><span>Q {quality.toFixed(1)}</span><span>A {(appeal ?? 5).toFixed(1)}</span></div>}</div>
+    {active && activeStage && <div className="song-development-controls"><div className="song-option-label">Creative direction</div><div className="studio-option-buttons">{(["commercial", "balanced", "artistic"] as SongDirection[]).map(direction => <button key={direction} className={`btn btn-sm ${active.direction === direction ? "btn-lime" : ""}`} onClick={() => configure(direction, active.investment)}>{SONG_DIRECTION_LABELS[activeStage][direction]}{direction === "artistic" ? " · Risk" : ""}</button>)}</div><div className="song-option-label">Execution</div><div className="studio-option-buttons">{(["standard", "focused"] as SessionInvestment[]).map(investment => <button key={investment} className={`btn btn-sm ${active.investment === investment ? "btn-lime" : ""}`} onClick={() => configure(active.direction, investment)}>{investment === "focused" ? `Focused (${fmtMoney(focusedCost)})` : "Standard"}</button>)}</div>{stage === "writing" && <details className="song-collaborator"><summary>Collaborator</summary><div className="studio-song-options-body"><label className="studio-select-label">Guest artist<select value={track.featId ?? ""} onChange={event => configure(active.direction, active.investment, { featId: event.target.value })}><option value="">No feature</option>{FEATURES.filter(item => item.genres.includes(state.genre) && state.fame >= item.fameR && state.rep >= item.repR && state.fans >= item.fanR).map(item => <option key={item.id} value={item.id}>{item.name} ({fmtMoney(getFeatureEffectiveCost(item, state.featureWorkCounts))})</option>)}</select></label><label className="studio-select-label">Co-writer<select value={track.cowriterId ?? ""} onChange={event => configure(active.direction, active.investment, { cowriterId: event.target.value })}><option value="">No co-writer</option>{FEATURES.filter(item => item.genres.includes(state.genre)).map(item => <option key={item.id} value={item.id}>{item.name} (FREE)</option>)}</select></label></div></details>}</div>}
+    {stage === "complete" && <details className="song-score-breakdown"><summary>Rating breakdown</summary><div className="music-detail-metrics"><span>Craft {development.qualityBreakdown?.craft ?? "—"}</span><span>Team {development.qualityBreakdown?.team ?? "—"}</span><span>Choices {development.qualityBreakdown?.choices ?? "—"}</span><span>Direction {development.appealBreakdown?.direction ?? "—"}</span></div></details>}
+  </article>;
 }

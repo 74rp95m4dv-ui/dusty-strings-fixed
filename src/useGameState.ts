@@ -15,7 +15,9 @@ import {
   TREND_THEME_SCORE_MULT, TREND_THEME_FAN_MULT,
   PRODUCER_THEMES, PRODUCER_SPECIALTY_QUALITY_BONUS,
   getProducerRelationship, getProducerEffectiveCost,
-  computeTrackWritingQuality, computeAlbumWritingMix, producerStyleBonus,
+  computeAlbumWritingMix,
+  createTrackDevelopment, getTrackDevelopment, getProjectPipelineStage,
+  countFocusedStages, getFocusedSessionCost, SONG_STAGES,
   getHook, getLyric,
   LABELS, MANAGERS, getLabel, getManager,
   generateLabelOffers, generateManagerOffers,
@@ -42,6 +44,11 @@ import {
   type OpeningActOffer,
   type FestivalBooking,
   type BusBreakdownEvent,
+  type SongStage,
+  type SongDevelopmentStage,
+  type SongDirection,
+  type SessionInvestment,
+  type TrackEntry,
   BUS_BREAKDOWN_EVENTS,
   VENUE_PERKS,
   FESTIVALS,
@@ -67,6 +74,116 @@ function applyArchQuality(arch: string, q: number) {
   if (archHas(arch,"trackQualBonus"))  q += archVal(arch);
   if (archHas(arch,"acousticQBonus"))  q += archVal(arch);
   return q;
+}
+
+const SONG_STAGE_NEXT: Record<SongStage, SongStage> = { writing: "recording", recording: "mixing", mixing: "complete", complete: "complete" };
+const SONG_DIRECTION_EFFECTS: Record<SongDirection, { quality: number; appeal: number; risky: boolean }> = {
+  commercial: { quality: -0.15, appeal: 0.75, risky: false },
+  balanced:   { quality: 0.20, appeal: 0.20, risky: false },
+  artistic:   { quality: 0.55, appeal: -0.25, risky: true },
+};
+
+function recalculateProjectWeeks(project: NonNullable<GameState["project"]>) {
+  const elapsed = project.totalWeeks - project.weeksLeft;
+  const total = calculateRecordingWeeks(
+    project.type,
+    Math.max(project.minTracks, project.tracks.length),
+    project.studioId,
+    project.producerId,
+    project.mode ?? "standard",
+    countFocusedStages(project.tracks),
+  );
+  project.totalWeeks = total;
+  project.weeksLeft = Math.max(0, total - elapsed);
+}
+
+function resolveTrackRating(state: GameState, project: NonNullable<GameState["project"]>, track: TrackEntry) {
+  const development = getTrackDevelopment(track);
+  const producer = PRODUCERS.find(item => item.id === project.producerId);
+  const studio = getStudio(project.studioId);
+  const relationship = producer ? getProducerRelationship(producer.id, state.producerWorkCounts) : null;
+  const themeFit = producer && project.themeId && (PRODUCER_THEMES[producer.id] ?? []).includes(project.themeId) ? 0.35 : 0;
+  const stages = SONG_STAGES.map(stage => development[stage]);
+  const directionQuality = stages.reduce((sum, stage) => sum + SONG_DIRECTION_EFFECTS[stage.direction].quality + (stage.riskQuality ?? 0), 0);
+  const directionAppeal = stages.reduce((sum, stage) => sum + SONG_DIRECTION_EFFECTS[stage.direction].appeal + (stage.riskAppeal ?? 0), 0);
+  const focused = stages.filter(stage => stage.investment === "focused").length;
+  const archetypeBonus = (applyArchQuality(state.archetype, state.qualityBase) - state.qualityBase) / 10;
+  const burnoutPenalty = burnoutQualityPenalty(state.burnout ?? 0) / 10;
+  const pushPenalty = -0.2 * (project.pushThroughCount ?? 0);
+  const modeBonus = RECORDING_MODE_CONFIG[project.mode ?? "standard"].qualityMod / 10;
+  const coWriterBonus = track.cowriterId ? 0.30 : 0;
+  const featureAppeal = track.featId ? 0.45 : 0;
+  const quality = clamp(
+    1.55 + state.qualityBase * 0.06 + (producer?.qB ?? 0) * 0.045 + (studio?.qB ?? 0) * 0.035 +
+    (relationship?.qBonus ?? 0) * 0.04 + themeFit + directionQuality + focused * 0.22 + coWriterBonus + archetypeBonus + burnoutPenalty + pushPenalty + modeBonus,
+    1, 10,
+  );
+  const appeal = clamp(
+    3.5 + (producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09 + directionAppeal + focused * 0.10 + featureAppeal + (track.cowriterId ? 0.12 : 0),
+    1, 10,
+  );
+  return {
+    quality: Number(quality.toFixed(1)),
+    appeal: Number(appeal.toFixed(1)),
+    qualityBreakdown: {
+      craft: Number((1.55 + state.qualityBase * 0.06).toFixed(2)), team: Number(((producer?.qB ?? 0) * 0.045 + (studio?.qB ?? 0) * 0.035 + (relationship?.qBonus ?? 0) * 0.04 + themeFit).toFixed(2)),
+      choices: Number((directionQuality + focused * 0.22 + coWriterBonus).toFixed(2)), condition: Number((archetypeBonus + burnoutPenalty + pushPenalty + modeBonus).toFixed(2)),
+    },
+    appealBreakdown: {
+      direction: Number(directionAppeal.toFixed(2)), team: Number(((producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09).toFixed(2)),
+      collaboration: Number((featureAppeal + (track.cowriterId ? 0.12 : 0)).toFixed(2)), focused: Number((focused * 0.10).toFixed(2)),
+    },
+  };
+}
+
+/** Resolves one project-wide creative pass. Returns false when a paid pass cannot run. */
+function resolveProjectSongSession(state: GameState, project: NonNullable<GameState["project"]>): boolean {
+  const stage = getProjectPipelineStage(project);
+  project.pipelineStage = stage;
+  if (stage === "complete") return true;
+  if (project.tracks.length < project.minTracks) {
+    state.pendingEvent = { msg: `Add at least ${project.minTracks} track${project.minTracks === 1 ? "" : "s"} before the ${stage} pass.`, type: "bad" };
+    return false;
+  }
+  const studio = getStudio(project.studioId);
+  const focusedTracks = project.tracks.filter(track => getTrackDevelopment(track)[stage].investment === "focused");
+  const focusedCost = focusedTracks.length * getFocusedSessionCost(studio?.tier ?? 0);
+  let featureCost = 0;
+  if (stage === "recording") {
+    for (const track of project.tracks) {
+      if (!track.featId) continue;
+      const feature = FEATURES.find(item => item.id === track.featId);
+      if (feature) featureCost += getFeatureEffectiveCost(feature, state.featureWorkCounts, featCostMult(state.archetype));
+    }
+  }
+  if (state.money < focusedCost + featureCost) {
+    state.pendingEvent = { msg: `Need ${fmtMoney(focusedCost + featureCost)} to run this ${stage} pass.`, type: "bad" };
+    return false;
+  }
+  state.money -= focusedCost + featureCost;
+  if (stage === "recording") {
+    for (const track of project.tracks) {
+      if (!track.featId) continue;
+      state.featureWorkCounts ??= {};
+      state.featureWorkCounts[track.featId] = (state.featureWorkCounts[track.featId] ?? 0) + 1;
+    }
+  }
+  for (const track of project.tracks) {
+    const development = getTrackDevelopment(track);
+    const pass = development[stage];
+    if (SONG_DIRECTION_EFFECTS[pass.direction].risky && pass.riskQuality === undefined) {
+      const riskScale = pass.investment === "focused" ? 0.65 : 1;
+      pass.riskQuality = Number((((Math.random() * 2 - 1) * 1.5) * riskScale).toFixed(2));
+      pass.riskAppeal = Number((((Math.random() * 2 - 1) * 0.65) * riskScale).toFixed(2));
+    }
+    pass.completed = true;
+    development.stage = SONG_STAGE_NEXT[stage];
+    track.development = development;
+  }
+  project.pipelineStage = SONG_STAGE_NEXT[stage];
+  const moneyNote = focusedCost > 0 ? ` · ${fmtMoney(focusedCost)} focused work` : "";
+  state.log.unshift({ week: state.week, msg: `${stage[0].toUpperCase() + stage.slice(1)} pass completed for ${project.tracks.length} track${project.tracks.length === 1 ? "" : "s"}${moneyNote}.`, type: "good" });
+  return true;
 }
 
 function calcTourDemand(fans:number, fame:number, rep:number, genreMod:Record<string,number>, genre:Genre, decayIdx:number) {
@@ -333,24 +450,30 @@ function advance(prev:GameState): GameState {
       s.project.pushThroughThisWeek = false;
       if ((s.energy ?? 0) < drain) {
         // Actually exhausted — apply push-through penalties
-        s.energy = Math.max(0, (s.energy ?? 0) - drain);
-        s.burnout = Math.min(100, (s.burnout ?? 0) + 12);
-        s.project.pushThroughCount = (s.project.pushThroughCount ?? 0) + 1;
-        s.project.weeksLeft--;
-        s.log.unshift({week:s.week,msg:"Pushed through exhaustion to record. Heavy burnout hit. Quality will suffer.",type:"bad"});
+        if (resolveProjectSongSession(s, s.project)) {
+          s.energy = Math.max(0, (s.energy ?? 0) - drain);
+          s.burnout = Math.min(100, (s.burnout ?? 0) + 12);
+          s.project.pushThroughCount = (s.project.pushThroughCount ?? 0) + 1;
+          s.project.weeksLeft--;
+          s.log.unshift({week:s.week,msg:"Pushed through exhaustion to record. Heavy burnout hit. Quality will suffer.",type:"bad"});
+        }
       } else {
         // Energy recovered before the tick — record normally, no penalty
-        s.energy = Math.max(0, (s.energy ?? 0) - drain);
-        s.burnout = Math.min(100, (s.burnout ?? 0) + 2);
-        s.project.weeksLeft--;
+        if (resolveProjectSongSession(s, s.project)) {
+          s.energy = Math.max(0, (s.energy ?? 0) - drain);
+          s.burnout = Math.min(100, (s.burnout ?? 0) + 2);
+          s.project.weeksLeft--;
+        }
       }
     } else if ((s.energy ?? 0) < drain) {
       s.log.unshift({week:s.week,msg:"Too exhausted to record this week. Rest up.",type:"bad"});
       // Project stalls — weeksLeft does NOT tick
     } else {
-      s.energy = Math.max(0, (s.energy ?? 0) - drain);
-      s.burnout = Math.min(100, (s.burnout ?? 0) + 2);
-      s.project.weeksLeft--;
+      if (resolveProjectSongSession(s, s.project)) {
+        s.energy = Math.max(0, (s.energy ?? 0) - drain);
+        s.burnout = Math.min(100, (s.burnout ?? 0) + 2);
+        s.project.weeksLeft--;
+      }
     }
   }
   // Weekly energy regen comes AFTER recording drain so exhaustion stall can trigger
@@ -1160,7 +1283,7 @@ export function useGameState() {
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
     const trackCount = mint[type] ?? 1;
     const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
-    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode};
+    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing"};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     return s;
   }),[upd]);
@@ -1202,16 +1325,7 @@ export function useGameState() {
     // ── Recalculate weeks if studio, producer, or mode changed ──
     const needsRecalc = ch.studioId !== undefined || ch.producerId !== undefined || ch.mode !== undefined;
     if (needsRecalc && s.project) {
-      const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-      const newTotal = calculateRecordingWeeks(
-        s.project.type,
-        s.project.tracks.length,
-        s.project.studioId,
-        s.project.producerId,
-        s.project.mode ?? "standard"
-      );
-      s.project.totalWeeks = newTotal;
-      s.project.weeksLeft = Math.max(0, newTotal - elapsed);
+      recalculateProjectWeeks(s.project);
     }
 
     return s;
@@ -1219,7 +1333,7 @@ export function useGameState() {
 
   const doAddTrack = useCallback((
     name:string,
-    opts?: { featId?: string; hook?: import("./gameLogic").HookStyle; lyric?: import("./gameLogic").LyricStyle; cowriterId?: string }
+    opts?: { featId?: string; cowriterId?: string }
   )=>upd(s=>{
     if (!s.project||s.project.tracks.length>=s.project.maxTracks) return s;
     // featId and cowriterId are mutually exclusive — featId wins if both given.
@@ -1231,37 +1345,16 @@ export function useGameState() {
       cowriterId,
       // Conservative defaults if caller doesn't pass — matches the legacy
       // fallback used in computeTrackWritingQuality so behavior is consistent.
-      hook: opts?.hook ?? "safe",
-      lyric: opts?.lyric ?? "heartfelt",
+      development: createTrackDevelopment(),
     });
-    // Recalculate weeks when track count changes
-    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      s.project.type,
-      s.project.tracks.length,
-      s.project.studioId,
-      s.project.producerId,
-      s.project.mode ?? "standard"
-    );
-    s.project.totalWeeks = newTotal;
-    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
+    recalculateProjectWeeks(s.project);
     return s;
   }),[upd]);
 
   const doRemoveTrack = useCallback((i:number)=>upd(s=>{
     if (!s.project) return s;
     s.project.tracks.splice(i,1);
-    // Recalculate weeks when track count changes
-    const elapsed = s.project.totalWeeks - s.project.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      s.project.type,
-      s.project.tracks.length,
-      s.project.studioId,
-      s.project.producerId,
-      s.project.mode ?? "standard"
-    );
-    s.project.totalWeeks = newTotal;
-    s.project.weeksLeft = Math.max(0, newTotal - elapsed);
+    recalculateProjectWeeks(s.project);
     return s;
   }),[upd]);
 
@@ -1273,22 +1366,36 @@ export function useGameState() {
     for (let i = 0; i < remaining; i++) {
       p.tracks.push({
         name: genThemedTrackName(p.themeId),
-        hook: rnd(["safe","catchy","experimental"]) as import("./gameLogic").HookStyle,
-        lyric: rnd(["party","heartfelt","literary"]) as import("./gameLogic").LyricStyle,
+        development: createTrackDevelopment(),
       });
     }
-    // Recalculate weeks after adding all tracks
-    const elapsed = p.totalWeeks - p.weeksLeft;
-    const newTotal = calculateRecordingWeeks(
-      p.type,
-      p.tracks.length,
-      p.studioId,
-      p.producerId,
-      p.mode ?? "standard"
-    );
-    p.totalWeeks = newTotal;
-    p.weeksLeft = Math.max(0, newTotal - elapsed);
+    recalculateProjectWeeks(p);
     s.log.unshift({week:s.week,msg:`Auto-generated ${remaining} track${remaining===1?"":"s"} for "${p.title}".`,type:"neutral"});
+    return s;
+  }),[upd]);
+
+  const doConfigureTrackStage = useCallback((
+    index: number,
+    stage: SongDevelopmentStage,
+    direction: SongDirection,
+    investment: SessionInvestment,
+    collaborator?: { featId?: string; cowriterId?: string },
+  )=>upd(s=>{
+    const project = s.project;
+    if (!project || getProjectPipelineStage(project) !== stage) return s;
+    const track = project.tracks[index];
+    if (!track) return s;
+    const development = getTrackDevelopment(track);
+    if (development[stage].completed) return s;
+    development[stage] = {
+      ...development[stage], direction, investment, riskQuality: undefined, riskAppeal: undefined,
+    };
+    track.development = development;
+    if (stage === "writing" && collaborator) {
+      track.cowriterId = collaborator.cowriterId || undefined;
+      track.featId = track.cowriterId ? undefined : (collaborator.featId || undefined);
+    }
+    recalculateProjectWeeks(project);
     return s;
   }),[upd]);
 
@@ -1299,6 +1406,55 @@ export function useGameState() {
       s.pendingEvent = { msg: `Recording still in progress — ${p.weeksLeft} week${p.weeksLeft === 1 ? "" : "s"} left.`, type: "bad" };
       return s;
     }
+    if (getProjectPipelineStage(p) !== "complete") {
+      s.pendingEvent = { msg: "Complete writing, recording, and mix passes for every track first.", type: "bad" };
+      return s;
+    }
+    let qualitySum = 0;
+    let appealSum = 0;
+    let coWriteCount = 0;
+    for (const track of p.tracks) {
+      const rating = resolveTrackRating(s, p, track);
+      const development = getTrackDevelopment(track);
+      development.stage = "complete";
+      development.qualityRating = rating.quality;
+      development.appealRating = rating.appeal;
+      development.qualityBreakdown = rating.qualityBreakdown;
+      development.appealBreakdown = rating.appealBreakdown;
+      track.development = development;
+      track.quality = rating.quality * 10;
+      qualitySum += rating.quality;
+      appealSum += rating.appeal;
+      if (track.cowriterId) coWriteCount++;
+    }
+    const avgTrackQuality = p.tracks.length ? qualitySum / p.tracks.length : 1;
+    const avgTrackAppeal = p.tracks.length ? appealSum / p.tracks.length : 1;
+    const avgQuality = Number((avgTrackQuality * 10).toFixed(1));
+    const avgAppeal = Number(avgTrackAppeal.toFixed(1));
+    const producer = PRODUCERS.find(item => item.id === p.producerId);
+    if (producer && producer.id !== "self") {
+      s.producerWorkCounts ??= {};
+      s.producerWorkCounts[producer.id] = (s.producerWorkCounts[producer.id] ?? 0) + 1;
+    }
+    for (const track of p.tracks) {
+      if (!track.cowriterId) continue;
+      s.featureWorkCounts ??= {};
+      s.featureWorkCounts[track.cowriterId] = (s.featureWorkCounts[track.cowriterId] ?? 0) + 1;
+    }
+    const burnAdd = p.type === "Live Album" ? 8 : p.type === "Album" ? 18 : p.type === "EP" ? 10 : 5;
+    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd);
+    s.qualityBase = Math.min(95, s.qualityBase + roll(1,4));
+    s.unreleased.push({
+      id: "p" + Date.now(), type: p.type, genre: p.genre, title: p.title,
+      producerId: p.producerId, studioId: p.studioId, themeId: p.themeId, tracks: p.tracks,
+      avgQuality, avgAppeal, hypeSnapshot: s.hype, marketingBudget: p.marketingBudget,
+    });
+    s.project = null;
+    const notes = [coWriteCount ? `${coWriteCount} co-write${coWriteCount === 1 ? "" : "s"}` : "", avgTrackAppeal >= 7 ? "strong commercial pull" : ""].filter(Boolean);
+    s.pendingEvent = { msg: `"${p.title}" is recorded — ${avgTrackQuality.toFixed(1)}/10 quality, ${avgAppeal.toFixed(1)}/10 appeal.${notes.length ? ` (${notes.join(" · ")})` : ""}`, type: "great" };
+    return s;
+
+    /* Legacy release-level quality calculation retained for migration reference.
     const prod=PRODUCERS.find(pr=>pr.id===p.producerId);
     const studio=getStudio(p.studioId);
     // Studio fees paid weekly during recording. Producer fees paid upfront via doUpdateProject.
@@ -1415,11 +1571,17 @@ export function useGameState() {
     const flavor = flavorBits.length ? ` (${flavorBits.join(" · ")})` : "";
     s.pendingEvent={msg:`"${s.unreleased[s.unreleased.length-1].title}" recorded. Release when ready.${flavor}`,type:"great"};
     return s;
+    */
   }),[upd]);
 
-  const doReleaseProject = useCallback((id:string)=>upd(s=>{
+  const doReleaseProject = useCallback((id:string, leadTrackIndex?:number)=>upd(s=>{
     const idx=s.unreleased.findIndex(p=>p.id===id); if(idx<0) return s;
     const p=s.unreleased[idx];
+    if (leadTrackIndex === undefined || !p.tracks[leadTrackIndex]) {
+      s.pendingEvent = { msg: "Choose a lead single before releasing.", type: "bad" };
+      return s;
+    }
+    p.leadTrackIndex = leadTrackIndex;
 
     // ── Market Saturation gate ──
     const sat = s.marketSaturation ?? 0;
@@ -1430,8 +1592,14 @@ export function useGameState() {
 
     if (p.marketingBudget>0){if(s.money<p.marketingBudget){s.pendingEvent={msg:"Not enough for marketing.",type:"bad"};return s;}s.money-=p.marketingBudget;}
     const trend=s.trends[p.genre]??1; const q=p.avgQuality; const hype=p.hypeSnapshot;
-    let score=p.type==="Single"?(q*0.35)+(hype*0.4)+(trend*25):p.type==="EP"?(q*0.5)+(hype*0.3)+(trend*20):p.type==="Live Album"?(q*0.45)+(hype*0.2)+(s.rep*0.6)+(trend*15):(q*0.62)+(hype*0.22)+(trend*16);
-    score*=roll(0.8,1.25);
+    const lead = p.tracks[leadTrackIndex];
+    const leadAppeal = getTrackDevelopment(lead).appealRating ?? (p.avgAppeal ?? 5);
+    const avgAppeal = p.avgAppeal ?? 5;
+    const leadWeight = p.type === "Single" ? 0.80 : p.type === "EP" ? 0.60 : p.type === "Live Album" ? 0.50 : 0.45;
+    const launchAppeal = leadAppeal * leadWeight + avgAppeal * (1 - leadWeight);
+    let score=p.type==="Single"?(q*0.32)+(launchAppeal*4.5)+(hype*0.4)+(trend*25):p.type==="EP"?(q*0.46)+(launchAppeal*3.8)+(hype*0.3)+(trend*20):p.type==="Live Album"?(q*0.42)+(launchAppeal*3.5)+(hype*0.2)+(s.rep*0.6)+(trend*15):(q*0.58)+(launchAppeal*3.2)+(hype*0.22)+(trend*16);
+    // Market noise is intentionally small and separate from the stored song ratings.
+    score*=roll(0.94,1.06);
 
     // ── ALBUM-THEME BONUSES ──
     // (a) Signature theme: if the player has built up an identity in this theme,
@@ -1514,7 +1682,7 @@ export function useGameState() {
     const headline=rnd(criticBand.headlines);
     const cid="r"+Date.now()+Math.random().toString(36).slice(2,6);
     s.catalog.push({
-    id:cid,title:p.title,type:p.type,genre:p.genre,quality:q,outcome,lifecycle,
+    id:cid,title:p.title,type:p.type,genre:p.genre,quality:q,appeal:avgAppeal,leadTrackIndex,outcome,lifecycle,
     decayRate:lcP.decayRate,streamFloor:Math.floor(peakStr*lcP.floorPct),
     weeklyStreams:peakStr,peakStreams:peakStr,totalStreams:0,
     releasedWeek:s.week,weeksActive:0,promoted:false,comebackCooldown:0,
@@ -1567,7 +1735,7 @@ export function useGameState() {
     s.log.unshift({week:s.week,msg:`${msg} ${fmtMoney(revenue)} · +${fmt(fansG)} fans · ${lifecycle}${satNote}${themeNote}`,type:outcome==="Flop"?"bad":outcome==="Viral"?"great":"good"});
     s.pendingEvent = null;
     s.releasePresentation = {
-      title: p.title, type: p.type, outcome, quality: q, revenue,
+      title: p.title, type: p.type, outcome, quality: q, appeal: avgAppeal, leadTrackIndex, leadTrackName: lead.name, revenue,
       fansGained: fansG, fameDelta: famD, repDelta: repD+repFromCritic,
       peakStreams: peakStr, criticHeadline: headline, lifecycle,
       week: s.week, genre: p.genre, tracks: p.tracks,
@@ -2346,7 +2514,7 @@ export function useGameState() {
     state, hasSave, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper,
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, loadGame, clearSave, startNewGame,
-    doStartProject, doUpdateProject, doAddTrack, doRemoveTrack,
+    doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
     doFinishProject, doReleaseProject, doDeleteUnreleased, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo,

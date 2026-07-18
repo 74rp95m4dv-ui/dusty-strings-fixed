@@ -2666,6 +2666,136 @@ hr {
   .music-insight-panel > summary small { max-width: 44%; }
 }
 
+/* ─── SONG DEVELOPMENT PIPELINE ───────────────────────────── */
+.song-studio-drawer { max-width: 560px; }
+
+.song-phase-meter {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-top: var(--space-3);
+}
+
+.song-phase-meter span {
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.song-phase-meter span.done { border-color: var(--sage); color: var(--sage); background: rgba(112, 152, 114, .08); }
+
+.song-development-card {
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel2);
+}
+
+.song-development-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 45px;
+  padding: 8px 10px;
+}
+
+.song-development-heading > div:first-child { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.song-development-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+
+.song-development-controls {
+  padding: 2px 10px 11px;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(212, 168, 32, .04), transparent 70%);
+}
+
+.song-option-label {
+  margin: 9px 0 5px;
+  color: var(--muted2);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.song-collaborator,
+.song-score-breakdown {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+}
+
+.song-collaborator summary,
+.song-score-breakdown summary {
+  min-height: 32px;
+  padding: 0 9px;
+  color: var(--muted2);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 32px;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.song-collaborator summary::-webkit-details-marker,
+.song-score-breakdown summary::-webkit-details-marker { display: none; }
+.song-score-breakdown .music-detail-metrics { padding: 0 9px 9px; }
+
+.song-score-pair { display: flex; gap: 4px; }
+.song-score-pair span { padding: 3px 5px; border: 1px solid var(--border2); border-radius: 3px; color: var(--lime); font-family: var(--mono); font-size: 9px; }
+.song-score-pair span:last-child { color: var(--amber); }
+
+.lead-single-picker { max-width: 480px; }
+.lead-single-picker .tip-text { margin: -4px 0 12px; line-height: 1.45; }
+.lead-single-list { display: grid; gap: 6px; margin-bottom: 12px; }
+
+.lead-single-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.lead-single-option:hover { border-color: var(--lime); }
+.lead-single-option > span:first-child { display: grid; gap: 3px; min-width: 0; }
+.lead-single-option b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.lead-single-option small { color: var(--muted2); font-size: 9px; }
+.lead-single-option > span:last-child { display: flex; align-items: center; gap: 4px; }
+.lead-single-option i { padding: 3px 5px; border-radius: 3px; background: var(--panel); color: var(--lime); font-family: var(--mono); font-size: 9px; font-style: normal; }
+.lead-single-option i:last-child { color: var(--amber); }
+
+.release-result-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 15px 0; }
+.release-result-grid .card-sm { min-height: 62px; text-align: center; }
+.release-result-grid strong { display: block; margin-top: 4px; font-size: 14px; }
+
+.lead-single-result { display: grid; gap: 3px; margin: 0 0 12px; padding: 10px; border-left: 2px solid var(--amber); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--panel2); }
+.lead-single-result span { color: var(--amber); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.lead-single-result b { font-size: 13px; }
+.lead-single-result small { color: var(--muted2); font-family: var(--mono); font-size: 9px; }
+
+@media (max-width: 480px) {
+  .song-development-heading { align-items: flex-start; }
+  .song-development-heading .btn-danger { padding: 5px 6px; font-size: 9px; }
+  .song-phase-meter span { font-size: 7px; }
+}
+
 /* ─── TOUR ARRIVAL CINEMATIC ───────────────────────────────────────────── */
 .tour-intro {
   --night: #03080d;

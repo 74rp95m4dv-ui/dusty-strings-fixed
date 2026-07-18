@@ -1258,10 +1258,12 @@ export const RECORDING_MODE_CONFIG: Record<RecordingMode, { timeMult: number; co
 };
 
 export const BASE_WEEKS_BY_FORMAT: Record<string, { base: number; perTrack: number }> = {
-  Single:      { base: 3,  perTrack: 0.8 },
-  EP:          { base: 6,  perTrack: 0.8 },
-  Album:       { base: 12, perTrack: 0.8 },
-  "Live Album": { base: 2,  perTrack: 0.3 },
+  // Three creative passes are now part of every project. These values target
+  // a standard 4wk single, 6wk EP, 12wk eight-track album, and 5wk live album.
+  Single:       { base: 3.5, perTrack: 0.5 },
+  EP:           { base: 4.5, perTrack: 0.5 },
+  Album:        { base: 8.0, perTrack: 0.5 },
+  "Live Album": { base: 3.0, perTrack: 0.5 },
 };
 
 // Calculate total recording weeks dynamically.
@@ -1271,7 +1273,8 @@ export function calculateRecordingWeeks(
   trackCount: number,
   studioId: string,
   producerId: string,
-  mode: RecordingMode = "standard"
+  mode: RecordingMode = "standard",
+  focusedStages = 0,
 ): number {
   const studio = STUDIOS.find(s => s.id === studioId);
   const producer = PRODUCERS.find(p => p.id === producerId);
@@ -1279,14 +1282,15 @@ export function calculateRecordingWeeks(
   const producerTier = producer?.tier ?? 0;
 
   const config = BASE_WEEKS_BY_FORMAT[type] ?? { base: 3, perTrack: 0.8 };
-  const baseWeeks = config.base + (trackCount * config.perTrack);
+  // Every four focused track-stage upgrades add a week of careful work.
+  const baseWeeks = config.base + (trackCount * config.perTrack) + Math.floor(focusedStages / 4);
 
   const studioMod = STUDIO_TIME_MODIFIERS[studioTier] ?? 1.0;
   const producerMod = PRODUCER_TIME_MODIFIERS[producerTier] ?? 1.0;
   const modeMod = RECORDING_MODE_CONFIG[mode].timeMult;
 
   const total = Math.ceil(baseWeeks * studioMod * producerMod * modeMod);
-  return Math.max(1, total);
+  return Math.max(3, total);
 }
 
 // Compute the "standard" weeks for a project (used by Deliberate mode burnout calc)
@@ -2538,6 +2542,9 @@ export interface ReleasePresentation {
   type: ReleaseType;
   outcome: ReleaseOutcome;
   quality: number;
+  appeal?: number;
+  leadTrackIndex?: number;
+  leadTrackName?: string;
   revenue: number;
   fansGained: number;
   fameDelta: number;
@@ -3674,6 +3681,8 @@ export interface TrackEntry {
   name: string;
   featId?: string;
   quality?: number;
+  /** Per-track CD-market-style development data. Optional for save compatibility. */
+  development?: TrackDevelopment;
   // ── Songwriting choices (set when track is added). All optional so legacy
   // tracks fall back to "catchy" + "heartfelt" defaults at finish-time. ──
   hook?: HookStyle;
@@ -3683,6 +3692,87 @@ export interface TrackEntry {
   // (so 4 co-writes with the same artist still earns the 30% feature discount).
   // Mutually exclusive with `featId` on the same track.
   cowriterId?: string;
+}
+
+export type SongStage = "writing" | "recording" | "mixing" | "complete";
+export type SongDevelopmentStage = Exclude<SongStage, "complete">;
+export type SongDirection = "commercial" | "balanced" | "artistic";
+export type SessionInvestment = "standard" | "focused";
+
+export interface StageDevelopment {
+  direction: SongDirection;
+  investment: SessionInvestment;
+  /** Only artistic decisions roll; the outcome is stored so a score never rerolls. */
+  riskQuality?: number;
+  riskAppeal?: number;
+  completed?: boolean;
+}
+
+export interface TrackDevelopment {
+  stage: SongStage;
+  writing: StageDevelopment;
+  recording: StageDevelopment;
+  mixing: StageDevelopment;
+  qualityRating?: number;
+  appealRating?: number;
+  qualityBreakdown?: Record<string, number>;
+  appealBreakdown?: Record<string, number>;
+}
+
+export const SONG_STAGES: SongDevelopmentStage[] = ["writing", "recording", "mixing"];
+
+export const SONG_DIRECTION_LABELS: Record<SongDevelopmentStage, Record<SongDirection, string>> = {
+  writing:   { commercial: "Hook-first", balanced: "Balanced", artistic: "Story-first" },
+  recording: { commercial: "Clean",      balanced: "Natural",  artistic: "Experimental" },
+  mixing:    { commercial: "Radio",      balanced: "Balanced", artistic: "Artistic" },
+};
+
+const EMPTY_STAGE: StageDevelopment = { direction: "balanced", investment: "standard" };
+
+export function createTrackDevelopment(): TrackDevelopment {
+  return {
+    stage: "writing",
+    writing: { ...EMPTY_STAGE },
+    recording: { ...EMPTY_STAGE },
+    mixing: { ...EMPTY_STAGE },
+  };
+}
+
+/** Hydrates old tracks without changing their eventual legacy quality. */
+export function getTrackDevelopment(track: TrackEntry): TrackDevelopment {
+  const current = track.development;
+  if (!current) return createTrackDevelopment();
+  return {
+    stage: current.stage ?? "writing",
+    writing: { ...EMPTY_STAGE, ...current.writing },
+    recording: { ...EMPTY_STAGE, ...current.recording },
+    mixing: { ...EMPTY_STAGE, ...current.mixing },
+    qualityRating: current.qualityRating,
+    appealRating: current.appealRating,
+    qualityBreakdown: current.qualityBreakdown,
+    appealBreakdown: current.appealBreakdown,
+  };
+}
+
+export function isTrackDevelopmentComplete(track: TrackEntry): boolean {
+  return getTrackDevelopment(track).stage === "complete";
+}
+
+export function getFocusedSessionCost(studioTier: number): number {
+  return [50, 100, 150, 200, 250][Math.max(0, Math.min(4, studioTier))] ?? 50;
+}
+
+export function countFocusedStages(tracks: TrackEntry[]): number {
+  return tracks.reduce((total, track) => {
+    const d = getTrackDevelopment(track);
+    return total + Number(d.writing.investment === "focused") + Number(d.recording.investment === "focused") + Number(d.mixing.investment === "focused");
+  }, 0);
+}
+
+export function getProjectPipelineStage(project: Pick<RecordingProject, "tracks" | "pipelineStage">): SongStage {
+  if (project.pipelineStage) return project.pipelineStage;
+  const incomplete = project.tracks.find(track => !isTrackDevelopmentComplete(track));
+  return incomplete ? getTrackDevelopment(incomplete).stage : "complete";
 }
 
 // ── SONGWRITING: HOOKS ─────────────────────────────────────
@@ -3812,6 +3902,7 @@ export interface RecordingProject {
   pushThroughThisWeek?: boolean;
   pushThroughCount?: number;
   mode?: RecordingMode;
+  pipelineStage?: SongStage;
 }
 
 export interface UnreleasedProject {
@@ -3824,6 +3915,8 @@ export interface UnreleasedProject {
   themeId?: string;
   tracks: TrackEntry[];
   avgQuality: number;
+  avgAppeal?: number;
+  leadTrackIndex?: number;
   hypeSnapshot: number;
   marketingBudget: number;
 }
@@ -3927,6 +4020,8 @@ export interface CatalogEntry {
   type: ReleaseType;
   genre: Genre;
   quality: number;
+  appeal?: number;
+  leadTrackIndex?: number;
   outcome: ReleaseOutcome;
   lifecycle: SongLifecycle;
   decayRate: number;

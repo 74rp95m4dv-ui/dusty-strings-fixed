@@ -21,6 +21,7 @@ import {
   getHook, getLyric,
   LABELS, MANAGERS, getLabel, getManager,
   generateLabelOffers, generateManagerOffers,
+  getLabelDeliverySummary, getLabelRecoupableBalance, getLabelRecoupmentRemaining,
   rnd, roll, clamp, fmt, fmtMoney,
   genAlbumName, genFanReviews, genThemedTrackName,
   // Recording time system (v2.0)
@@ -49,6 +50,8 @@ import {
   type SongDirection,
   type SessionInvestment,
   type TrackEntry,
+  type CampaignAllocation,
+  type LabelSubmission,
   BUS_BREAKDOWN_EVENTS,
   VENUE_PERKS,
   FESTIVALS,
@@ -74,6 +77,100 @@ function applyArchQuality(arch: string, q: number) {
   if (archHas(arch,"trackQualBonus"))  q += archVal(arch);
   if (archHas(arch,"acousticQBonus"))  q += archVal(arch);
   return q;
+}
+
+/** Charge an eligible recording cost from the opted-in label fund before cash. */
+function payRecordingCost(state: GameState, project: NonNullable<GameState["project"]>, amount: number) {
+  const label = state.currentLabel;
+  const canUseFund = !!(project.labelFunding && label && !label.fundingFrozen);
+  const fundAvailable = canUseFund ? Math.max(0, label!.recordingFund - label!.recordingFundUsed) : 0;
+  const fromFund = Math.min(fundAvailable, Math.max(0, amount));
+  const fromCash = Math.max(0, amount - fromFund);
+  if (fromFund && label) label.recordingFundUsed += fromFund;
+  state.money -= fromCash;
+  return { fromFund, fromCash };
+}
+
+function getRecordingFundAvailable(state: GameState, project: NonNullable<GameState["project"]>) {
+  if (!project.labelFunding || !state.currentLabel || state.currentLabel.fundingFrozen) return 0;
+  return Math.max(0, state.currentLabel.recordingFund - state.currentLabel.recordingFundUsed);
+}
+
+function updateLabelDeliveryStatus(state: GameState) {
+  const label = state.currentLabel;
+  if (!label) return;
+  const delivery = getLabelDeliverySummary(label, state.week);
+  label.deliveryDeadlineWeek = delivery.deadlineWeek;
+  label.deliveryStatus = delivery.status;
+
+  if (delivery.albumsRemaining === 0) return;
+  if ([12, 6, 2].includes(delivery.weeksRemaining)) {
+    state.log.unshift({
+      week: state.week,
+      msg: `${label.name}: ${delivery.albumsRemaining} album${delivery.albumsRemaining === 1 ? "" : "s"} due in ${delivery.weeksRemaining} weeks.`,
+      type: delivery.weeksRemaining <= 2 ? "bad" : "neutral",
+    });
+  }
+  if (delivery.status !== "breach" || label.lastDeliveryPenaltyWeek === state.week) return;
+
+  const extensionWeeks = label.suspensionRights ? 8 : 12;
+  label.deliveryExtensions = (label.deliveryExtensions ?? 0) + 1;
+  label.lastDeliveryPenaltyWeek = state.week;
+  label.deliveryDeadlineWeek = state.week + extensionWeeks;
+  label.deliveryStatus = "breach";
+  label.fundingFrozen = true;
+  state.rep = clamp(state.rep - (label.suspensionRights ? 5 : 3), 0, 100);
+  state.log.unshift({
+    week: state.week,
+    msg: label.suspensionRights
+      ? `${label.name} placed you on delivery notice. No new label-funded sessions until you deliver an album. ${extensionWeeks} weeks to cure the breach.`
+      : `${label.name} extended your album deadline by ${extensionWeeks} weeks. Your standing with the label took a hit.`,
+    type: "bad",
+  });
+}
+
+const EMPTY_CAMPAIGN: CampaignAllocation = { streaming: 25, radio: 25, press: 25, live: 25 };
+
+function isValidCampaign(allocation: CampaignAllocation) {
+  const values = Object.values(allocation);
+  return values.every(value => Number.isFinite(value) && value >= 0 && value <= 100) &&
+    values.reduce((sum, value) => sum + value, 0) === 100;
+}
+
+function labelRequiresReleaseApproval(label: NonNullable<GameState["currentLabel"]>) {
+  return label.approvalRights.includes("singles") || label.approvalRights.includes("release date");
+}
+
+function processLabelSubmissionReview(state: GameState) {
+  const submission = state.pendingLabelSubmission;
+  const label = state.currentLabel;
+  if (!submission || !label || submission.status !== "under_review" || state.week < submission.reviewWeek) return;
+  const project = state.unreleased.find(item => item.id === submission.projectId);
+  const lead = project?.tracks[submission.leadTrackIndex];
+  if (!project || !lead) {
+    state.pendingLabelSubmission = null;
+    return;
+  }
+  const leadAppeal = getTrackDevelopment(lead).appealRating ?? project.avgAppeal ?? 5;
+  const averageAppeal = project.avgAppeal ?? 5;
+  const commercialShare = (submission.allocation.streaming + submission.allocation.radio) / 100;
+  const approvalScore = leadAppeal * 0.6 + averageAppeal * 0.25 + commercialShare * 2.5 + (project.avgQuality / 10) * 0.15;
+  const threshold = label.creativeControl < 40 ? 7.1 : label.creativeControl < 70 ? 6.4 : 5.8;
+  if (approvalScore >= threshold) {
+    submission.status = "approved";
+    submission.reviewNote = `${label.exec} approved the release and released the full campaign allocation.`;
+    state.log.unshift({ week: state.week, msg: `${label.name} approved "${project.title}" for release.`, type: "great" });
+    return;
+  }
+  if (!submission.revisionUsed) {
+    submission.status = "revision_requested";
+    submission.reviewNote = `${label.exec} wants a stronger lead or a more commercial campaign mix before approving the release.`;
+    state.log.unshift({ week: state.week, msg: `${label.name} sent notes on "${project.title}". One revision window is open.`, type: "neutral" });
+    return;
+  }
+  submission.status = "held";
+  submission.reviewNote = `${label.exec} is holding the release. You can revise later or override the label and launch with reduced support.`;
+  state.log.unshift({ week: state.week, msg: `${label.name} held "${project.title}" after final review.`, type: "bad" });
 }
 
 const SONG_STAGE_NEXT: Record<SongStage, SongStage> = { writing: "recording", recording: "mixing", mixing: "complete", complete: "complete" };
@@ -156,11 +253,17 @@ function resolveProjectSongSession(state: GameState, project: NonNullable<GameSt
       if (feature) featureCost += getFeatureEffectiveCost(feature, state.featureWorkCounts, featCostMult(state.archetype));
     }
   }
-  if (state.money < focusedCost + featureCost) {
-    state.pendingEvent = { msg: `Need ${fmtMoney(focusedCost + featureCost)} to run this ${stage} pass.`, type: "bad" };
+  const totalSessionCost = focusedCost + featureCost;
+  const fundAvailable = getRecordingFundAvailable(state, project);
+  const cashRequired = Math.max(0, totalSessionCost - fundAvailable);
+  if (state.money < cashRequired) {
+    state.pendingEvent = { msg: `Need ${fmtMoney(cashRequired)} more to run this ${stage} pass after label funding.`, type: "bad" };
     return false;
   }
-  state.money -= focusedCost + featureCost;
+  const payment = payRecordingCost(state, project, totalSessionCost);
+  if (payment.fromFund > 0) {
+    state.log.unshift({ week: state.week, msg: `${fmtMoney(payment.fromFund)} of this ${stage} pass came from the label recording fund.`, type: "neutral" });
+  }
   if (stage === "recording") {
     for (const track of project.tracks) {
       if (!track.featId) continue;
@@ -417,6 +520,14 @@ function advance(prev:GameState): GameState {
   const s:GameState = JSON.parse(JSON.stringify(prev));
   s.pendingEvent = null; s.modal = null;
   s.week++; s.weeksSinceRelease++;
+  if (s.campaignLiveBoostWeeks > 0) {
+    s.campaignLiveBoostWeeks--;
+    if (s.campaignLiveBoostWeeks === 0) s.campaignLiveBoost = 0;
+  }
+  if (s.campaignRadioBoostWeeks > 0) {
+    s.campaignRadioBoostWeeks--;
+    if (s.campaignRadioBoostWeeks === 0) s.campaignRadioBoost = 0;
+  }
   for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k]--;
   // Burnout slowly recovers each week — but only meaningfully when not actively
   // grinding (touring counters this in the show block below).
@@ -425,6 +536,7 @@ function advance(prev:GameState): GameState {
   s.marketSaturation = Math.max(0, (s.marketSaturation??0) - 5);
   s.hype   = Math.max(0,   s.hype-5);
   if (s.weeksSinceRelease>6) { s.fame=Math.max(0,s.fame-0.6); s.rep=Math.max(0,s.rep-0.2); }
+  processLabelSubmissionReview(s);
   // Recording: studio fee charged every active week; energy drained & progress ticks only if not exhausted.
   // Energy regen (+20) happens AFTER this block so stall can trigger when artist ends a week too drained.
   if (s.project && s.project.weeksLeft > 0) {
@@ -438,7 +550,10 @@ function advance(prev:GameState): GameState {
     const recStudio = getStudio(s.project.studioId);
     if (recStudio && recStudio.perWeek > 0) {
       const weeklyCost = Math.floor(recStudio.perWeek * modeCfg.costMult);
-      s.money -= weeklyCost;
+      const payment = payRecordingCost(s, s.project, weeklyCost);
+      if (payment.fromFund > 0) {
+        s.log.unshift({week:s.week,msg:`Label fund covered ${fmtMoney(payment.fromFund)} of this week's studio rent.`,type:"neutral"});
+      }
       s.log.unshift({week:s.week,msg:`Studio: ${recStudio.name} — ${fmtMoney(weeklyCost)}/wk${mode !== "standard" ? ` (${mode})` : ""}.`,type:"neutral"});
     }
 
@@ -577,9 +692,18 @@ function advance(prev:GameState): GameState {
     t.streamStats.weeklyStreams = t.weeklyStreams;
     t.streamStats.peakStreams = t.peakStreams;
   }
-  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);  // streamingCut unchanged
+  const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);
+  const grossStreamInc = s.currentLabel
+    ? calcStreamRevenue(s.catalog, 0, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee)
+    : 0;
   const streamInc = calcStreamRevenue(s.catalog, streamCutPct, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee);
   s.money+=streamInc; s.totalEarned+=streamInc;
+  if (s.currentLabel) {
+    const labelShare = Math.max(0, grossStreamInc - streamInc);
+    const recouped = Math.min(labelShare * s.currentLabel.recoupRate, getLabelRecoupmentRemaining(s.currentLabel));
+    if (recouped > 0) s.currentLabel.advanceRecouped += recouped;
+    s.currentLabel.isRecouped = getLabelRecoupmentRemaining(s.currentLabel) <= 0;
+  }
   const curWeekStreams = s.catalog.reduce((t,c)=>t+c.weeklyStreams,0);
   s.streamHistory = [...(s.streamHistory??[]), curWeekStreams].slice(-104);
   s.peakWeeklyStreams = Math.max(s.peakWeeklyStreams??0, curWeekStreams);
@@ -608,10 +732,26 @@ function advance(prev:GameState): GameState {
   // Label contract countdown — when expired, drop the contract.
   if (s.currentLabel) {
     s.currentLabel.weeksLeft -= 1;
+    updateLabelDeliveryStatus(s);
     if (s.currentLabel.weeksLeft <= 0) {
+      const label = s.currentLabel;
+      const outstandingAlbums = Math.max(0, label.albumsCommitted - label.albumsDelivered);
+      if (outstandingAlbums > 0 && (label.deliveryExtensions ?? 0) < 2) {
+        label.weeksLeft = label.suspensionRights ? 8 : 12;
+        label.deliveryDeadlineWeek = s.week + label.weeksLeft;
+        label.deliveryStatus = "breach";
+        label.fundingFrozen = true;
+        label.deliveryExtensions = (label.deliveryExtensions ?? 0) + 1;
+        s.log.unshift({
+          week:s.week,
+          msg: `${label.name} extended the term by ${label.weeksLeft} weeks for ${outstandingAlbums} undelivered album${outstandingAlbums === 1 ? "" : "s"}. Label funding is frozen until you deliver.`,
+          type:"bad",
+        });
+      } else {
       s.log.unshift({ week:s.week, msg:`Contract with ${s.currentLabel.name} expired. You're a free agent.`, type:"neutral" });
       s.currentLabel = null;
       s.labelSigned = false;
+      }
     }
   }
 
@@ -729,7 +869,8 @@ function advance(prev:GameState): GameState {
         s.log.unshift({ week:s.week, msg:"Tour ended early.", type:"neutral" });
       }
     } else {
-    const demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
+    let demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
+    if (s.campaignLiveBoostWeeks > 0) demand = Math.floor(demand * (1 + s.campaignLiveBoost));
     const burnoutMult = burnoutShowMult(s.burnout ?? 0);
 
     // ── Venue Reputation Bonus ──
@@ -1153,6 +1294,7 @@ export function useGameState() {
         crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
         suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
         isRecouped:false, perks:[], type:"indie" as const,
+        approvalStrikes:0, campaignFrozen:false,
       } : null),
       currentManager: saved.currentManager ?? (saved.hasManager ? {
         managerId:"legacy", name:"Your Manager",
@@ -1166,6 +1308,11 @@ export function useGameState() {
       pendingSyncOffers: saved.pendingSyncOffers ?? [],
       selloutScore: saved.selloutScore ?? 0,
       totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
+      pendingLabelSubmission: saved.pendingLabelSubmission ?? null,
+      campaignLiveBoost: saved.campaignLiveBoost ?? 0,
+      campaignLiveBoostWeeks: saved.campaignLiveBoostWeeks ?? 0,
+      campaignRadioBoost: saved.campaignRadioBoost ?? 0,
+      campaignRadioBoostWeeks: saved.campaignRadioBoostWeeks ?? 0,
 
       // Feature artist system (added in v1.x)
       pendingFeatureRequests: saved.pendingFeatureRequests ?? [],
@@ -1211,6 +1358,7 @@ export function useGameState() {
         crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
         suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
         isRecouped:false, perks:[], type:"indie" as const,
+        approvalStrikes:0, campaignFrozen:false,
       } : null),
     currentManager: s.currentManager ?? (s.hasManager ? {
       managerId:"legacy", name:"Your Manager",
@@ -1224,6 +1372,11 @@ export function useGameState() {
     pendingSyncOffers: s.pendingSyncOffers ?? [],
     selloutScore: s.selloutScore ?? 0,
     totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
+    pendingLabelSubmission: s.pendingLabelSubmission ?? null,
+    campaignLiveBoost: s.campaignLiveBoost ?? 0,
+    campaignLiveBoostWeeks: s.campaignLiveBoostWeeks ?? 0,
+    campaignRadioBoost: s.campaignRadioBoost ?? 0,
+    campaignRadioBoostWeeks: s.campaignRadioBoostWeeks ?? 0,
 
     pendingFeatureRequests: s.pendingFeatureRequests ?? [],
     guestCredits: s.guestCredits ?? [],
@@ -1283,7 +1436,7 @@ export function useGameState() {
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
     const trackCount = mint[type] ?? 1;
     const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
-    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing"};
+    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing",labelFunding:false};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     return s;
   }),[upd]);
@@ -1306,18 +1459,30 @@ export function useGameState() {
     }
     // Studio fees are paid weekly during recording — no upfront delta for studio swaps.
 
-    if (delta > 0 && s.money < delta) {
+    const useLabelFund = !!((ch.labelFunding ?? p.labelFunding) && s.currentLabel && !s.currentLabel.fundingFrozen);
+    const fundAvailable = useLabelFund && s.currentLabel
+      ? Math.max(0, s.currentLabel.recordingFund - s.currentLabel.recordingFundUsed)
+      : 0;
+    const cashRequired = Math.max(0, delta - fundAvailable);
+    if (delta > 0 && s.money < cashRequired) {
       const newProd = ch.producerId ? PRODUCERS.find(pr => pr.id === ch.producerId) : null;
       const newStudio = ch.studioId ? getStudio(ch.studioId) : null;
       const target = newProd?.name ?? newStudio?.name ?? "this upgrade";
-      blockMsg = `Need ${fmtMoney(delta)} more to book ${target}.`;
+      blockMsg = `Need ${fmtMoney(cashRequired)} more to book ${target} after label funding.`;
     }
 
     if (blockMsg) {
       s.pendingEvent = { msg: blockMsg, type: "bad" };
       return s;
     }
-    if (delta !== 0) s.money -= delta;
+    if (delta > 0) {
+      const fromFund = Math.min(fundAvailable, delta);
+      if (fromFund && s.currentLabel) s.currentLabel.recordingFundUsed += fromFund;
+      s.money -= delta - fromFund;
+      if (fromFund) s.log.unshift({week:s.week,msg:`${fmtMoney(fromFund)} producer cost covered by the label recording fund.`,type:"neutral"});
+    } else if (delta < 0) {
+      s.money -= delta;
+    }
 
     // Apply the partial update first
     s.project = { ...s.project, ...ch } as GameState["project"];
@@ -1574,14 +1739,91 @@ export function useGameState() {
     */
   }),[upd]);
 
-  const doReleaseProject = useCallback((id:string, leadTrackIndex?:number)=>upd(s=>{
+  const doSubmitLabelRelease = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation)=>upd(s=>{
+    const project = s.unreleased.find(item => item.id === projectId);
+    const label = s.currentLabel;
+    if (!project || !label || !labelRequiresReleaseApproval(label)) return s;
+    if (!project.tracks[leadTrackIndex] || !isValidCampaign(allocation)) {
+      s.pendingEvent = { msg:"Set a valid lead single and a campaign allocation totaling 100%.", type:"bad" };
+      return s;
+    }
+    const existing = s.pendingLabelSubmission;
+    if (existing && existing.projectId !== projectId) {
+      s.pendingEvent = { msg:`${label.name} is already reviewing another release.`, type:"bad" };
+      return s;
+    }
+    s.pendingLabelSubmission = {
+      projectId, leadTrackIndex, allocation: {...allocation}, submittedWeek:s.week, reviewWeek:s.week + 1,
+      revisionUsed: existing?.revisionUsed ?? false, status:"under_review",
+    };
+    s.log.unshift({ week:s.week, msg:`Submitted "${project.title}" to ${label.name} A&R. Review returns next week.`, type:"neutral" });
+    s.pendingEvent = { msg:`A&R has "${project.title}". Check back in week ${s.week + 1}.`, type:"good" };
+    return s;
+  }),[upd]);
+
+  const doReviseLabelSubmission = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation)=>upd(s=>{
+    const submission = s.pendingLabelSubmission;
+    const label = s.currentLabel;
+    if (!submission || !label || submission.projectId !== projectId || submission.status !== "revision_requested") return s;
+    if (!s.unreleased.find(item => item.id === projectId)?.tracks[leadTrackIndex] || !isValidCampaign(allocation)) {
+      s.pendingEvent = { msg:"Set a valid lead single and a campaign allocation totaling 100%.", type:"bad" };
+      return s;
+    }
+    submission.leadTrackIndex = leadTrackIndex;
+    submission.allocation = {...allocation};
+    submission.submittedWeek = s.week;
+    submission.reviewWeek = s.week + 1;
+    submission.revisionUsed = true;
+    submission.status = "under_review";
+    submission.reviewNote = undefined;
+    s.log.unshift({ week:s.week, msg:`Resubmitted "${s.unreleased.find(item => item.id === projectId)?.title}" after A&R notes.`, type:"neutral" });
+    s.pendingEvent = { msg:`Revision submitted. Final A&R review returns in week ${s.week + 1}.`, type:"good" };
+    return s;
+  }),[upd]);
+
+  const doReleaseProject = useCallback((id:string, leadTrackIndex?:number, campaign?:CampaignAllocation, approvalOverride=false)=>upd(s=>{
     const idx=s.unreleased.findIndex(p=>p.id===id); if(idx<0) return s;
     const p=s.unreleased[idx];
     if (leadTrackIndex === undefined || !p.tracks[leadTrackIndex]) {
       s.pendingEvent = { msg: "Choose a lead single before releasing.", type: "bad" };
       return s;
     }
+    const label = s.currentLabel;
+    const allocation = campaign ?? EMPTY_CAMPAIGN;
+    if (label && !isValidCampaign(allocation)) {
+      s.pendingEvent = { msg:"Campaign allocation must total 100%.", type:"bad" };
+      return s;
+    }
+    const submission = s.pendingLabelSubmission;
+    const isThisSubmission = submission?.projectId === id;
+    if (label && labelRequiresReleaseApproval(label)) {
+      const approved = isThisSubmission && submission?.status === "approved";
+      const canOverride = isThisSubmission && (submission?.status === "revision_requested" || submission?.status === "held");
+      if (!approved && !(approvalOverride && canOverride)) {
+        s.pendingEvent = { msg:"Submit this release to A&R before launching.", type:"bad" };
+        return s;
+      }
+      const campaignChanged = !!campaign && Object.keys(campaign).some(key => campaign[key as keyof CampaignAllocation] !== submission!.allocation[key as keyof CampaignAllocation]);
+      if (approved && (submission!.leadTrackIndex !== leadTrackIndex || campaignChanged)) {
+        s.pendingEvent = { msg:"Approved campaigns cannot be changed. Submit a new campaign for review.", type:"bad" };
+        return s;
+      }
+    }
     p.leadTrackIndex = leadTrackIndex;
+
+    const campaignAllocation = label && isThisSubmission ? submission!.allocation : allocation;
+    const campaignBase = label ? Math.floor(label.marketingCommitment / Math.max(1, label.albumsCommitted)) : 0;
+    const plannedDeploymentPct = label && !label.campaignFrozen ? (approvalOverride ? 0.55 : 1) : 0;
+    const campaignAvailable = label ? Math.max(0, label.marketingCommitment - label.marketingSpendYTD) : 0;
+    const deployedCampaign = Math.min(Math.floor(campaignBase * plannedDeploymentPct), campaignAvailable);
+    const deploymentPct = campaignBase > 0 ? deployedCampaign / campaignBase : 0;
+    const labelMktBoost = label
+      ? 1 + (label.marketingBoost - 1) * deploymentPct
+      : (s.labelSigned ? 1.3 : 1);
+    const streamingPush = 1 + (campaignAllocation.streaming / 100) * 0.30 * deploymentPct;
+    const pressBonus = (campaignAllocation.press / 100) * 8 * deploymentPct;
+    const radioFameBonus = Math.floor((campaignAllocation.radio / 25) * deploymentPct);
+    const liveConversionBonus = (campaignAllocation.live / 100) * 0.012 * deploymentPct;
 
     // ── Market Saturation gate ──
     const sat = s.marketSaturation ?? 0;
@@ -1665,8 +1907,7 @@ export function useGameState() {
     }
     const radioMult=archHas(s.archetype,"radioBonus")?archVal(s.archetype):1;
     const bStr={Single:500,EP:1500,Album:5000,"Live Album":1200}[p.type]??500;
-    const labelMktBoost = s.currentLabel?.marketingBoost ?? (s.labelSigned ? 1.3 : 1);
-    const peakStr=Math.floor(bStr*(score/50)*roll(0.8,1.3)*labelMktBoost*radioMult*fanMult*writingMix.streamMult);
+    const peakStr=Math.floor(bStr*(score/50)*roll(0.8,1.3)*labelMktBoost*streamingPush*radioMult*fanMult*writingMix.streamMult);
     const lifecycle=classifyLifecycle(q,outcome,p.marketingBudget,score,s.archetype);
 
     // Increase saturation after release
@@ -1678,7 +1919,7 @@ export function useGameState() {
     // of it. The mix is averaged per-track so one cut won't tank the verdict.
     // We do NOT floor at 0 — bad albums' negative crit rep punishment must
     // still bite (final s.rep is clamped 0..100 downstream anyway).
-    const repFromCritic=criticBand.rep + writingMix.critRepBonus;
+    const repFromCritic=criticBand.rep + writingMix.critRepBonus + pressBonus;
     const headline=rnd(criticBand.headlines);
     const cid="r"+Date.now()+Math.random().toString(36).slice(2,6);
     s.catalog.push({
@@ -1687,6 +1928,9 @@ export function useGameState() {
     weeklyStreams:peakStr,peakStreams:peakStr,totalStreams:0,
     releasedWeek:s.week,weeksActive:0,promoted:false,comebackCooldown:0,
     tracks:p.tracks,hasMusicVideo:false,
+    campaign: label ? {
+      allocation: {...campaignAllocation}, deploymentPct, deployedBudget:deployedCampaign, approvalOverride,
+    } : undefined,
     // Realistic streaming tracking (v2.0)
     streamStats: {
       totalStreams: 0,
@@ -1715,15 +1959,48 @@ export function useGameState() {
     // (q >= 85) converts an extra slice on top of the outcome bonus.
     const sfRate = outcome === "Viral" ? 0.030 : outcome === "Hit" ? 0.015 : outcome === "Moderate" ? 0.004 : 0;
     const sfBonus = q >= 85 ? 0.010 : 0;
-    if (sfRate + sfBonus > 0) {
+    if (sfRate + sfBonus + liveConversionBonus > 0) {
       const sfPrior = s.superfans ?? 0;
       const casualsAvail = Math.max(0, s.fans - sfPrior);
-      const sfConv = Math.floor(casualsAvail * (sfRate + sfBonus));
+      const sfConv = Math.floor(casualsAvail * (sfRate + sfBonus + liveConversionBonus));
       if (sfConv > 0) s.superfans = sfPrior + sfConv;
     }
-    s.fame=clamp(s.fame+famD,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
+    s.fame=clamp(s.fame+famD+radioFameBonus,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
     s.hype=Math.max(0,s.hype-15); s.weeksSinceRelease=0; s.totalReleases++;
     s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false});
+    if (label) {
+      label.marketingSpendYTD += deployedCampaign;
+      if (campaignAllocation.radio > 0 && deploymentPct > 0) {
+        s.campaignRadioBoostWeeks = Math.max(s.campaignRadioBoostWeeks, 4);
+        s.campaignRadioBoost = Math.max(s.campaignRadioBoost, (campaignAllocation.radio / 100) * 0.20 * deploymentPct);
+      }
+      if (campaignAllocation.live > 0 && deploymentPct > 0) {
+        s.campaignLiveBoostWeeks = Math.max(s.campaignLiveBoostWeeks, 4);
+        s.campaignLiveBoost = Math.max(s.campaignLiveBoost, (campaignAllocation.live / 100) * 0.18 * deploymentPct);
+      }
+      if (approvalOverride) {
+        label.approvalStrikes = (label.approvalStrikes ?? 0) + 1;
+        s.rep = clamp(s.rep - 2, 0, 100);
+        if (label.approvalStrikes >= 2) label.campaignFrozen = true;
+        s.log.unshift({ week:s.week, msg:`You overrode ${label.name}'s A&R notes. Campaign support is reduced and the relationship is strained.`, type:"bad" });
+      }
+    }
+    if (label && p.type === "Album") {
+      label.albumsDelivered = Math.min(label.albumsCommitted, label.albumsDelivered + 1);
+      label.deliveryStatus = "good";
+      label.fundingFrozen = false;
+      label.approvalStrikes = 0;
+      label.campaignFrozen = false;
+      const albumsRemaining = Math.max(0, label.albumsCommitted - label.albumsDelivered);
+      if (albumsRemaining > 0) {
+        label.deliveryDeadlineWeek = s.week + Math.max(12, Math.floor(label.weeksLeft / albumsRemaining));
+      }
+      s.log.unshift({
+        week:s.week,
+        msg: `${label.name} accepted "${p.title}" as album ${label.albumsDelivered}/${label.albumsCommitted}. ${albumsRemaining ? `Next delivery due week ${label.deliveryDeadlineWeek}.` : "Your delivery commitment is fulfilled."}`,
+        type:"great",
+      });
+    }
     // Record this release toward the player's theme identity.
     if (p.themeId) {
       if (!s.themeCounts) s.themeCounts = {};
@@ -1731,6 +2008,7 @@ export function useGameState() {
     }
     s.criticReviews.push({week:s.week,headline,title:p.title,score:Math.floor(q)});
     s.unreleased.splice(idx,1);
+    if (s.pendingLabelSubmission?.projectId === id) s.pendingLabelSubmission = null;
     const msg={Flop:`"${p.title}" flopped. Brutal.`,Moderate:`"${p.title}" did okay.`,Hit:`"${p.title}" is a HIT!`,Viral:`"${p.title}" went VIRAL!`}[outcome];
     s.log.unshift({week:s.week,msg:`${msg} ${fmtMoney(revenue)} · +${fmt(fansG)} fans · ${lifecycle}${satNote}${themeNote}`,type:outcome==="Flop"?"bad":outcome==="Viral"?"great":"good"});
     s.pendingEvent = null;
@@ -1780,7 +2058,7 @@ export function useGameState() {
     if(ef.money){const v=Math.floor(ef.money*roll(0.85,1.15));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
     if(ef.money_pct&&s.fans>0){const v=Math.floor(s.fans*ef.money_pct*roll(0.8,1.2));s.money+=v;msgs.push(`+${fmtMoney(v)}`);}
     if(ef.satReduce){s.marketSaturation=Math.max(0,(s.marketSaturation??0)-ef.satReduce);msgs.push(`sat-${ef.satReduce}`);}
-    if(ef.radio&&s.totalReleases>0&&Math.random()<0.4){const rm2=archHas(s.archetype,"radioBonus")?archVal(s.archetype):1;const fG=Math.floor(roll(400,1200)*rm2);s.fans+=fG;s.fame=clamp(s.fame+Math.max(1,Math.floor(2*rm2)),0,100);s.rep=clamp(s.rep+2,0,100);msgs.push(`RADIO! +${fmt(fG)} fans`);s.pendingEvent={msg:`Radio spin! +${fmt(fG)} fans`,type:"great"};}
+    if(ef.radio&&s.totalReleases>0&&Math.random()<Math.min(0.75,0.4+(s.campaignRadioBoostWeeks>0?s.campaignRadioBoost:0))){const rm2=archHas(s.archetype,"radioBonus")?archVal(s.archetype):1;const fG=Math.floor(roll(400,1200)*rm2);s.fans+=fG;s.fame=clamp(s.fame+Math.max(1,Math.floor(2*rm2)),0,100);s.rep=clamp(s.rep+2,0,100);msgs.push(`RADIO! +${fmt(fG)} fans`);s.pendingEvent={msg:`Radio spin! +${fmt(fG)} fans`,type:"great"};}
     if(ef.playlist&&s.totalReleases>0&&Math.random()<0.35){s.hype=clamp(s.hype+18,0,100);s.fans+=Math.floor(roll(200,800));s.catalog.forEach(t=>{t.weeklyStreams=Math.min(t.peakStreams,Math.floor(t.weeklyStreams*1.3));});s.pendingEvent={msg:"Playlist secured! Streams boosted.",type:"great"};}
     if(ef.sync_chance&&s.totalReleases>0){const prob=archHas(s.archetype,"syncRadioBoost")?0.38:0.25;if(Math.random()<prob){const m=Math.floor(roll(3000,15000));s.money+=m;s.fame=clamp(s.fame+2,0,100);msgs.push(`SYNC +${fmtMoney(m)}`);s.pendingEvent={msg:`Sync deal! +${fmtMoney(m)}`,type:"gold"};}}
     if(ef.festival_chance&&s.totalReleases>0&&Math.random()<0.3){const fF=Math.floor(roll(500,2000));s.fans+=fF;s.fame=clamp(s.fame+3,0,100);s.rep=clamp(s.rep+2,0,100);msgs.push(`FEST! +${fmt(fF)}`);s.pendingEvent={msg:`Festival slot! +${fmt(fF)} fans`,type:"great"};}
@@ -1909,6 +2187,9 @@ export function useGameState() {
       albumsCommitted: offer.albumsCommitted, albumsDelivered: 0,
       optionsRemaining: offer.options, optionWeeks: offer.optionWeeks,
       weeksLeft: offer.termWeeks, totalWeeks: offer.termWeeks, signedAtWeek: s.week,
+      deliveryDeadlineWeek: s.week + Math.max(12, Math.floor(offer.termWeeks / Math.max(1, offer.albumsCommitted))),
+      deliveryStatus: "good", deliveryExtensions: 0, fundingFrozen: false,
+      approvalStrikes: 0, campaignFrozen: false,
       crossCollateralization: offer.crossCollateralization,
       controlledComposition: offer.controlledComposition,
       controlledCompositionCap: offer.controlledCompositionCap,
@@ -2515,7 +2796,7 @@ export function useGameState() {
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
-    doFinishProject, doReleaseProject, doDeleteUnreleased, doScrubProject,
+    doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo,
     doSignBrandDeal, doSignLabel, doSwitchGenre,

@@ -384,6 +384,17 @@ export interface SignedLabel {
   weeksLeft: number;
   totalWeeks: number;
   signedAtWeek: number;
+  // Delivery enforcement. A contract requires completed Albums, not singles or EPs.
+  // The deadline is rebalanced after each accepted delivery so multi-album deals
+  // stay readable and fair throughout their term.
+  deliveryDeadlineWeek?: number;
+  deliveryStatus?: "good" | "at_risk" | "breach";
+  deliveryExtensions?: number;
+  lastDeliveryPenaltyWeek?: number;
+  fundingFrozen?: boolean;
+  // Release approval and label-campaign standing.
+  approvalStrikes?: number;
+  campaignFrozen?: boolean;
 
   // Legal
   crossCollateralization: boolean;
@@ -1022,7 +1033,7 @@ export function runLabelAccounting(
   const artPublishing = publishingRev - lblPublishing;
   const totalArtistKeep = artStreaming + artTour + artMerch + artSync + artPublishing;
 
-  const remainingBefore = label.advance - label.advanceRecouped;
+  const remainingBefore = getLabelRecoupmentRemaining(label);
   const recoupThisWeek = Math.min(totalLabelShare * label.recoupRate, remainingBefore);
   const remainingAfter = remainingBefore - recoupThisWeek;
   const nowRecouped = remainingAfter <= 0;
@@ -1091,6 +1102,11 @@ export function signLabel(offer: LabelOffer, state: GameState): SignedLabel {
     weeksLeft: offer.termWeeks,
     totalWeeks: offer.termWeeks,
     signedAtWeek: state.week,
+    deliveryDeadlineWeek: state.week + Math.max(12, Math.floor(offer.termWeeks / Math.max(1, offer.albumsCommitted))),
+    deliveryStatus: "good",
+    deliveryExtensions: 0,
+    approvalStrikes: 0,
+    campaignFrozen: false,
     crossCollateralization: offer.crossCollateralization,
     controlledComposition: offer.controlledComposition,
     controlledCompositionCap: offer.controlledCompositionCap,
@@ -1120,8 +1136,9 @@ export function recoupProgress(label: SignedLabel): {
   formatted: string;
   status: string;
 } {
-  const pct = clamp(label.advanceRecouped / label.advance, 0, 1);
-  const formatted = `${fmtMoney(label.advanceRecouped)} / ${fmtMoney(label.advance)}`;
+  const recoupableBalance = getLabelRecoupableBalance(label);
+  const pct = clamp(label.advanceRecouped / recoupableBalance, 0, 1);
+  const formatted = `${fmtMoney(label.advanceRecouped)} / ${fmtMoney(recoupableBalance)}`;
   const status = label.isRecouped
     ? "✓ FULLY RECOUPED — royalties now paying"
     : pct > 0.75
@@ -1132,6 +1149,62 @@ export function recoupProgress(label: SignedLabel): {
     ? "Just started"
     : "Not yet recouped";
   return { pct, formatted, status };
+}
+
+export type CampaignChannel = "streaming" | "radio" | "press" | "live";
+
+export interface CampaignAllocation {
+  streaming: number;
+  radio: number;
+  press: number;
+  live: number;
+}
+
+export type LabelSubmissionStatus = "under_review" | "revision_requested" | "approved" | "held";
+
+export interface LabelSubmission {
+  projectId: string;
+  leadTrackIndex: number;
+  allocation: CampaignAllocation;
+  submittedWeek: number;
+  reviewWeek: number;
+  revisionUsed: boolean;
+  status: LabelSubmissionStatus;
+  reviewNote?: string;
+}
+
+/** The advance and every dollar drawn from the recording fund are recoupable. */
+export function getLabelRecoupableBalance(label: SignedLabel): number {
+  return Math.max(0, label.advance + label.recordingFundUsed);
+}
+
+export function getLabelRecoupmentRemaining(label: SignedLabel): number {
+  return Math.max(0, getLabelRecoupableBalance(label) - label.advanceRecouped);
+}
+
+export function getLabelDeliveryDeadline(label: SignedLabel): number {
+  return label.deliveryDeadlineWeek ?? (
+    label.signedAtWeek + Math.max(12, Math.floor(label.totalWeeks / Math.max(1, label.albumsCommitted)))
+  );
+}
+
+export function getLabelDeliverySummary(label: SignedLabel, week: number): {
+  deadlineWeek: number;
+  weeksRemaining: number;
+  albumsRemaining: number;
+  status: "good" | "at_risk" | "breach";
+} {
+  const deadlineWeek = getLabelDeliveryDeadline(label);
+  const weeksRemaining = deadlineWeek - week;
+  const albumsRemaining = Math.max(0, label.albumsCommitted - label.albumsDelivered);
+  const status = albumsRemaining === 0
+    ? "good"
+    : weeksRemaining < 0
+    ? "breach"
+    : weeksRemaining <= 12
+    ? "at_risk"
+    : "good";
+  return { deadlineWeek, weeksRemaining, albumsRemaining, status };
 }
 
 export function get360Summary(offer: LabelOffer | SignedLabel): {
@@ -3903,6 +3976,8 @@ export interface RecordingProject {
   pushThroughCount?: number;
   mode?: RecordingMode;
   pipelineStage?: SongStage;
+  /** When enabled, eligible production expenses draw down the label fund first. */
+  labelFunding?: boolean;
 }
 
 export interface UnreleasedProject {
@@ -4035,6 +4110,12 @@ export interface CatalogEntry {
   comebackCooldown: number;
   tracks: TrackEntry[];
   hasMusicVideo: boolean;
+  campaign?: {
+    allocation: CampaignAllocation;
+    deploymentPct: number;
+    deployedBudget: number;
+    approvalOverride: boolean;
+  };
   // ── Streaming v2.0 tracking ──
   platformMix?: Record<string, number>;
   geoDist?: Record<string, number>;
@@ -4548,6 +4629,11 @@ export interface GameState {
   // Active label / manager contracts (null when unsigned)
   currentLabel: SignedLabel | null;
   currentManager: SignedManager | null;
+  pendingLabelSubmission: LabelSubmission | null;
+  campaignLiveBoost: number;
+  campaignLiveBoostWeeks: number;
+  campaignRadioBoost: number;
+  campaignRadioBoostWeeks: number;
   // Pending offers waiting for player decision (queued from pitch attempts)
   pendingLabelOffers: LabelOffer[];
   pendingManagerOffers: ManagerOffer[];
@@ -4663,6 +4749,11 @@ export const INITIAL_STATE: GameState = {
   producerWorkCounts: {},
   currentLabel: null,
   currentManager: null,
+  pendingLabelSubmission: null,
+  campaignLiveBoost: 0,
+  campaignLiveBoostWeeks: 0,
+  campaignRadioBoost: 0,
+  campaignRadioBoostWeeks: 0,
   pendingLabelOffers: [],
   pendingManagerOffers: [],
   pendingFeatureRequests: [],

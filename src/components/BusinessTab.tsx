@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   fmtMoney, fmtPercent, fmtDuration,
-  getRiskLabel,
+  getRiskLabel, getLabelRecoupableBalance,
   BRAND_DEALS,
   type SyncOffer,
   type PublishingOffer,
@@ -272,6 +272,7 @@ function RecoupmentSection(game: any) {
   const { state } = game;
   const label = state.currentLabel;
   const publishing = state.currentPublishing;
+  const labelBalance = label ? getLabelRecoupableBalance(label) : 0;
 
   return (
     <div>
@@ -281,8 +282,8 @@ function RecoupmentSection(game: any) {
           <div style={{ fontSize: 13, fontWeight: 600 }}>{label.name}</div>
           <div style={{ marginTop: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-              <span>Advance</span>
-              <span>{fmtMoney(label.advance)}</span>
+              <span>Recoupable balance</span>
+              <span>{fmtMoney(labelBalance)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
               <span>Recouped</span>
@@ -290,11 +291,11 @@ function RecoupmentSection(game: any) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
               <span>Remaining</span>
-              <span style={{ color: label.isRecouped ? "var(--sage)" : "var(--rust)" }}>{fmtMoney(Math.max(0, label.advance - label.advanceRecouped))}</span>
+              <span style={{ color: label.isRecouped ? "var(--sage)" : "var(--rust)" }}>{fmtMoney(Math.max(0, labelBalance - label.advanceRecouped))}</span>
             </div>
             <div style={{ width: "100%", height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden", marginTop: 6 }}>
               <div style={{ 
-                width: `${Math.min(100, (label.advanceRecouped / Math.max(1, label.advance)) * 100)}%`, 
+                width: `${Math.min(100, (label.advanceRecouped / Math.max(1, labelBalance)) * 100)}%`,
                 height: "100%", 
                 background: label.isRecouped ? "var(--sage)" : "var(--amber)",
                 borderRadius: 4 

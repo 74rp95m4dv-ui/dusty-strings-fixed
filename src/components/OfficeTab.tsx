@@ -1,14 +1,14 @@
 import { useState } from "react";
 import {
   BRAND_DEALS, AWARDS, CAREER_TIERS, fmtMoney, RIVALS, fmtPercent, fmt,
-  recoupProgress, get360Summary, getRiskLabel, getLabel, getManager,
+  recoupProgress, get360Summary, getRiskLabel, getLabel, getManager, getLabelDeliverySummary,
   MANAGERS, type LabelOffer,
 } from "../gameLogic";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   const {
     state, doSignBrandDeal, doDropLabel, doDropManager, doSwitchGenre,
-    doDismissLabelOffers, doDismissManagerOffers, doSignLabel,
+    doDismissLabelOffers, doDismissManagerOffers, doAcceptLabelOffer,
     doAcceptManagerOffer, doAcceptPublishingOffer,
     doDismissPublishingOffers, doAcceptSyncOffer, doDismissSyncOffers,
     doToggleMerchItem, doRemoveMerchItem, doAddMerchItem,
@@ -43,7 +43,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       {sub === "deals" && (
         <div className="stagger-1">
           {/* Label Contract */}
-          <LabelContractCard state={state} onDrop={doDropLabel} onSign={doSignLabel} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
+          <LabelContractCard state={state} onDrop={doDropLabel} onSign={doAcceptLabelOffer} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
 
           {/* Management */}
           <div className="card">
@@ -313,7 +313,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
 
 /* ─── Label Contract Card ─── */
 function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
-  state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView: (offer: LabelOffer) => void; onDismiss: () => void;
+  state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView?: (offer: LabelOffer) => void; onDismiss: () => void;
 }) {
   if (state.currentLabel) {
     const lbl = state.currentLabel;
@@ -321,6 +321,11 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
     const threeSixty = get360Summary(lbl);
     const weeksUsed = lbl.totalWeeks - lbl.weeksLeft;
     const termPct = weeksUsed / lbl.totalWeeks;
+    const delivery = getLabelDeliverySummary(lbl, state.week);
+    const deliveryColor = delivery.status === "breach" ? "var(--rust)" : delivery.status === "at_risk" ? "var(--amber)" : "var(--sage)";
+    const fundRemaining = Math.max(0, lbl.recordingFund - lbl.recordingFundUsed);
+    const campaignPerAlbum = Math.floor(lbl.marketingCommitment / Math.max(1, lbl.albumsCommitted));
+    const campaignRemaining = Math.max(0, lbl.marketingCommitment - lbl.marketingSpendYTD);
 
     return (
       <div className="card label-contract-card">
@@ -353,6 +358,17 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
         </div>
 
         <div className="contract-section">
+          <div className="contract-section-title">Delivery Standing</div>
+          <div className="terms-grid">
+            <TermRow label="Albums due" value={`${lbl.albumsDelivered}/${lbl.albumsCommitted} delivered`} good={delivery.status === "good"} />
+            <TermRow label="Next deadline" value={delivery.albumsRemaining ? `Week ${delivery.deadlineWeek}` : "Commitment met"} good={delivery.status === "good"} />
+            <TermRow label="Time remaining" value={delivery.albumsRemaining ? `${Math.max(0, delivery.weeksRemaining)} weeks` : "—"} good={delivery.status === "good"} />
+            <TermRow label="Standing" value={delivery.status === "breach" ? "BREACH — cure required" : delivery.status === "at_risk" ? "AT RISK" : "IN GOOD STANDING"} good={delivery.status === "good"} />
+          </div>
+          {lbl.fundingFrozen && <div className="tip-text" style={{ color: "var(--rust)", marginTop: 8 }}>Label recording fund is frozen until an album is delivered.</div>}
+        </div>
+
+        <div className="contract-section">
           <div className="contract-section-title">
             360 Participation <span style={{ color: threeSixty.color, fontWeight: 700 }}>({threeSixty.severity})</span>
           </div>
@@ -369,13 +385,16 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
           <div className="contract-section-title">Contract Terms</div>
           <div className="terms-grid">
             <TermRow label="Royalty Rate" value={fmtPercent(lbl.royaltyRate)} good={lbl.royaltyRate >= 0.18} />
-            <TermRow label="Recording Fund" value={fmtMoney(lbl.recordingFund)} sub={`used ${fmtMoney(lbl.recordingFundUsed)}`} />
+            <TermRow label="Recording Fund" value={fmtMoney(fundRemaining)} sub={`${fmtMoney(lbl.recordingFundUsed)} drawn of ${fmtMoney(lbl.recordingFund)}`} />
             <TermRow label="Marketing" value={fmtMoney(lbl.marketingCommitment)} sub={`spent ${fmtMoney(lbl.marketingSpendYTD)}`} />
+            <TermRow label="Campaign / release" value={fmtMoney(campaignPerAlbum)} sub={`${fmtMoney(campaignRemaining)} commitment remaining`} />
+            <TermRow label="Approval strikes" value={`${lbl.approvalStrikes ?? 0} active`} good={(lbl.approvalStrikes ?? 0) === 0} />
             <TermRow label="Marketing Boost" value={`${lbl.marketingBoost.toFixed(2)}x`} />
             <TermRow label="Albums" value={`${lbl.albumsDelivered}/${lbl.albumsCommitted}`} />
             <TermRow label="Options" value={`${lbl.optionsRemaining} remaining`} />
           </div>
         </div>
+        {lbl.campaignFrozen && <div className="tip-text" style={{ color: "var(--rust)", marginTop: 8 }}>Campaign support is frozen until the label accepts your next album delivery.</div>}
 
         <div className="contract-section">
           <div className="contract-section-title">Term Remaining</div>
@@ -406,7 +425,7 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
         const risk = getRiskLabel(offer.riskLevel);
         const threeSixty = get360Summary(offer);
         return (
-          <div key={offer.labelId} className="label-offer-card" onClick={() => onView(offer)}>
+          <div key={offer.labelId} className="label-offer-card" onClick={() => onView?.(offer)}>
             <div className="offer-header">
               <div>
                 <div className="offer-label-name">{def?.name}</div>
@@ -426,7 +445,7 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
             <div className="offer-fit">{offer.fitNote}</div>
             <div className="offer-actions">
               <button className="btn btn-sm" onClick={(e) => { e.stopPropagation(); onSign(offer); }}>Sign Deal</button>
-              <button className="btn btn-sm btn-ghost" onClick={(e) => { e.stopPropagation(); onView(offer); }}>Review →</button>
+              <button className="btn btn-sm btn-ghost" onClick={(e) => { e.stopPropagation(); onView?.(offer); }}>Review →</button>
             </div>
           </div>
         );

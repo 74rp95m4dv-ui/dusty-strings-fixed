@@ -52,6 +52,8 @@ import {
   type TrackEntry,
   type CampaignAllocation,
   type LabelSubmission,
+  MARKET_ERAS, getMarketEra, getReleaseFormat,
+  type ReleaseFormat,
   BUS_BREAKDOWN_EVENTS,
   VENUE_PERKS,
   FESTIVALS,
@@ -171,6 +173,24 @@ function processLabelSubmissionReview(state: GameState) {
   submission.status = "held";
   submission.reviewNote = `${label.exec} is holding the release. You can revise later or override the label and launch with reduced support.`;
   state.log.unshift({ week: state.week, msg: `${label.name} held "${project.title}" after final review.`, type: "bad" });
+}
+
+function migrateMarketState(saved: Partial<GameState>) {
+  const currentYear = saved.currentYear ?? 2018;
+  const era = getMarketEra(currentYear);
+  return {
+    currentYear,
+    marketEraId: saved.marketEraId ?? era.id,
+    catalog: (saved.catalog ?? []).map(item => ({
+      ...item,
+      format: item.format ?? "streaming" as ReleaseFormat,
+      releasedEraId: item.releasedEraId ?? "platform_era",
+      reissuedEraIds: item.reissuedEraIds ?? [],
+      weeklyRevenueBreakdown: item.weeklyRevenueBreakdown ?? { physical:0, download:0, streaming:item.weeklyRevenue ?? 0 },
+      lifetimeRevenueBreakdown: item.lifetimeRevenueBreakdown ?? { physical:0, download:0, streaming:item.lifetimeRevenue ?? 0 },
+    })),
+    discography: (saved.discography ?? []).map(item => ({ ...item, format:item.format ?? "streaming" as ReleaseFormat, releasedEraId:item.releasedEraId ?? "platform_era" })),
+  };
 }
 
 const SONG_STAGE_NEXT: Record<SongStage, SongStage> = { writing: "recording", recording: "mixing", mixing: "complete", complete: "complete" };
@@ -299,14 +319,38 @@ function calcFill(demand:number, cap:number, mult:number) {
 }
 function calcCrewCost(tier:number) { return ({1:120,2:180,3:280,4:450,5:750,6:1500,7:3500} as Record<number,number>)[tier]??120; }
 
-function calcStreamRevenue(catalog: CatalogEntry[], streamCut: number, platformMix?: Record<string, number>, geoDist?: Record<string, number>, premiumRatio?: number, distributorFee?: number) {
-  const total = catalog.reduce((s,t)=>s+t.weeklyStreams,0);
-  // Real-world blended streaming rate: ~$0.0032/stream after platform variance
-  // Distributor takes ~15% off the top, then label takes their cut
-  const blendedRate = 0.0032;
-  const grossRevenue = total * blendedRate;
-  const afterDistro = grossRevenue * 0.85; // 15% distributor fee
-  return Math.floor(afterDistro * (1 - streamCut));
+function calcMarketRevenue(s: GameState, labelCut: number) {
+  const era = getMarketEra(s.currentYear);
+  let grossTotal = 0;
+  let artistTotal = 0;
+  for (const t of s.catalog) {
+    const format = t.format ?? "streaming";
+    const isAvailable = era.formats.includes(format);
+    const isReissued = t.reissuedEraIds?.includes(era.id) ?? false;
+    const availability = isReissued ? 1.25 : isAvailable ? 1 : 0.55;
+    const formatInfo = getReleaseFormat(format);
+    const primaryChannel = ["cassette", "vinyl", "cd"].includes(format) ? "physical" : format === "download" ? "download" : "streaming";
+    const channelBoost = (channel: "physical" | "download" | "streaming") => channel === primaryChannel ? formatInfo.launchMult * availability : availability;
+    const attention = t.weeklyStreams;
+    const breakdown = {
+      physical: Math.floor(attention * era.revenueMix.physical * 0.008 * channelBoost("physical")),
+      download: Math.floor(attention * era.revenueMix.download * 0.0045 * channelBoost("download")),
+      streaming: Math.floor(attention * era.revenueMix.streaming * 0.00272 * channelBoost("streaming")),
+    };
+    const gross = breakdown.physical + breakdown.download + breakdown.streaming;
+    const artist = Math.floor(gross * (1 - labelCut));
+    t.weeklyRevenueBreakdown = breakdown;
+    const lifetime = t.lifetimeRevenueBreakdown ?? { physical:0, download:0, streaming:0 };
+    lifetime.physical += breakdown.physical;
+    lifetime.download += breakdown.download;
+    lifetime.streaming += breakdown.streaming;
+    t.lifetimeRevenueBreakdown = lifetime;
+    t.weeklyRevenue = artist;
+    if (t.streamStats) t.streamStats.weeklyRevenue = breakdown.streaming;
+    grossTotal += gross;
+    artistTotal += artist;
+  }
+  return { gross: grossTotal, artist: artistTotal };
 }
 
 function classifyLifecycle(quality:number, outcome:string, mkt:number, score:number, arch:string): SongLifecycle {
@@ -520,6 +564,26 @@ function advance(prev:GameState): GameState {
   const s:GameState = JSON.parse(JSON.stringify(prev));
   s.pendingEvent = null; s.modal = null;
   s.week++; s.weeksSinceRelease++;
+  const previousEra = getMarketEra(s.currentYear ?? 2018);
+  s.currentYear = 1990 + Math.floor((s.week - 1) / 52);
+  const currentEra = getMarketEra(s.currentYear);
+  s.marketEraId = currentEra.id;
+  if (currentEra.id !== previousEra.id) {
+    s.log.unshift({ week:s.week, msg:`Market shift: ${currentEra.name}. ${currentEra.marketNote}`, type:"great" });
+    s.pendingEvent = { msg:`${currentEra.name} begins. ${currentEra.promotionNote}`, type:"gold" };
+  }
+  if (s.pendingReissue) {
+    const reissue = s.pendingReissue;
+    const entry = s.catalog.find(item => item.id === reissue.releaseId);
+    if (entry) {
+      entry.format = reissue.format;
+      entry.reissuedEraIds = [...(entry.reissuedEraIds ?? []), reissue.eraId];
+      entry.weeklyStreams = Math.min(Math.floor(entry.peakStreams * 1.15), Math.floor(entry.weeklyStreams * 1.5 + 50));
+      s.hype = clamp(s.hype + 5, 0, 100);
+      s.log.unshift({ week:s.week, msg:`Reissue arrived: "${entry.title}" is back in market on ${getReleaseFormat(reissue.format).label}.`, type:"great" });
+    }
+    s.pendingReissue = null;
+  }
   if (s.campaignLiveBoostWeeks > 0) {
     s.campaignLiveBoostWeeks--;
     if (s.campaignLiveBoostWeeks === 0) s.campaignLiveBoost = 0;
@@ -693,13 +757,10 @@ function advance(prev:GameState): GameState {
     t.streamStats.peakStreams = t.peakStreams;
   }
   const streamCutPct = s.currentLabel?.streamingCut ?? (s.labelSigned ? 0.18 : 0);
-  const grossStreamInc = s.currentLabel
-    ? calcStreamRevenue(s.catalog, 0, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee)
-    : 0;
-  const streamInc = calcStreamRevenue(s.catalog, streamCutPct, s.platformMix, s.geoDist, s.premiumRatio, s.distributorFee);
-  s.money+=streamInc; s.totalEarned+=streamInc;
+  const marketIncome = calcMarketRevenue(s, streamCutPct);
+  s.money+=marketIncome.artist; s.totalEarned+=marketIncome.artist;
   if (s.currentLabel) {
-    const labelShare = Math.max(0, grossStreamInc - streamInc);
+    const labelShare = Math.max(0, marketIncome.gross - marketIncome.artist);
     const recouped = Math.min(labelShare * s.currentLabel.recoupRate, getLabelRecoupmentRemaining(s.currentLabel));
     if (recouped > 0) s.currentLabel.advanceRecouped += recouped;
     s.currentLabel.isRecouped = getLabelRecoupmentRemaining(s.currentLabel) <= 0;
@@ -1275,6 +1336,7 @@ export function useGameState() {
     const saved=loadFromDisk();
     if (saved) return {
       ...saved,
+      ...migrateMarketState(saved),
       hasSave:true,
       pendingEvent:null,
       modal:null,
@@ -1309,6 +1371,7 @@ export function useGameState() {
       selloutScore: saved.selloutScore ?? 0,
       totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
       pendingLabelSubmission: saved.pendingLabelSubmission ?? null,
+      pendingReissue: saved.pendingReissue ?? null,
       campaignLiveBoost: saved.campaignLiveBoost ?? 0,
       campaignLiveBoostWeeks: saved.campaignLiveBoostWeeks ?? 0,
       campaignRadioBoost: saved.campaignRadioBoost ?? 0,
@@ -1344,6 +1407,7 @@ export function useGameState() {
   const goToSetup = useCallback(()=>setState(p=>({...p,screen:"setup"})),[]);
   const loadGame  = useCallback(()=>{ const s=loadFromDisk(); if(s) setState({
     ...s, hasSave:true, pendingEvent:null, modal:null,
+    ...migrateMarketState(s),
     themeCounts: s.themeCounts ?? {},
     currentTrendTheme: s.currentTrendTheme ?? pickTrendTheme(null),
     producerWorkCounts: s.producerWorkCounts ?? {},
@@ -1373,6 +1437,7 @@ export function useGameState() {
     selloutScore: s.selloutScore ?? 0,
     totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
     pendingLabelSubmission: s.pendingLabelSubmission ?? null,
+    pendingReissue: s.pendingReissue ?? null,
     campaignLiveBoost: s.campaignLiveBoost ?? 0,
     campaignLiveBoostWeeks: s.campaignLiveBoostWeeks ?? 0,
     campaignRadioBoost: s.campaignRadioBoost ?? 0,
@@ -1739,11 +1804,12 @@ export function useGameState() {
     */
   }),[upd]);
 
-  const doSubmitLabelRelease = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation)=>upd(s=>{
+  const doSubmitLabelRelease = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation, releaseFormat?:ReleaseFormat)=>upd(s=>{
     const project = s.unreleased.find(item => item.id === projectId);
     const label = s.currentLabel;
     if (!project || !label || !labelRequiresReleaseApproval(label)) return s;
-    if (!project.tracks[leadTrackIndex] || !isValidCampaign(allocation)) {
+    const format = releaseFormat ?? getMarketEra(s.currentYear).formats[0];
+    if (!project.tracks[leadTrackIndex] || !isValidCampaign(allocation) || !getMarketEra(s.currentYear).formats.includes(format)) {
       s.pendingEvent = { msg:"Set a valid lead single and a campaign allocation totaling 100%.", type:"bad" };
       return s;
     }
@@ -1753,7 +1819,7 @@ export function useGameState() {
       return s;
     }
     s.pendingLabelSubmission = {
-      projectId, leadTrackIndex, allocation: {...allocation}, submittedWeek:s.week, reviewWeek:s.week + 1,
+      projectId, leadTrackIndex, releaseFormat:format, allocation: {...allocation}, submittedWeek:s.week, reviewWeek:s.week + 1,
       revisionUsed: existing?.revisionUsed ?? false, status:"under_review",
     };
     s.log.unshift({ week:s.week, msg:`Submitted "${project.title}" to ${label.name} A&R. Review returns next week.`, type:"neutral" });
@@ -1761,7 +1827,7 @@ export function useGameState() {
     return s;
   }),[upd]);
 
-  const doReviseLabelSubmission = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation)=>upd(s=>{
+  const doReviseLabelSubmission = useCallback((projectId:string, leadTrackIndex:number, allocation:CampaignAllocation, releaseFormat?:ReleaseFormat)=>upd(s=>{
     const submission = s.pendingLabelSubmission;
     const label = s.currentLabel;
     if (!submission || !label || submission.projectId !== projectId || submission.status !== "revision_requested") return s;
@@ -1769,7 +1835,10 @@ export function useGameState() {
       s.pendingEvent = { msg:"Set a valid lead single and a campaign allocation totaling 100%.", type:"bad" };
       return s;
     }
+    const format = releaseFormat ?? submission.releaseFormat ?? getMarketEra(s.currentYear).formats[0];
+    if (!getMarketEra(s.currentYear).formats.includes(format)) return s;
     submission.leadTrackIndex = leadTrackIndex;
+    submission.releaseFormat = format;
     submission.allocation = {...allocation};
     submission.submittedWeek = s.week;
     submission.reviewWeek = s.week + 1;
@@ -1781,7 +1850,7 @@ export function useGameState() {
     return s;
   }),[upd]);
 
-  const doReleaseProject = useCallback((id:string, leadTrackIndex?:number, campaign?:CampaignAllocation, approvalOverride=false)=>upd(s=>{
+  const doReleaseProject = useCallback((id:string, leadTrackIndex?:number, campaign?:CampaignAllocation, approvalOverride=false, releaseFormat?:ReleaseFormat)=>upd(s=>{
     const idx=s.unreleased.findIndex(p=>p.id===id); if(idx<0) return s;
     const p=s.unreleased[idx];
     if (leadTrackIndex === undefined || !p.tracks[leadTrackIndex]) {
@@ -1789,12 +1858,18 @@ export function useGameState() {
       return s;
     }
     const label = s.currentLabel;
+    const submission = s.pendingLabelSubmission;
+    const era = getMarketEra(s.currentYear);
+    const format = releaseFormat ?? submission?.releaseFormat ?? (era.formats.includes("streaming") ? "streaming" : era.formats.includes("cd") ? "cd" : era.formats[0]);
+    if (!era.formats.includes(format)) {
+      s.pendingEvent = { msg:`${getReleaseFormat(format).label} is not available in the ${era.name} market.`, type:"bad" };
+      return s;
+    }
     const allocation = campaign ?? EMPTY_CAMPAIGN;
     if (label && !isValidCampaign(allocation)) {
       s.pendingEvent = { msg:"Campaign allocation must total 100%.", type:"bad" };
       return s;
     }
-    const submission = s.pendingLabelSubmission;
     const isThisSubmission = submission?.projectId === id;
     if (label && labelRequiresReleaseApproval(label)) {
       const approved = isThisSubmission && submission?.status === "approved";
@@ -1840,6 +1915,7 @@ export function useGameState() {
     const leadWeight = p.type === "Single" ? 0.80 : p.type === "EP" ? 0.60 : p.type === "Live Album" ? 0.50 : 0.45;
     const launchAppeal = leadAppeal * leadWeight + avgAppeal * (1 - leadWeight);
     let score=p.type==="Single"?(q*0.32)+(launchAppeal*4.5)+(hype*0.4)+(trend*25):p.type==="EP"?(q*0.46)+(launchAppeal*3.8)+(hype*0.3)+(trend*20):p.type==="Live Album"?(q*0.42)+(launchAppeal*3.5)+(hype*0.2)+(s.rep*0.6)+(trend*15):(q*0.58)+(launchAppeal*3.2)+(hype*0.22)+(trend*16);
+    score *= (era.genreDemand[p.genre] ?? 1) * getReleaseFormat(format).launchMult;
     // Market noise is intentionally small and separate from the stored song ratings.
     score*=roll(0.94,1.06);
 
@@ -1927,7 +2003,8 @@ export function useGameState() {
     decayRate:lcP.decayRate,streamFloor:Math.floor(peakStr*lcP.floorPct),
     weeklyStreams:peakStr,peakStreams:peakStr,totalStreams:0,
     releasedWeek:s.week,weeksActive:0,promoted:false,comebackCooldown:0,
-    tracks:p.tracks,hasMusicVideo:false,
+    tracks:p.tracks,hasMusicVideo:false,format,releasedEraId:era.id,reissuedEraIds:[],
+    weeklyRevenueBreakdown:{physical:0,download:0,streaming:0}, lifetimeRevenueBreakdown:{physical:0,download:0,streaming:0},
     campaign: label ? {
       allocation: {...campaignAllocation}, deploymentPct, deployedBudget:deployedCampaign, approvalOverride,
     } : undefined,
@@ -1967,7 +2044,7 @@ export function useGameState() {
     }
     s.fame=clamp(s.fame+famD+radioFameBonus,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
     s.hype=Math.max(0,s.hype-15); s.weeksSinceRelease=0; s.totalReleases++;
-    s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false});
+    s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false,format,releasedEraId:era.id});
     if (label) {
       label.marketingSpendYTD += deployedCampaign;
       if (campaignAllocation.radio > 0 && deploymentPct > 0) {
@@ -2025,6 +2102,29 @@ export function useGameState() {
   }),[upd]);
 
   const doDeleteUnreleased = useCallback((id:string)=>upd(s=>{s.unreleased=s.unreleased.filter(p=>p.id!==id);return s;}),[upd]);
+  const doReissueRelease = useCallback((id:string, format:ReleaseFormat)=>upd(s=>{
+    const entry = s.catalog.find(item => item.id === id);
+    const era = getMarketEra(s.currentYear);
+    if (!entry || !era.formats.includes(format)) return s;
+    if (s.pendingReissue) {
+      s.pendingEvent = { msg:"A reissue is already in production. It will arrive next week.", type:"bad" };
+      return s;
+    }
+    if (entry.reissuedEraIds?.includes(era.id)) {
+      s.pendingEvent = { msg:"This release has already been reissued for the current era.", type:"bad" };
+      return s;
+    }
+    const cost = getReleaseFormat(format).reissueCost;
+    if (s.money < cost) {
+      s.pendingEvent = { msg:`You need ${fmtMoney(cost)} to fund this reissue.`, type:"bad" };
+      return s;
+    }
+    s.money -= cost;
+    s.pendingReissue = { releaseId:id, format, eraId:era.id };
+    s.log.unshift({ week:s.week, msg:`Prepared a ${getReleaseFormat(format).label} reissue of "${entry.title}" for the ${era.name}.`, type:"neutral" });
+    s.pendingEvent = { msg:`Reissue in production. "${entry.title}" returns to market next week.`, type:"good" };
+    return s;
+  }),[upd]);
   const doScrubProject = useCallback(()=>upd(s=>{
     if (!s.project) return s;
     // Refund the upfront producer fee (studio fees were paid weekly, nothing to refund there).
@@ -2796,7 +2896,7 @@ export function useGameState() {
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
-    doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doScrubProject,
+    doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doReissueRelease, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo,
     doSignBrandDeal, doSignLabel, doSwitchGenre,

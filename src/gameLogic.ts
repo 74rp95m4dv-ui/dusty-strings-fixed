@@ -6,9 +6,44 @@
 export type Genre = "Country" | "Blues";
 export type GameScreen = "menu" | "setup" | "game" | "gameover" | "victory";
 export type ReleaseType = "Single" | "EP" | "Album" | "Live Album";
+export type ReleaseFormat = "cassette" | "vinyl" | "cd" | "download" | "streaming";
 export type RecordingMode = "standard" | "rush" | "deliberate";
 export type ReleaseOutcome = "Flop" | "Moderate" | "Hit" | "Viral";
 export type SongLifecycle = "Normal" | "Hit" | "Evergreen";
+
+export interface MarketEra {
+  id: string;
+  name: string;
+  startYear: number;
+  endYear?: number;
+  formats: ReleaseFormat[];
+  revenueMix: { physical: number; download: number; streaming: number };
+  genreDemand: Record<Genre, number>;
+  promotionNote: string;
+  marketNote: string;
+}
+
+export const RELEASE_FORMATS: Record<ReleaseFormat, { label: string; short: string; launchMult: number; reissueCost: number }> = {
+  cassette: { label: "Cassette", short: "Tape", launchMult: 0.92, reissueCost: 450 },
+  vinyl: { label: "Vinyl", short: "Vinyl", launchMult: 1.05, reissueCost: 900 },
+  cd: { label: "Compact Disc", short: "CD", launchMult: 1.12, reissueCost: 700 },
+  download: { label: "Digital Download", short: "Download", launchMult: 1.00, reissueCost: 500 },
+  streaming: { label: "Streaming", short: "Streaming", launchMult: 1.04, reissueCost: 650 },
+};
+
+export const MARKET_ERAS: MarketEra[] = [
+  { id:"cd_boom", name:"CD Boom", startYear:1990, endYear:1999, formats:["cassette","vinyl","cd"], revenueMix:{physical:0.92,download:0,streaming:0.08}, genreDemand:{Country:1.12,Blues:0.94}, promotionNote:"Retail displays, radio adds, and tour support move records.", marketNote:"Compact discs are king. A strong physical release can build a real career." },
+  { id:"digital_transition", name:"Digital Transition", startYear:2000, endYear:2005, formats:["vinyl","cd","download"], revenueMix:{physical:0.62,download:0.30,streaming:0.08}, genreDemand:{Country:1.05,Blues:1.00}, promotionNote:"Radio still matters, but online discovery is beginning to change the playbook.", marketNote:"Downloads are arriving while CD retail remains powerful." },
+  { id:"download_peak", name:"Download Peak", startYear:2006, endYear:2011, formats:["vinyl","cd","download"], revenueMix:{physical:0.30,download:0.60,streaming:0.10}, genreDemand:{Country:1.08,Blues:0.96}, promotionNote:"Digital storefronts and blogs can break a song faster than retail ever could.", marketNote:"Fans buy tracks one at a time. Singles have new leverage." },
+  { id:"streaming_takeover", name:"Streaming Takeover", startYear:2012, endYear:2017, formats:["vinyl","cd","download","streaming"], revenueMix:{physical:0.18,download:0.20,streaming:0.62}, genreDemand:{Country:1.03,Blues:1.02}, promotionNote:"Playlists, video, and social buzz turn attention into repeat listeners.", marketNote:"Streaming is rewriting the economics of every release." },
+  { id:"platform_era", name:"Platform Era", startYear:2018, formats:["vinyl","cd","streaming"], revenueMix:{physical:0.16,download:0.04,streaming:0.80}, genreDemand:{Country:1.06,Blues:1.00}, promotionNote:"Platform attention, short-form moments, and a reliable live audience all matter.", marketNote:"The catalog never sleeps—but attention is expensive." },
+];
+
+export function getMarketEra(year: number): MarketEra {
+  return MARKET_ERAS.find(era => year >= era.startYear && (era.endYear === undefined || year <= era.endYear)) ?? MARKET_ERAS[MARKET_ERAS.length - 1];
+}
+
+export function getReleaseFormat(format: ReleaseFormat) { return RELEASE_FORMATS[format]; }
 
 // ── ARCHETYPE ──────────────────────────────────────────────
 export interface Archetype {
@@ -1165,6 +1200,7 @@ export type LabelSubmissionStatus = "under_review" | "revision_requested" | "app
 export interface LabelSubmission {
   projectId: string;
   leadTrackIndex: number;
+  releaseFormat?: ReleaseFormat;
   allocation: CampaignAllocation;
   submittedWeek: number;
   reviewWeek: number;
@@ -3994,6 +4030,7 @@ export interface UnreleasedProject {
   leadTrackIndex?: number;
   hypeSnapshot: number;
   marketingBudget: number;
+  releaseFormat?: ReleaseFormat;
 }
 
 export interface DiscographyEntry {
@@ -4014,6 +4051,8 @@ export interface DiscographyEntry {
   criticHeadline: string;
   lifecycle: SongLifecycle;
   hasMusicVideo: boolean;
+  format?: ReleaseFormat;
+  releasedEraId?: string;
 }
 
 // ─── ALBUM THEMES ─────────────────────────────────────────
@@ -4110,6 +4149,11 @@ export interface CatalogEntry {
   comebackCooldown: number;
   tracks: TrackEntry[];
   hasMusicVideo: boolean;
+  format?: ReleaseFormat;
+  releasedEraId?: string;
+  reissuedEraIds?: string[];
+  weeklyRevenueBreakdown?: { physical: number; download: number; streaming: number };
+  lifetimeRevenueBreakdown?: { physical: number; download: number; streaming: number };
   campaign?: {
     allocation: CampaignAllocation;
     deploymentPct: number;
@@ -4578,6 +4622,8 @@ export interface GameState {
   city: string;
   archetype: string;
   week: number;
+  currentYear: number;
+  marketEraId: string;
   money: number;
   fans: number;
   // Subset of `fans` who are deeply loyal — they don't churn from inactivity,
@@ -4630,6 +4676,7 @@ export interface GameState {
   currentLabel: SignedLabel | null;
   currentManager: SignedManager | null;
   pendingLabelSubmission: LabelSubmission | null;
+  pendingReissue: { releaseId: string; format: ReleaseFormat; eraId: string } | null;
   campaignLiveBoost: number;
   campaignLiveBoostWeeks: number;
   campaignRadioBoost: number;
@@ -4712,6 +4759,8 @@ export const INITIAL_STATE: GameState = {
   city: "Nashville, TN",
   archetype: "outlaw",
   week: 1,
+  currentYear: 1990,
+  marketEraId: "cd_boom",
   money: 1500,
   fans: 0,
   superfans: 0,
@@ -4750,6 +4799,7 @@ export const INITIAL_STATE: GameState = {
   currentLabel: null,
   currentManager: null,
   pendingLabelSubmission: null,
+  pendingReissue: null,
   campaignLiveBoost: 0,
   campaignLiveBoostWeeks: 0,
   campaignRadioBoost: 0,

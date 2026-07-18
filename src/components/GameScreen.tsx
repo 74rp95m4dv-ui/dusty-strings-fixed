@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS } from "../gameLogic";
+import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS, getMarketEra } from "../gameLogic";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
 import OfficeTab from "./OfficeTab";
@@ -95,7 +95,7 @@ const s = game.state;
       <header className="app-header">
         <div className="header-artist">{s.artistName}</div>
         <div className="header-meta">
-          Wk {s.week} • {s.genre}
+          {s.currentYear} • Wk {s.week} • {getMarketEra(s.currentYear).name} • {s.genre}
           {s.currentLabel && (
             <span style={{ marginLeft: 8, color: "var(--amber)" }}>
               • {s.currentLabel.name}

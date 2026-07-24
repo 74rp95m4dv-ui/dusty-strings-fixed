@@ -9,11 +9,11 @@ import {
 type SettingPicker = "producer" | "studio" | "theme" | null;
 
 export default function StudioDrawer(game: any) {
-  const { state, doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onClose } = game;
+  const { state, advance, doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onClose } = game;
   const [view, setView] = useState<"new" | "project" | null>(state.project ? "project" : "new");
 
   if (view === "new") return <NewProjectForm doStartProject={doStartProject} onBack={() => state.project ? setView("project") : onClose()} onProjectStarted={() => setView("project")} />;
-  if (state.project && view === "project") return <ActiveProject state={state} doUpdateProject={doUpdateProject} doAddTrack={doAddTrack} doRemoveTrack={doRemoveTrack} doConfigureTrackStage={doConfigureTrackStage} doFinishProject={doFinishProject} doScrubProject={doScrubProject} doTakeStudioBreak={doTakeStudioBreak} doPushThrough={doPushThrough} doCancelStudioChoice={doCancelStudioChoice} doAutoGenerateTracks={doAutoGenerateTracks} onBack={() => state.unreleased.length ? setView(null) : onClose()} onClose={onClose} />;
+  if (state.project && view === "project") return <ActiveProject state={state} advance={advance} doUpdateProject={doUpdateProject} doAddTrack={doAddTrack} doRemoveTrack={doRemoveTrack} doConfigureTrackStage={doConfigureTrackStage} doFinishProject={doFinishProject} doScrubProject={doScrubProject} doTakeStudioBreak={doTakeStudioBreak} doPushThrough={doPushThrough} doCancelStudioChoice={doCancelStudioChoice} doAutoGenerateTracks={doAutoGenerateTracks} onBack={() => state.unreleased.length ? setView(null) : onClose()} onClose={onClose} />;
 
   return <div className="drawer-overlay" onClick={onClose}><div className="drawer" onClick={event => event.stopPropagation()}><div className="drawer-handle" /><div className="drawer-title">Studio</div><button className="btn btn-lime btn-block" onClick={() => setView(state.project ? "project" : "new")}>{state.project ? "Continue Recording" : "Start New Project"}</button><button className="btn btn-ghost btn-block" onClick={onClose} style={{ marginTop: 8 }}>Close</button></div></div>;
 }
@@ -24,7 +24,7 @@ function NewProjectForm({ doStartProject, onBack, onProjectStarted }: any) {
   return <div className="drawer-overlay" onClick={onBack}><div className="drawer" onClick={event => event.stopPropagation()}><div className="drawer-handle" /><div className="drawer-title">New Project</div><p className="tip-text studio-intro">Every song moves through writing, recording, and mixing before the project is finished.</p><div className="studio-choice-grid">{(["Single", "EP", "Album", "Live Album"] as ReleaseType[]).map(option => <button key={option} className={`btn ${type === option ? "btn-lime" : ""}`} onClick={() => setType(option)}>{option}</button>)}</div><div className="studio-section-card"><div className="studio-section-eyebrow">Recording pace</div><div className="studio-choice-grid studio-choice-grid--mode">{(["standard", "rush", "deliberate"] as RecordingMode[]).map(option => <button key={option} className={`btn btn-sm ${mode === option ? "btn-lime" : ""}`} onClick={() => setMode(option)}>{RECORDING_MODE_CONFIG[option].label}</button>)}</div><div className="tip-text">{mode === "rush" ? "Faster sessions, but lower quality and higher burnout." : mode === "deliberate" ? "More time for the work, with a quality lift and extra burnout." : "A balanced production schedule."}</div></div><button className="btn btn-lime btn-block" onClick={() => { doStartProject(type, mode); onProjectStarted(); }}>Start Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 8 }}>Back</button></div></div>;
 }
 
-function ActiveProject({ state, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onBack, onClose }: any) {
+function ActiveProject({ state, advance, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage, doFinishProject, doScrubProject, doTakeStudioBreak, doPushThrough, doCancelStudioChoice, doAutoGenerateTracks, onBack, onClose }: any) {
   const project = state.project!;
   const [trackName, setTrackName] = useState("");
   const [picker, setPicker] = useState<SettingPicker>(null);
@@ -51,7 +51,7 @@ function ActiveProject({ state, doUpdateProject, doAddTrack, doRemoveTrack, doCo
     </section>
 
     <details className="studio-session-details"><summary>Session details</summary><div className="studio-session-content"><div className="studio-mini-panel"><div className="studio-option-label">This week</div><div className="studio-option-buttons"><button className="btn btn-sm" onClick={doTakeStudioBreak}>Take Break</button><button className="btn btn-sm" onClick={doPushThrough}>Push Through</button><button className="btn btn-sm btn-ghost" onClick={doCancelStudioChoice}>Cancel</button></div><div className="tip-text">A focused pass charges when the week ends. Breaks hold progress; pushing through exhaustion hurts every final rating.</div></div><button className="btn btn-danger btn-block" onClick={doScrubProject}>Scrub Project</button></div></details>
-    <button className="btn btn-lime btn-block" disabled={!canFinish} onClick={doFinishProject}>Finish Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>
+    <button className="btn btn-end-week btn-block" onClick={advance}>⏭ End Week</button><button className="btn btn-lime btn-block" disabled={!canFinish} onClick={doFinishProject} style={{ marginTop: 8 }}>Finish Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>
   </div></div>;
 }
 

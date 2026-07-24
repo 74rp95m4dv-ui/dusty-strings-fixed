@@ -2601,6 +2601,17 @@ hr {
 .music-insight-summary span { display: block; overflow: hidden; color: var(--muted2); font-family: var(--mono); font-size: 8px; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .music-insight-summary strong { display: block; margin-top: 4px; overflow: hidden; color: var(--text); font-family: var(--mono); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 
+.music-market-summary { grid-template-columns: 92px minmax(0, 2fr) minmax(92px, 1fr); }
+.music-market-summary .music-market-brief { display: grid; align-content: start; gap: 3px; }
+.music-market-summary .music-market-brief strong,
+.music-market-summary .music-market-brief small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.music-market-summary .music-market-brief strong { margin-top: 0; font-size: 13px; line-height: 1.3; }
+.music-market-summary .music-market-brief small { color: var(--muted2); font-size: 10px; line-height: 1.4; }
+
 .music-insight-panel { background: var(--bg3); }
 .music-insight-panel > summary { min-height: 48px; color: var(--text); font-size: 11px; }
 .music-insight-panel > summary small { color: var(--muted2); font-size: 9px; text-align: right; text-transform: none; }
@@ -2663,6 +2674,10 @@ hr {
   .music-insight-summary { grid-template-columns: 1fr; }
   .music-insight-summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .music-insight-summary strong { margin-top: 0; }
+  .music-market-summary .music-market-brief { display: block; }
+  .music-market-summary .music-market-brief > span { display: inline; margin-right: 8px; }
+  .music-market-summary .music-market-brief strong { display: inline; font-size: 12px; }
+  .music-market-summary .music-market-brief small { display: block; margin-top: 4px; }
   .music-insight-panel > summary small { max-width: 44%; }
 }
 

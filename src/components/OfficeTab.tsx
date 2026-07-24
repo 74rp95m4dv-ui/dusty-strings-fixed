@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   BRAND_DEALS, AWARDS, CAREER_TIERS, fmtMoney, RIVALS, fmtPercent, fmt,
   recoupProgress, get360Summary, getRiskLabel, getLabel, getManager, getLabelDeliverySummary,
-  MANAGERS, type LabelOffer,
+  MANAGERS, CAREER_IDENTITIES, type LabelOffer,
 } from "../gameLogic";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
@@ -42,6 +42,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       {/* DEALS */}
       {sub === "deals" && (
         <div className="stagger-1">
+          <div className="card"><div className="card-title">Public Identity</div>{state.currentCareerIdentity ? <><div style={{ fontWeight: 700 }}>{CAREER_IDENTITIES[state.currentCareerIdentity].title}</div><div className="tip-text">{CAREER_IDENTITIES[state.currentCareerIdentity].perk}</div></> : <div className="tip-text">Still emerging. Consistent creative, commercial, touring, independent, or crossover choices will earn a public identity.</div>}</div>
           {/* Label Contract */}
           <LabelContractCard state={state} onDrop={doDropLabel} onSign={doAcceptLabelOffer} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
 

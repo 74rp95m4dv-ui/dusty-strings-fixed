@@ -52,6 +52,9 @@ import {
   type TrackEntry,
   type CampaignAllocation,
   type LabelSubmission,
+  type CareerIdentity,
+  type AlbumCampaignAction,
+  CAREER_IDENTITIES,
   MARKET_ERAS, getMarketEra, getReleaseFormat,
   type ReleaseFormat,
   BUS_BREAKDOWN_EVENTS,
@@ -191,6 +194,100 @@ function migrateMarketState(saved: Partial<GameState>) {
     })),
     discography: (saved.discography ?? []).map(item => ({ ...item, format:item.format ?? "streaming" as ReleaseFormat, releasedEraId:item.releasedEraId ?? "platform_era" })),
   };
+}
+
+const EMPTY_IDENTITY_SCORES: Record<CareerIdentity, number> = {
+  critic_darling: 0, radio_favorite: 0, road_warrior: 0, independent_spirit: 0, crossover_act: 0,
+};
+
+function addIdentityScore(s: GameState, identity: CareerIdentity, amount: number) {
+  s.identityScores = { ...EMPTY_IDENTITY_SCORES, ...(s.identityScores ?? {}) };
+  s.identityScores[identity] = Math.max(0, s.identityScores[identity] + amount);
+  const ranked = (Object.keys(s.identityScores) as CareerIdentity[])
+    .sort((a, b) => s.identityScores[b] - s.identityScores[a]);
+  const leader = ranked[0];
+  const runnerUp = ranked[1];
+  const previous = s.currentCareerIdentity;
+  const previousScore = previous ? s.identityScores[previous] : 0;
+  // A title must be earned, and a challenger needs a clear lead to replace it.
+  if (s.identityScores[leader] >= 10 && s.identityScores[leader] >= s.identityScores[runnerUp] + 3 &&
+      (!previous || leader === previous || s.identityScores[leader] >= previousScore + 3)) {
+    s.currentCareerIdentity = leader;
+    if (leader !== previous) s.log.unshift({ week:s.week, msg:`Public image earned: ${CAREER_IDENTITIES[leader].title}.`, type:"great" });
+  }
+}
+
+function resolveAlbumCampaignWeek(s: GameState) {
+  const campaign = s.activeAlbumCampaign;
+  if (!campaign) return;
+  const release = s.catalog.find(item => item.id === campaign.releaseId);
+  if (!release) { s.activeAlbumCampaign = null; return; }
+  const action = campaign.pendingAction ?? "hold_steady";
+  let outcome = "Held steady and let the record breathe.";
+  const followUp = campaign.followUpTrackIndex === null ? null : release.tracks[campaign.followUpTrackIndex];
+
+  if (action === "follow_up_single" && followUp) {
+    const appeal = getTrackDevelopment(followUp).appealRating ?? release.appeal ?? 5;
+    const boost = 1.12 + appeal * 0.055;
+    release.weeklyStreams = Math.max(release.weeklyStreams, Math.floor(release.weeklyStreams * boost + appeal * 90));
+    const fans = Math.floor(180 + appeal * 95);
+    s.fans += fans;
+    addIdentityScore(s, "radio_favorite", appeal >= 7 ? 2 : 1);
+    outcome = `"${followUp.name}" became the follow-up single (+${fmt(fans)} fans).`;
+  } else if (action === "radio_push") {
+    const cost = 1000;
+    if (followUp && s.money >= cost) {
+      s.money -= cost;
+      const appeal = getTrackDevelopment(followUp).appealRating ?? release.appeal ?? 5;
+      const chance = clamp(0.28 + appeal * 0.045 + (s.currentCareerIdentity === "radio_favorite" ? 0.14 : 0) + (s.campaignRadioBoostWeeks > 0 ? s.campaignRadioBoost : 0), 0.15, 0.88);
+      if (roll(chance)) {
+        release.weeklyStreams = Math.floor(release.weeklyStreams * 1.6 + 500);
+        s.fame = clamp(s.fame + 4, 0, 100);
+        s.hype = clamp(s.hype + 10, 0, 100);
+        outcome = `Radio broke for "${followUp.name}" — streams and fame climbed.`;
+        addIdentityScore(s, "radio_favorite", 3);
+      } else {
+        release.weeklyStreams = Math.floor(release.weeklyStreams * 1.13);
+        outcome = `Radio push for "${followUp.name}" found some spins, but no breakthrough.`;
+        addIdentityScore(s, "radio_favorite", 1);
+      }
+    } else outcome = "Radio push could not be funded; the team held steady.";
+  } else if (action === "music_video") {
+    const cost = 1200;
+    if (followUp && !release.hasMusicVideo && s.money >= cost) {
+      s.money -= cost;
+      release.hasMusicVideo = true;
+      release.weeklyStreams = Math.floor(release.weeklyStreams * 1.35 + 250);
+      s.fame = clamp(s.fame + 3, 0, 100); s.rep = clamp(s.rep + 2, 0, 100);
+      s.hype = clamp(s.hype + 22, 0, 100); s.fans += 900;
+      addIdentityScore(s, "radio_favorite", 2);
+      outcome = `Music video for "${followUp.name}" landed (+900 fans).`;
+    } else outcome = "Video could not be completed; the team held steady.";
+  } else if (action === "live_appearance") {
+    if (s.energy >= 15) {
+      s.energy -= 15;
+      const fans = s.currentCareerIdentity === "crossover_act" ? 850 : 700;
+      s.fans += fans; s.hype = clamp(s.hype + 14, 0, 100);
+      s.campaignLiveBoost = Math.max(s.campaignLiveBoost, 0.10);
+      s.campaignLiveBoostWeeks = Math.max(s.campaignLiveBoostWeeks, 4);
+      addIdentityScore(s, "road_warrior", 2);
+      outcome = `Live appearance brought ${fmt(fans)} new fans and lifted tour demand.`;
+    } else outcome = "Too drained for a live appearance; the team held steady.";
+  } else if (action === "hold_steady") {
+    s.burnout = Math.max(0, (s.burnout ?? 0) - 3);
+  }
+
+  if (action !== "hold_steady" && !campaign.actionsUsed.includes(action)) campaign.actionsUsed.push(action);
+  campaign.actionHistory.push({ week:s.week, action, outcome });
+  campaign.pendingAction = null;
+  campaign.actionTakenWeek = null;
+  release.albumCampaign = { startedWeek:campaign.startWeek, followUpTrackIndex:campaign.followUpTrackIndex, actions:[...campaign.actionHistory] };
+  s.log.unshift({ week:s.week, msg:`Album campaign: ${outcome}`, type: action === "hold_steady" ? "neutral" : "great" });
+  if (s.week >= campaign.endWeek) {
+    release.albumCampaign.endedWeek = s.week;
+    s.log.unshift({ week:s.week, msg:`Album campaign complete: "${campaign.releaseTitle}" finished its four-week run with ${campaign.actionHistory.length} weekly moves.`, type:"great" });
+    s.activeAlbumCampaign = null;
+  }
 }
 
 const SONG_STAGE_NEXT: Record<SongStage, SongStage> = { writing: "recording", recording: "mixing", mixing: "complete", complete: "complete" };
@@ -592,6 +689,7 @@ function advance(prev:GameState): GameState {
     s.campaignRadioBoostWeeks--;
     if (s.campaignRadioBoostWeeks === 0) s.campaignRadioBoost = 0;
   }
+  resolveAlbumCampaignWeek(s);
   for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k]--;
   // Burnout slowly recovers each week — but only meaningfully when not actively
   // grinding (touring counters this in the show block below).
@@ -932,6 +1030,7 @@ function advance(prev:GameState): GameState {
     } else {
     let demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
     if (s.campaignLiveBoostWeeks > 0) demand = Math.floor(demand * (1 + s.campaignLiveBoost));
+    if (s.currentCareerIdentity === "road_warrior") demand = Math.floor(demand * 1.08);
     const burnoutMult = burnoutShowMult(s.burnout ?? 0);
 
     // ── Venue Reputation Bonus ──
@@ -1001,7 +1100,8 @@ function advance(prev:GameState): GameState {
     const casualsAvail = Math.max(0, s.fans - (s.superfans ?? 0));
     const sfG = Math.min(casualsAvail, Math.floor(seats * 0.08 * Math.max(0.4, fill)));
     s.superfans = (s.superfans ?? 0) + sfG;
-    s.totalShows++; s.tourFatigue=Math.min(100,s.tourFatigue+10);
+    s.totalShows++; s.tourFatigue=Math.min(100,s.tourFatigue+(s.currentCareerIdentity === "independent_spirit" ? 8 : 10));
+    addIdentityScore(s, "road_warrior", fill >= 0.7 ? 2 : 1);
     s.tourActive.demandDecayIndex++;
     const repG=fill>=0.7?(archHas(s.archetype,"showRepBonus")?archVal(s.archetype)*3:3):fill>=0.4?1:-2;
     s.rep=clamp(s.rep+repG+venueRepMod+setlistRepBonus,0,100);
@@ -1372,6 +1472,9 @@ export function useGameState() {
       totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
       pendingLabelSubmission: saved.pendingLabelSubmission ?? null,
       pendingReissue: saved.pendingReissue ?? null,
+      activeAlbumCampaign: saved.activeAlbumCampaign ?? null,
+      identityScores: { ...EMPTY_IDENTITY_SCORES, ...(saved.identityScores ?? {}) },
+      currentCareerIdentity: saved.currentCareerIdentity ?? null,
       campaignLiveBoost: saved.campaignLiveBoost ?? 0,
       campaignLiveBoostWeeks: saved.campaignLiveBoostWeeks ?? 0,
       campaignRadioBoost: saved.campaignRadioBoost ?? 0,
@@ -1438,6 +1541,9 @@ export function useGameState() {
     totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
     pendingLabelSubmission: s.pendingLabelSubmission ?? null,
     pendingReissue: s.pendingReissue ?? null,
+    activeAlbumCampaign: s.activeAlbumCampaign ?? null,
+    identityScores: { ...EMPTY_IDENTITY_SCORES, ...(s.identityScores ?? {}) },
+    currentCareerIdentity: s.currentCareerIdentity ?? null,
     campaignLiveBoost: s.campaignLiveBoost ?? 0,
     campaignLiveBoostWeeks: s.campaignLiveBoostWeeks ?? 0,
     campaignRadioBoost: s.campaignRadioBoost ?? 0,
@@ -1763,7 +1869,8 @@ export function useGameState() {
     const adjQ=clamp(applyArchQuality(s.archetype,baseQ)+Math.random()*15-5,0,100);
     // Studio time itself accumulates burnout (longer formats = more burnout).
     const burnAdd = p.type==="Live Album"?8 : p.type==="Album"?18 : p.type==="EP"?10 : 5;
-    s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd + modeBurnoutAdd);
+    const burnoutMult = s.currentCareerIdentity === "independent_spirit" ? 0.80 : 1;
+    s.burnout = Math.min(100, (s.burnout ?? 0) + Math.floor((burnAdd + modeBurnoutAdd) * burnoutMult));
     if (burnPenalty < 0) {
       s.log.unshift({ week:s.week, msg:`Recording while exhausted hurt the result (${burnPenalty.toFixed(0)} quality).`, type:"bad" });
     }
@@ -1853,6 +1960,10 @@ export function useGameState() {
   const doReleaseProject = useCallback((id:string, leadTrackIndex?:number, campaign?:CampaignAllocation, approvalOverride=false, releaseFormat?:ReleaseFormat)=>upd(s=>{
     const idx=s.unreleased.findIndex(p=>p.id===id); if(idx<0) return s;
     const p=s.unreleased[idx];
+    if (p.type === "Album" && s.activeAlbumCampaign) {
+      s.pendingEvent = { msg:`Finish the active campaign for "${s.activeAlbumCampaign.releaseTitle}" before launching another album.`, type:"bad" };
+      return s;
+    }
     if (leadTrackIndex === undefined || !p.tracks[leadTrackIndex]) {
       s.pendingEvent = { msg: "Choose a lead single before releasing.", type: "bad" };
       return s;
@@ -1981,6 +2092,7 @@ export function useGameState() {
         if(f)fansG+=Math.floor(f.fB*0.15*(outcome==="Viral"?1.8:outcome==="Hit"?1.2:0.6)*fanMult);
       }
     }
+    if (s.currentCareerIdentity === "crossover_act" && (writingMix.streamMult > 1 || p.tracks.some(track => track.featId))) fansG = Math.floor(fansG * 1.10);
     const radioMult=archHas(s.archetype,"radioBonus")?archVal(s.archetype):1;
     const bStr={Single:500,EP:1500,Album:5000,"Live Album":1200}[p.type]??500;
     const peakStr=Math.floor(bStr*(score/50)*roll(0.8,1.3)*labelMktBoost*streamingPush*radioMult*fanMult*writingMix.streamMult);
@@ -1995,7 +2107,7 @@ export function useGameState() {
     // of it. The mix is averaged per-track so one cut won't tank the verdict.
     // We do NOT floor at 0 — bad albums' negative crit rep punishment must
     // still bite (final s.rep is clamped 0..100 downstream anyway).
-    const repFromCritic=criticBand.rep + writingMix.critRepBonus + pressBonus;
+    const repFromCritic=(criticBand.rep + writingMix.critRepBonus + pressBonus) * (s.currentCareerIdentity === "critic_darling" ? 1.20 : 1);
     const headline=rnd(criticBand.headlines);
     const cid="r"+Date.now()+Math.random().toString(36).slice(2,6);
     s.catalog.push({
@@ -2008,6 +2120,7 @@ export function useGameState() {
     campaign: label ? {
       allocation: {...campaignAllocation}, deploymentPct, deployedBudget:deployedCampaign, approvalOverride,
     } : undefined,
+    albumCampaign: p.type === "Album" ? { startedWeek:s.week, followUpTrackIndex:null, actions:[] } : undefined,
     // Realistic streaming tracking (v2.0)
     streamStats: {
       totalStreams: 0,
@@ -2044,7 +2157,16 @@ export function useGameState() {
     }
     s.fame=clamp(s.fame+famD+radioFameBonus,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
     s.hype=Math.max(0,s.hype-15); s.weeksSinceRelease=0; s.totalReleases++;
+    if (q >= 72 || writingMix.critRepBonus > 0) addIdentityScore(s, "critic_darling", q >= 82 ? 4 : 2);
+    if (avgAppeal >= 7 || writingMix.streamMult > 1) addIdentityScore(s, "radio_favorite", avgAppeal >= 8 ? 3 : 1);
+    if (p.tracks.some(track => track.featId)) addIdentityScore(s, "crossover_act", 2);
+    if (!label || p.producerId === "self") addIdentityScore(s, "independent_spirit", 2);
     s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false,format,releasedEraId:era.id});
+    if (p.type === "Album") {
+      s.activeAlbumCampaign = { releaseId:cid, releaseTitle:p.title, startWeek:s.week, endWeek:s.week + 4,
+        followUpTrackIndex:null, actionsUsed:[], actionHistory:[], pendingAction:null, actionTakenWeek:null };
+      s.log.unshift({ week:s.week, msg:`Album campaign started for "${p.title}". Choose one move before each of the next four weeks.`, type:"great" });
+    }
     if (label) {
       label.marketingSpendYTD += deployedCampaign;
       if (campaignAllocation.radio > 0 && deploymentPct > 0) {
@@ -2232,6 +2354,8 @@ export function useGameState() {
   }),[upd]);
 
   const doShootMusicVideo = useCallback((id:string)=>upd(s=>{
+    const existing = s.catalog.find(x=>x.id===id);
+    if (existing?.hasMusicVideo) { s.pendingEvent={msg:"This release already has a music video.",type:"bad"}; return s; }
     if(s.money<1200){s.pendingEvent={msg:"Need $1,200 for music video.",type:"bad"};return s;}
     s.money-=1200; s.fame=clamp(s.fame+3,0,100); s.rep=clamp(s.rep+2,0,100); s.hype=clamp(s.hype+22,0,100); s.fans+=900;
     // Music videos deepen engagement — convert ~2% of casuals into superfans.
@@ -2253,6 +2377,26 @@ export function useGameState() {
     }
     if(disc)disc.hasMusicVideo=true;
     s.pendingEvent={msg:"Music video done! YouTube Music + Spotify video boost active. Streams and hype up.",type:"great"};
+    return s;
+  }),[upd]);
+
+  const doAlbumCampaignAction = useCallback((action:AlbumCampaignAction, trackIndex?:number)=>upd(s=>{
+    const campaign = s.activeAlbumCampaign;
+    if (!campaign || campaign.pendingAction) { s.pendingEvent={msg:"That campaign week already has a move planned.",type:"bad"}; return s; }
+    const release = s.catalog.find(item => item.id === campaign.releaseId);
+    if (!release || campaign.actionsUsed.includes(action)) { s.pendingEvent={msg:"That campaign move has already been used.",type:"bad"}; return s; }
+    if (action === "follow_up_single") {
+      if (trackIndex === undefined || trackIndex === release.leadTrackIndex || !release.tracks[trackIndex]) {
+        s.pendingEvent={msg:"Choose a non-lead album track as the follow-up single.",type:"bad"}; return s;
+      }
+      campaign.followUpTrackIndex = trackIndex;
+    }
+    if ((action === "radio_push" || action === "music_video") && campaign.followUpTrackIndex === null) {
+      s.pendingEvent={msg:"Choose a follow-up single before promoting it.",type:"bad"}; return s;
+    }
+    campaign.pendingAction = action;
+    campaign.actionTakenWeek = s.week;
+    s.pendingEvent={msg:`${action === "hold_steady" ? "Holding steady" : "Campaign move locked in"}. It resolves when you end the week.`,type:"good"};
     return s;
   }),[upd]);
 
@@ -2442,6 +2586,7 @@ export function useGameState() {
     s.rep = clamp(s.rep - 5, 0, 100);
     s.currentLabel = null;
     s.labelSigned = false;
+    addIdentityScore(s, "independent_spirit", 4);
     // 26-week (~6 month) industry-wide cooldown — labels talk to each other.
     s.cooldowns["net_label"] = 26;
     return s;
@@ -2887,6 +3032,7 @@ export function useGameState() {
       s.fans = Math.max(0, s.fans - sfLost);
     }
     const lostNote = sfLost > 0 ? ` -${fmt(sfLost)} superfans walked.` : "";
+    addIdentityScore(s, "crossover_act", 4);
     s.pendingEvent={msg:`Now making ${genre} music. -10 rep.${lostNote}`,type:"bad"};
     return s;
   }),[upd]);
@@ -2898,7 +3044,7 @@ export function useGameState() {
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
     doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doReissueRelease, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
-    doPromoteTrack, doShootMusicVideo,
+    doPromoteTrack, doShootMusicVideo, doAlbumCampaignAction,
     doSignBrandDeal, doSignLabel, doSwitchGenre,
     doAcceptLabelOffer, doDismissLabelOffers, doAcceptManagerOffer, doDismissManagerOffers,
     doAcceptFeatureRequest, doDismissFeatureRequests,

@@ -1195,6 +1195,35 @@ export interface CampaignAllocation {
   live: number;
 }
 
+export type CareerIdentity = "critic_darling" | "radio_favorite" | "road_warrior" | "independent_spirit" | "crossover_act";
+export type AlbumCampaignAction = "follow_up_single" | "radio_push" | "music_video" | "live_appearance" | "hold_steady";
+
+export interface AlbumCampaignHistory {
+  week: number;
+  action: AlbumCampaignAction;
+  outcome: string;
+}
+
+export interface ActiveAlbumCampaign {
+  releaseId: string;
+  releaseTitle: string;
+  startWeek: number;
+  endWeek: number;
+  followUpTrackIndex: number | null;
+  actionsUsed: AlbumCampaignAction[];
+  actionHistory: AlbumCampaignHistory[];
+  pendingAction: AlbumCampaignAction | null;
+  actionTakenWeek: number | null;
+}
+
+export const CAREER_IDENTITIES: Record<CareerIdentity, { title: string; perk: string }> = {
+  critic_darling: { title: "Critic Darling", perk: "Stronger critic-reputation gains" },
+  radio_favorite: { title: "Radio Favorite", perk: "Improved radio-push odds" },
+  road_warrior: { title: "Road Warrior", perk: "Stronger tour demand" },
+  independent_spirit: { title: "Independent Spirit", perk: "Less burnout from recording and touring" },
+  crossover_act: { title: "Crossover Act", perk: "Broader fan gains from features and commercial campaigns" },
+};
+
 export type LabelSubmissionStatus = "under_review" | "revision_requested" | "approved" | "held";
 
 export interface LabelSubmission {
@@ -4160,6 +4189,12 @@ export interface CatalogEntry {
     deployedBudget: number;
     approvalOverride: boolean;
   };
+  albumCampaign?: {
+    startedWeek: number;
+    endedWeek?: number;
+    followUpTrackIndex?: number | null;
+    actions: AlbumCampaignHistory[];
+  };
   // ── Streaming v2.0 tracking ──
   platformMix?: Record<string, number>;
   geoDist?: Record<string, number>;
@@ -4652,6 +4687,9 @@ export interface GameState {
   discography: DiscographyEntry[];
   totalReleases: number;
   weeksSinceRelease: number;
+  activeAlbumCampaign: ActiveAlbumCampaign | null;
+  identityScores: Record<CareerIdentity, number>;
+  currentCareerIdentity: CareerIdentity | null;
   // charts
   chartPosition: number | null;
   peakChart: number | null;
@@ -4781,6 +4819,9 @@ export const INITIAL_STATE: GameState = {
   discography: [],
   totalReleases: 0,
   weeksSinceRelease: 99,
+  activeAlbumCampaign: null,
+  identityScores: { critic_darling: 0, radio_favorite: 0, road_warrior: 0, independent_spirit: 0, crossover_act: 0 },
+  currentCareerIdentity: null,
   chartPosition: null,
   peakChart: null,
   tourQueue: [],

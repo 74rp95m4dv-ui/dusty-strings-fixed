@@ -608,6 +608,7 @@ function playerRecordingStories(s: GameState): NewspaperStory[] {
 function playerStories(s: GameState): NewspaperStory[] {
   const out: NewspaperStory[] = [];
   const me = s.artistName || "You";
+  const publicTitle = s.currentCareerIdentity ? ({ critic_darling:"Critic Darling", radio_favorite:"Radio Favorite", road_warrior:"Road Warrior", independent_spirit:"Independent Spirit", crossover_act:"Crossover Act" } as const)[s.currentCareerIdentity] : null;
 
   // Recent release (within last 4 weeks)
   const recent = (s.discography ?? []).filter(d => s.week - d.releasedWeek <= 4 && s.week - d.releasedWeek >= 0);
@@ -621,7 +622,7 @@ function playerStories(s: GameState): NewspaperStory[] {
     out.push({ section:"Front Page", isPlayer:true,
       headline:`${me.toUpperCase()} RELEASES "${r.title.toUpperCase()}" — CRITICS CALL IT ${verdict.toUpperCase()}`,
       byline:`By ${pick(REPORTERS)}`,
-      body:`The ${fmtType} pulled ${r.peakStreams.toLocaleString()} weekly streams at peak. ${r.criticHeadline ? `One critic wrote: "${r.criticHeadline}"` : "Reviews are still rolling in."}`});
+      body:`The ${fmtType} pulled ${r.peakStreams.toLocaleString()} weekly streams at peak. ${publicTitle ? `The public has increasingly tagged ${me} as a ${publicTitle.toLowerCase()}. ` : ""}${r.criticHeadline ? `One critic wrote: "${r.criticHeadline}"` : "Reviews are still rolling in."}`});
   }
 
   // Tour activity

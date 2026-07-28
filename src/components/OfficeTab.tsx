@@ -42,7 +42,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       {/* DEALS */}
       {sub === "deals" && (
         <div className="stagger-1">
-          <div className="card"><div className="card-title">Public Identity</div>{state.currentCareerIdentity ? <><div style={{ fontWeight: 700 }}>{CAREER_IDENTITIES[state.currentCareerIdentity].title}</div><div className="tip-text">{CAREER_IDENTITIES[state.currentCareerIdentity].perk}</div></> : <div className="tip-text">Still emerging. Consistent creative, commercial, touring, independent, or crossover choices will earn a public identity.</div>}</div>
+          <div className="card"><div className="card-title">Public Identity</div>{state.currentCareerIdentity ? <><div style={{ fontWeight: 700 }}>{CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES].title}</div><div className="tip-text">{CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES].perk}</div></> : <div className="tip-text">Still emerging. Consistent creative, commercial, touring, independent, or crossover choices will earn a public identity.</div>}</div>
           {/* Label Contract */}
           <LabelContractCard state={state} onDrop={doDropLabel} onSign={doAcceptLabelOffer} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
 
@@ -316,6 +316,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
 function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
   state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView?: (offer: LabelOffer) => void; onDismiss: () => void;
 }) {
+  const [confirmTermination, setConfirmTermination] = useState(false);
   if (state.currentLabel) {
     const lbl = state.currentLabel;
     const recoup = recoupProgress(lbl);
@@ -408,9 +409,10 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
           </div>
         </div>
 
-        <button className="btn btn-sm btn-danger" style={{ marginTop: 12 }} onClick={onDrop}>
-          Terminate Contract (-8 rep)
+        <button className="btn btn-sm btn-danger" style={{ marginTop: 12 }} onClick={() => setConfirmTermination(true)}>
+          Terminate Contract (-5 rep)
         </button>
+        {confirmTermination && <div className="modal-overlay"><section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="contract-confirm-title"><div className="modal-title" id="contract-confirm-title">Terminate contract?</div><p className="tip-text">You will lose 5 reputation and cannot receive new label pitches for 26 weeks. Unrecouped advances and undelivered albums remain part of this career story.</p><div className="modal-footer"><button className="btn btn-danger" onClick={() => { onDrop(); setConfirmTermination(false); }}>Terminate</button><button className="btn btn-ghost" onClick={() => setConfirmTermination(false)}>Keep contract</button></div></section></div>}
       </div>
     );
   }

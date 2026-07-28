@@ -68,8 +68,7 @@ import {
   BRAND_DEALS_V2, getBrandDealSellout,
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
-
-const SAVE_KEY = "dusty_strings_v1";
+import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -240,7 +239,7 @@ function resolveAlbumCampaignWeek(s: GameState) {
       s.money -= cost;
       const appeal = getTrackDevelopment(followUp).appealRating ?? release.appeal ?? 5;
       const chance = clamp(0.28 + appeal * 0.045 + (s.currentCareerIdentity === "radio_favorite" ? 0.14 : 0) + (s.campaignRadioBoostWeeks > 0 ? s.campaignRadioBoost : 0), 0.15, 0.88);
-      if (roll(chance)) {
+      if (Math.random() < chance) {
         release.weeklyStreams = Math.floor(release.weeklyStreams * 1.6 + 500);
         s.fame = clamp(s.fame + 4, 0, 100);
         s.hype = clamp(s.hype + 10, 0, 100);
@@ -476,8 +475,20 @@ function runAwardCheck(s:GameState): Award|null {
   return null;
 }
 
-function saveToDisk(s:GameState) { try { localStorage.setItem(SAVE_KEY,JSON.stringify(s)); } catch {} }
-function loadFromDisk(): GameState|null { try { const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; } catch { return null; } }
+type StoredGame = { state: GameState | null; message: string | null; migrated: boolean };
+
+function readStoredGame(): StoredGame {
+  if (typeof window === "undefined") return { state: null, message: null, migrated: false };
+  const result = loadGameState<GameState>(window.localStorage);
+  if (result.kind === "success") return { state: result.state, message: result.warning ?? null, migrated: result.migrated };
+  if (result.kind === "error") return { state: null, message: result.message, migrated: false };
+  return { state: null, message: null, migrated: false };
+}
+
+function saveToDisk(s:GameState) {
+  if (typeof window === "undefined") return false;
+  return saveGameState(window.localStorage, s);
+}
 
 // ─── RIVALS / ARCS HELPERS ─────────────────────────────────
 function seedRivals(playerFame: number): RivalState[] {
@@ -1432,8 +1443,10 @@ function advance(prev:GameState): GameState {
 
 // ─── HOOK ─────────────────────────────────────────────────
 export function useGameState() {
+  const [initialLoad] = useState<StoredGame>(() => readStoredGame());
+  const [saveIssue, setSaveIssue] = useState<string | null>(() => initialLoad.message);
   const [state,setState] = useState<GameState>(()=>{
-    const saved=loadFromDisk();
+    const saved=initialLoad.state;
     if (saved) return {
       ...saved,
       ...migrateMarketState(saved),
@@ -1500,7 +1513,7 @@ export function useGameState() {
     return {...INITIAL_STATE};
   });
 
-  const hasSave = !!loadFromDisk();
+  const hasSave = state.hasSave || !!initialLoad.state;
 
   const upd = useCallback((fn:(s:GameState)=>GameState)=>{
     setState(prev=>{ const next=fn(JSON.parse(JSON.stringify(prev))); saveToDisk(next); return next; });
@@ -1508,7 +1521,9 @@ export function useGameState() {
 
   const goToMenu  = useCallback(()=>setState(p=>({...p,screen:"menu"})),[]);
   const goToSetup = useCallback(()=>setState(p=>({...p,screen:"setup"})),[]);
-  const loadGame  = useCallback(()=>{ const s=loadFromDisk(); if(s) setState({
+  const loadGame  = useCallback(()=>{ const loaded = readStoredGame(); const s=loaded.state; setSaveIssue(loaded.message); if(s) {
+    if (loaded.migrated || loaded.message) saveToDisk(s);
+    setState({
     ...s, hasSave:true, pendingEvent:null, modal:null,
     ...migrateMarketState(s),
     themeCounts: s.themeCounts ?? {},
@@ -1570,8 +1585,22 @@ export function useGameState() {
       pendingFestivalOffers: s.pendingFestivalOffers ?? [],
       completedFestivals: s.completedFestivals ?? [],
       lastBusBreakdownWeek: s.lastBusBreakdownWeek ?? 0,
-  }); },[]);
-  const clearSave = useCallback(()=>{ try{localStorage.removeItem(SAVE_KEY);}catch{} setState({...INITIAL_STATE}); },[]);
+    });
+  } },[]);
+  const clearSave = useCallback(()=>{
+    if (typeof window !== "undefined") clearGameState(window.localStorage);
+    setSaveIssue(null);
+    setState({...INITIAL_STATE});
+  },[]);
+  const restoreBackup = useCallback(()=>{
+    if (typeof window === "undefined") return;
+    const restored = restoreBackupToPrimary<GameState>(window.localStorage);
+    if (restored.kind === "success") {
+      setSaveIssue("Your latest backup has been restored. Continue your career to resume play.");
+      setState(current => ({ ...current, hasSave: true, screen: "menu" }));
+    } else if (restored.kind === "error") setSaveIssue(restored.message);
+  },[]);
+  const dismissSaveIssue = useCallback(() => setSaveIssue(null), []);
 
   const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string)=>{
     const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,artistName:name,genre,city,archetype,
@@ -1591,7 +1620,7 @@ export function useGameState() {
       totalPublishingRevenue: 0,
 
     };
-    saveToDisk(s); setState(s);
+    saveToDisk(s); setState({ ...s, hasSave: true });
   },[]);
 
   const doAdvance       = useCallback(()=>setState(prev=>advance(prev)),[]);
@@ -3038,7 +3067,7 @@ export function useGameState() {
   }),[upd]);
 
   return {
-    state, hasSave, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper,
+    state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper,
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,

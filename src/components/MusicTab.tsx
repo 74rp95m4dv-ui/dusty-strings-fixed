@@ -18,7 +18,7 @@ export default function MusicTab(game: any) {
   const era = getMarketEra(state.currentYear);
   const activeCampaign = state.activeAlbumCampaign;
   const campaignRelease = activeCampaign ? state.catalog.find((item: any) => item.id === activeCampaign.releaseId) : null;
-  const identity = state.currentCareerIdentity ? CAREER_IDENTITIES[state.currentCareerIdentity] : null;
+  const identity = state.currentCareerIdentity ? CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES] : null;
   const launch = (projectId: string, leadIndex: number, allocation?: CampaignAllocation, override = false, format?: ReleaseFormat) => {
     doReleaseProject(projectId, leadIndex, allocation, override, format);
     setReleaseTarget(null);
@@ -61,6 +61,7 @@ export function ReleaseCampaignBuilder({ project, state, onClose, onLaunch, onSu
   const [allocation, setAllocation] = useState<CampaignAllocation>(submission?.allocation ?? DEFAULT_ALLOCATION);
   const era = getMarketEra(state.currentYear);
   const [format, setFormat] = useState<ReleaseFormat>(submission?.releaseFormat ?? project.releaseFormat ?? (era.formats.includes("cd") ? "cd" : era.formats[0]));
+  const [confirmLaunch, setConfirmLaunch] = useState(false);
   const total = Object.values(allocation).reduce((sum, value) => sum + value, 0);
   const perAlbum = label ? Math.floor(label.marketingCommitment / Math.max(1, label.albumsCommitted)) : 0;
   const setShare = (channel: keyof CampaignAllocation, value: string) => setAllocation(current => ({ ...current, [channel]: Math.max(0, Math.min(100, Number(value) || 0)) }));
@@ -80,5 +81,8 @@ export function ReleaseCampaignBuilder({ project, state, onClose, onLaunch, onSu
     {label && <div style={{ margin: "14px 0" }}><div className="contract-section-title">Campaign allocation <span className={total === 100 ? "text-sage" : "text-rust"}>({total}/100%)</span></div>{(["streaming", "radio", "press", "live"] as Array<keyof CampaignAllocation>).map(channel => <label key={channel} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, textTransform: "capitalize" }}><span style={{ width: 84 }}>{channel}</span><input type="number" min="0" max="100" value={allocation[channel]} onChange={event => setShare(channel, event.target.value)} disabled={submission?.status === "approved" || submission?.status === "held"} style={{ width: 72 }} /><small>% {channel === "streaming" ? "launch streams" : channel === "radio" ? "fame + radio pitch" : channel === "press" ? "critic reputation" : "fan conversion + tour demand"}</small></label>)}</div>}
     {label?.campaignFrozen && <div className="text-rust">Campaign support is frozen until the next accepted album delivery.</div>}
     {submission?.status === "held" && <div className="text-rust" style={{ marginBottom: 8 }}>Override: release now with 55% campaign support, -2 rep, and one approval strike.</div>}
-    <button className="btn btn-lime btn-block" disabled={!canSubmit} onClick={action}>{actionLabel}</button><button className="btn btn-ghost btn-block" onClick={onClose}>Back</button></div></div>;
+    <section className="action-impact" aria-label="Release impact"><strong>Next week</strong><span>{needsApproval && !submission ? "A&R reviews the campaign; release waits for approval." : `The release launches as ${getReleaseFormat(format).label}; quality, appeal, and campaign choices set its first-week result.`}</span></section>
+    <button className="btn btn-lime btn-block" disabled={!canSubmit} onClick={() => setConfirmLaunch(true)}>{actionLabel}</button><button className="btn btn-ghost btn-block" onClick={onClose}>Back</button>
+    {confirmLaunch && <div className="modal-overlay"><section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="release-confirm-title"><div className="modal-title" id="release-confirm-title">Confirm release plan</div><p className="tip-text">Lead: <b>{project.tracks[leadIndex]?.name}</b> · Format: {getReleaseFormat(format).label}{label ? ` · Campaign: ${total}% allocated` : ""}. {needsApproval && !submission ? "This submits the plan to A&R for review." : "This commits the release and removes it from your unreleased vault."}</p><div className="modal-footer"><button className="btn btn-lime" onClick={() => { action(); setConfirmLaunch(false); }}>Confirm</button><button className="btn btn-ghost" onClick={() => setConfirmLaunch(false)}>Keep editing</button></div></section></div>}
+    </div></div>;
 }

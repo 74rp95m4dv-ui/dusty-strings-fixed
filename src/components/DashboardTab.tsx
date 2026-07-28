@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, getBurnoutTier } from "../gameLogic";
 import type { DrawerType } from "./GameScreen";
 
@@ -27,6 +28,7 @@ interface DashboardProps {
 
 export default function DashboardTab(props: DashboardProps) {
   const s = props.state;
+  const [confirmation, setConfirmation] = useState<"scrub" | "abort" | null>(null);
   const tier = CAREER_TIERS[getCareerTierIdx(s.fame)];
   const burn = getBurnoutTier(s.burnout ?? 0);
 
@@ -77,6 +79,17 @@ export default function DashboardTab(props: DashboardProps) {
           <div className="bigstat-lbl">Superfans</div>
         </div>
       </div>
+
+      <section className="week-summary" aria-label="This week summary">
+        <div className="card-title">This week</div>
+        <ul>
+          {s.project && <li><b>Studio:</b> {s.project.pipelineStage ?? "writing"} pass for <i>{s.project.title}</i> · {s.project.weeksLeft} week{s.project.weeksLeft === 1 ? "" : "s"} remaining.</li>}
+          {s.tourActive && <li><b>Live:</b> {s.tourActive.shows[s.tourActive.progress]?.cityName ?? "tour wrap"} is next · show {s.tourActive.progress + 1} of {s.tourActive.shows.length}.</li>}
+          {s.activeAlbumCampaign && <li><b>Campaign:</b> {s.activeAlbumCampaign.pendingAction ? "a campaign move is locked in" : "choose a campaign move or hold steady"} before ending the week.</li>}
+          {!s.project && !s.tourActive && !s.activeAlbumCampaign && <li><b>Open week:</b> choose a recording, release, live, or business action before advancing.</li>}
+          <li><b>End week:</b> pays recurring income and expenses, advances active work, and may trigger industry events.</li>
+        </ul>
+      </section>
 
       {/* Quick Actions */}
       <div className="quick-actions quick-actions-primary">
@@ -137,7 +150,7 @@ export default function DashboardTab(props: DashboardProps) {
               <button className="btn btn-sm btn-lime" onClick={props.doFinishProject}>
                 Finish
               </button>
-              <button className="btn btn-sm btn-danger" onClick={props.doScrubProject}>
+              <button className="btn btn-sm btn-danger" onClick={() => setConfirmation("scrub")}>
                 Scrub
               </button>
             </div>
@@ -162,7 +175,7 @@ export default function DashboardTab(props: DashboardProps) {
                 }}
               />
             </div>
-            <button className="btn btn-sm btn-danger" style={{ marginTop: 12 }} onClick={props.doAbortTour}>
+            <button className="btn btn-sm btn-danger" style={{ marginTop: 12 }} onClick={() => setConfirmation("abort")}>
               Abort Tour
             </button>
           </div>
@@ -317,6 +330,18 @@ export default function DashboardTab(props: DashboardProps) {
           )}
         </div>
       </div>
+      {confirmation && <div className="modal-overlay" role="presentation">
+        <section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="confirm-action-title">
+          <div className="modal-title" id="confirm-action-title">{confirmation === "scrub" ? "Scrub this project?" : "Abort this tour?"}</div>
+          <p className="tip-text">{confirmation === "scrub"
+            ? "This permanently deletes the current recording project and all of its unfinished tracks. No cash is refunded."
+            : `This cancels the remaining ${Math.max(0, s.tourActive.shows.length - s.tourActive.progress)} show(s). You will lose reputation but recover energy and burnout.`}</p>
+          <div className="modal-footer">
+            <button className="btn btn-danger" onClick={() => { if (confirmation === "scrub") props.doScrubProject(); else props.doAbortTour(); setConfirmation(null); }}>Confirm</button>
+            <button className="btn btn-ghost" onClick={() => setConfirmation(null)}>Keep playing</button>
+          </div>
+        </section>
+      </div>}
     </div>
   );
 }

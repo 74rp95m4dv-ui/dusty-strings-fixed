@@ -210,6 +210,35 @@ body::before {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── RELEASE READINESS: ACCESSIBLE, MOBILE-SAFE CONTROLS ─────────────── */
+:focus-visible {
+  outline: 3px solid var(--amber-l);
+  outline-offset: 3px;
+}
+
+button, input, select, summary { touch-action: manipulation; }
+button.city-row { width: 100%; color: inherit; font: inherit; text-align: left; }
+
+.week-summary, .action-impact, .save-help, .save-notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-md);
+  background: rgba(232, 216, 176, .035);
+}
+
+.week-summary ul { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: var(--text2); font-size: 12px; line-height: 1.4; }
+.week-summary b, .action-impact strong, .save-help strong, .save-notice strong { color: var(--amber); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.action-impact { display: grid; gap: 6px; margin-top: 12px; color: var(--text2); font-size: 12px; line-height: 1.4; }
+.save-help { max-width: 280px; margin: 28px auto 0; text-align: left; }
+.save-help p, .save-notice p { margin: 7px 0 0; color: var(--muted2); font-size: 11px; line-height: 1.45; }
+.save-notice { max-width: 320px; margin: -20px auto 20px; text-align: left; border-color: rgba(192, 68, 44, .55); background: var(--rust-d); }
+.save-notice-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 @keyframes fadeInDown {
   from { opacity: 0; transform: translateY(-12px); }
   to   { opacity: 1; transform: translateY(0); }

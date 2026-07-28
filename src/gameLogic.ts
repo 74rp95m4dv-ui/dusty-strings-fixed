@@ -5166,7 +5166,7 @@ export interface FeatureEvent {
   choices: Array<{
     label: string;
     sub: string;
-    effect: { trustDelta?: number; chemistryDelta?: number; qualityBonus?: number; fameBonus?: number; moneyCost?: number };
+    effect: { trustDelta?: number; chemistryDelta?: number; qualityBonus?: number; fameBonus?: number; fansBonus?: number; moneyCost?: number };
   }>;
 }
 

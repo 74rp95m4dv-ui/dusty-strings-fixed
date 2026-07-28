@@ -14,6 +14,7 @@ export default function LiveTab(game: any) {
     doAcceptFestival, doDismissFestivalOffers,
   } = game;
   const [sub, setSub] = useState<"tour" | "setlist" | "offers" | "festivals" | "reputation">("tour");
+  const [confirmTour, setConfirmTour] = useState(false);
 
   const inQueue = new Set(state.tourQueue.map((q: any) => q.cityName));
   const isHeadliner = state.tourQueue.length > 5;
@@ -89,7 +90,7 @@ export default function LiveTab(game: any) {
               </div>
               <div className="card">
                 <div className="card-title">Ticket Price</div>
-                <input type="range" min={0.5} max={2.5} step={0.1} value={state.tourTicketMult} onChange={(e) => doSetTicketMult(parseFloat(e.target.value))} />
+                <input aria-label="Ticket price multiplier" type="range" min={0.5} max={2.5} step={0.1} value={state.tourTicketMult} onChange={(e) => doSetTicketMult(parseFloat(e.target.value))} />
                 <div style={{ textAlign: "center", fontSize: 12, marginTop: 4 }}>×{state.tourTicketMult.toFixed(1)}</div>
               </div>
               <div className="card">
@@ -99,20 +100,22 @@ export default function LiveTab(game: any) {
                     const v = c.venues.find((v: any) => v.tier === state.tourVenue) ?? c.venues[c.venues.length - 1];
                     const isIn = inQueue.has(c.name);
                     return (
-                      <div key={c.name} className={`city-row ${isIn ? "booked" : ""}`} onClick={() => doToggleTourCity(c.name)}>
+                      <button key={c.name} type="button" className={`city-row ${isIn ? "booked" : ""}`} onClick={() => doToggleTourCity(c.name)} aria-pressed={isIn}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</div>
                           <div className="tip-text">{v.name} • {v.cap} cap • {fmtMoney(v.cost + c.travelCost)}</div>
                         </div>
                         <div style={{ fontSize: 18 }}>{isIn ? "✓" : "+"}</div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
-              <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={doStartTour}>
+              <div className="tip-text" style={{ marginBottom: 8 }}>Upfront route cost: {fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))}. One stop resolves per week and builds fatigue.</div>
+              <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={() => setConfirmTour(true)}>
                 Launch Tour ({fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))})
               </button>
+              {confirmTour && <div className="modal-overlay"><section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="live-tour-confirm"><div className="modal-title" id="live-tour-confirm">Launch this tour?</div><p className="tip-text">You will pay the route cost now and commit to {state.tourQueue.length} stop{state.tourQueue.length === 1 ? "" : "s"}. You can still abort later at a reputation cost.</p><div className="modal-footer"><button className="btn btn-lime" onClick={() => { doStartTour(); setConfirmTour(false); }}>Launch tour</button><button className="btn btn-ghost" onClick={() => setConfirmTour(false)}>Review route</button></div></section></div>}
             </>
           )}
         </div>

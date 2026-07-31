@@ -4,6 +4,7 @@ import {
   recoupProgress, get360Summary, getRiskLabel, getLabel, getManager, getLabelDeliverySummary,
   MANAGERS, CAREER_IDENTITIES, type LabelOffer,
 } from "../gameLogic";
+import ActionCard from "./ui/ActionCard";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   const {
@@ -91,12 +92,12 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
                 state.rep >= b.repReq &&
                 !state.activeBrandDeals.find((d: any) => d.id === b.id)
             ).map((b: any) => (
-              <div className="pick-card" key={b.id} onClick={() => doSignBrandDeal(b.id)}>
+              <ActionCard key={b.id} onClick={() => doSignBrandDeal(b.id)} aria-label={`Sign ${b.name} brand deal`}>
                 <div>
                   <div className="pick-name">{b.name}</div>
                   <div className="pick-meta">{fmtMoney(b.weeklyIncome)}/wk • {b.duration}wk • {b.desc}</div>
                 </div>
-              </div>
+              </ActionCard>
             ))}
             {BRAND_DEALS.filter(
               (b: any) =>

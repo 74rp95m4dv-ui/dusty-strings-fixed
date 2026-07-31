@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, getBurnoutTier } from "../gameLogic";
 import type { DrawerType } from "./GameScreen";
+import Dialog from "./ui/Dialog";
+import ActionCard from "./ui/ActionCard";
 
 interface DashboardProps {
   state: any;
@@ -50,6 +52,13 @@ export default function DashboardTab(props: DashboardProps) {
     (s.pendingFestivalOffers?.length || 0) +
     (s.pendingPublishingOffers?.length || 0) +
     (s.pendingSyncOffers?.length || 0);
+  const primaryAction = s.project
+    ? { label: "Continue recording", detail: `${s.project.title} has ${s.project.weeksLeft} week${s.project.weeksLeft === 1 ? "" : "s"} left.`, action: () => props.onOpenDrawer("studio") }
+    : s.tourActive
+      ? { label: "Play the next show", detail: `${s.tourActive.shows[s.tourActive.progress]?.cityName ?? "Your final stop"} resolves when you end the week.`, action: props.advance }
+      : totalPending > 0
+        ? { label: `Review ${totalPending} offer${totalPending === 1 ? "" : "s"}`, detail: "Respond before the next week brings new opportunities.", action: () => props.onSwitchTab("office") }
+        : { label: "Choose this week's move", detail: "Record, release, book a route, or build your name.", action: () => props.onOpenDrawer("studio") };
 
   return (
     <div className="animate-fadeIn">
@@ -62,6 +71,15 @@ export default function DashboardTab(props: DashboardProps) {
         <button className="btn btn-end-week home-advance" onClick={props.advance}>
           End week
         </button>
+      </section>
+
+      <section className="next-move" aria-label="Recommended next move">
+        <div>
+          <span className="next-move-kicker">Recommended next move</span>
+          <strong>{primaryAction.label}</strong>
+          <p>{primaryAction.detail}</p>
+        </div>
+        <button className="btn btn-lime btn-sm" onClick={primaryAction.action}>Go</button>
       </section>
 
       {/* Big Stats */}
@@ -187,60 +205,60 @@ export default function DashboardTab(props: DashboardProps) {
             <div className="card-title">📋 Pending Offers ({totalPending})</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {s.pendingLabelOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                <ActionCard onClick={() => props.onSwitchTab("office")}>
                   <div>
                     <div className="pick-name">🏢 {s.pendingLabelOffers.length} Label Offer{s.pendingLabelOffers.length > 1 ? "s" : ""}</div>
                     <div className="pick-meta">Tap to review in Office</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingManagerOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                <ActionCard onClick={() => props.onSwitchTab("office")}>
                   <div>
                     <div className="pick-name">👔 {s.pendingManagerOffers.length} Manager Offer{s.pendingManagerOffers.length > 1 ? "s" : ""}</div>
                     <div className="pick-meta">Tap to review in Office</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingFeatureRequests?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onOpenDrawer("offers")}>
+                <ActionCard onClick={() => props.onOpenDrawer("offers")}>
                   <div>
                     <div className="pick-name">🎤 Feature Request</div>
                     <div className="pick-meta">From {s.pendingFeatureRequests[0]?.featureName || "an artist"}</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingOpeningActOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("live")}>
+                <ActionCard onClick={() => props.onSwitchTab("live")}>
                   <div>
                     <div className="pick-name">🎤 Opening Act Offer</div>
                     <div className="pick-meta">{s.pendingOpeningActOffers[0]?.headlinerName}</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingFestivalOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("live")}>
+                <ActionCard onClick={() => props.onSwitchTab("live")}>
                   <div>
                     <div className="pick-name">🎪 Festival Offer</div>
                     <div className="pick-meta">{s.pendingFestivalOffers[0]?.festivalName}</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingPublishingOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                <ActionCard onClick={() => props.onSwitchTab("office")}>
                   <div>
                     <div className="pick-name">📚 Publishing Offer</div>
                     <div className="pick-meta">{s.pendingPublishingOffers[0]?.publisherName}</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
               {s.pendingSyncOffers?.length > 0 && (
-                <div className="pick-card" onClick={() => props.onSwitchTab("office")}>
+                <ActionCard onClick={() => props.onSwitchTab("office")}>
                   <div>
                     <div className="pick-name">📺 Sync Offer</div>
                     <div className="pick-meta">{s.pendingSyncOffers[0]?.showName}</div>
                   </div>
-                </div>
+                </ActionCard>
               )}
             </div>
           </div>
@@ -330,17 +348,17 @@ export default function DashboardTab(props: DashboardProps) {
           )}
         </div>
       </div>
-      {confirmation && <div className="modal-overlay" role="presentation">
-        <section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="confirm-action-title">
+      {confirmation && <div className="modal-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmation(null); }}>
+        <Dialog titleId="confirm-action-title" onClose={() => setConfirmation(null)}>
           <div className="modal-title" id="confirm-action-title">{confirmation === "scrub" ? "Scrub this project?" : "Abort this tour?"}</div>
           <p className="tip-text">{confirmation === "scrub"
             ? "This permanently deletes the current recording project and all of its unfinished tracks. No cash is refunded."
             : `This cancels the remaining ${Math.max(0, s.tourActive.shows.length - s.tourActive.progress)} show(s). You will lose reputation but recover energy and burnout.`}</p>
           <div className="modal-footer">
-            <button className="btn btn-danger" onClick={() => { if (confirmation === "scrub") props.doScrubProject(); else props.doAbortTour(); setConfirmation(null); }}>Confirm</button>
+            <button data-dialog-initial className="btn btn-danger" onClick={() => { if (confirmation === "scrub") props.doScrubProject(); else props.doAbortTour(); setConfirmation(null); }}>Confirm</button>
             <button className="btn btn-ghost" onClick={() => setConfirmation(null)}>Keep playing</button>
           </div>
-        </section>
+        </Dialog>
       </div>}
     </div>
   );
@@ -354,7 +372,7 @@ function StatBar({ name, val, max, color }: { name: string; val: number; max: nu
         <span className="sbar-name">{name}</span>
         <span className="sbar-val">{val.toFixed(0)}</span>
       </div>
-      <div className="sbar-track">
+      <div className="sbar-track" role="progressbar" aria-label={name} aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.round(val)}>
         <div className={`sbar-fill ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>

@@ -20,6 +20,7 @@ import UnreleasedDrawer from "./drawers/UnreleasedDrawer";
 import TourPlannerDrawer from "./drawers/TourPlannerDrawer";
 import { IntroCinematic } from "./IntroCinematic";
 import { TourCinematicDetails } from "./CinematicFramework";
+import Dialog from "./ui/Dialog";
 
 const TABS = [
   { id: "home", label: "Home", icon: "🏠" },
@@ -88,6 +89,9 @@ const s = game.state;
   // We'll leave the cinematic component in place but ensure it's properly connected to the game state.
 
   const activeOffer = game.viewingOffer || viewingOffer;
+  const officeAlerts = (s.pendingLabelOffers?.length || 0) + (s.pendingManagerOffers?.length || 0) + (s.pendingPublishingOffers?.length || 0) + (s.pendingSyncOffers?.length || 0);
+  const liveAlerts = (s.pendingOpeningActOffers?.length || 0) + (s.pendingFestivalOffers?.length || 0);
+  const musicAlerts = (s.unreleased?.length || 0) + (s.project ? 1 : 0);
 
   return (
     <div className="app-shell">
@@ -110,7 +114,7 @@ const s = game.state;
           <div className="header-tier header-tier-compact">
             <span>{CAREER_TIERS[getCareerTierIdx(s.fame)]?.name || "Unknown"}</span>
           </div>
-          <button className="header-advance" onClick={game.advance}>
+          <button className="header-advance" onClick={game.advance} aria-label="End the current week and advance your career">
             <span>End</span>
             <strong>Week</strong>
           </button>
@@ -144,13 +148,12 @@ const s = game.state;
             key={t.id}
             className={`nav-btn ${tab === t.id ? "active" : ""}`}
             onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? "page" : undefined}
+            aria-label={`${t.label}${t.id === "office" && officeAlerts ? `, ${officeAlerts} pending offers` : t.id === "live" && liveAlerts ? `, ${liveAlerts} pending bookings` : t.id === "music" && musicAlerts ? `, ${musicAlerts} active music items` : ""}`}
           >
             <span className="nav-icon">{t.icon}</span>
             <span>{t.label}</span>
-            {t.id === "office" &&
-              (s.pendingLabelOffers?.length > 0 || s.pendingManagerOffers?.length > 0) && (
-                <span className="badge-dot" />
-              )}
+            {((t.id === "office" && officeAlerts > 0) || (t.id === "live" && liveAlerts > 0) || (t.id === "music" && musicAlerts > 0)) && <span className="badge-dot" aria-hidden="true" />}
           </button>
         ))}
       </nav>
@@ -166,16 +169,16 @@ const s = game.state;
 
       {/* Modal Stack */}
       {s.pendingEvent && (
-        <div className="modal-overlay" onClick={game.doDismissEvent}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">News</div>
+        <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) game.doDismissEvent(); }}>
+          <Dialog titleId="news-dialog-title" onClose={game.doDismissEvent}>
+            <div className="modal-title" id="news-dialog-title">News</div>
             <div style={{ fontSize: 14, lineHeight: 1.6 }}>{s.pendingEvent.msg}</div>
             <div className="modal-footer">
-              <button className="btn btn-lime btn-block" onClick={game.doDismissEvent}>
+              <button data-dialog-initial className="btn btn-lime btn-block" onClick={game.doDismissEvent}>
                 Continue
               </button>
             </div>
-          </div>
+          </Dialog>
         </div>
       )}
       {s.pendingScenarioId && <ScenarioModal {...game} scenario={RANDOM_SCENARIOS.find(sc => sc.id === s.pendingScenarioId)} />}

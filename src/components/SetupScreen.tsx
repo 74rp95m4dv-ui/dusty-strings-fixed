@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ARCHETYPES, CITIES, generateRandomName } from "../gameLogic";
 import type { Genre } from "../gameLogic";
+import ActionCard from "./ui/ActionCard";
 
 export default function SetupScreen(game: any) {
   const [name, setName] = useState("");
@@ -19,15 +20,17 @@ export default function SetupScreen(game: any) {
   };
 
   return (
-    <div style={{ padding: "24px 16px 100px", minHeight: "100dvh", overflowY: "auto" }}>
+    <div className="setup-screen">
       <div className="animate-fadeIn">
-        <div className="pg-title" style={{ marginBottom: 16 }}>New Career</div>
+        <div className="setup-kicker">Start a new chapter</div>
+        <div className="pg-title" style={{ marginBottom: 6 }}>Build your act</div>
+        <p className="setup-intro">Choose the sound and hometown that shape your first opportunities. You can change direction later, but your origin story stays with you.</p>
 
         <div className="field">
-          <label>Artist Name</label>
+          <label htmlFor="artist-name">Artist Name</label>
           <div style={{ display: "flex", gap: 8 }}>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter name or roll the dice" style={{ flex: 1 }} />
-            <button type="button" className="btn" onClick={() => setName(generateRandomName())} title="Generate random name">🎲</button>
+            <input id="artist-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter name or roll the dice" style={{ flex: 1 }} />
+            <button type="button" className="btn" onClick={() => setName(generateRandomName())} title="Generate random name" aria-label="Generate random artist name">🎲</button>
           </div>
         </div>
 
@@ -41,8 +44,8 @@ export default function SetupScreen(game: any) {
         </div>
 
         <div className="field">
-          <label>Hometown</label>
-          <select value={city} onChange={(e) => setCity(e.target.value)}>
+          <label htmlFor="hometown">Hometown</label>
+          <select id="hometown" value={city} onChange={(e) => setCity(e.target.value)}>
             {CITIES.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
         </div>
@@ -53,13 +56,13 @@ export default function SetupScreen(game: any) {
             {Object.values(ARCHETYPES)
               .filter((a: any) => a.genre === genre)
               .map((a: any) => (
-                <div key={a.id} className={`pick-card ${arch === a.id ? "sel" : ""}`} onClick={() => setArch(a.id)}>
+                <ActionCard key={a.id} className={arch === a.id ? "sel" : ""} onClick={() => setArch(a.id)} aria-pressed={arch === a.id}>
                   <div>
                     <div className="pick-name">{a.name}</div>
                     <div className="pick-bio">{a.desc}</div>
-                    <div className="pick-meta">Bonus: {a.bonus}</div>
+                    <div className="pick-meta">Career edge: {a.bonus}</div>
                   </div>
-                </div>
+                </ActionCard>
               ))}
           </div>
         </div>

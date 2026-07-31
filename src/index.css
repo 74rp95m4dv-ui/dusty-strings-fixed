@@ -228,6 +228,35 @@ button.city-row { width: 100%; color: inherit; font: inherit; text-align: left; 
   background: rgba(232, 216, 176, .035);
 }
 
+/* Reusable decision surfaces: clear hierarchy without losing the rough-hewn character. */
+.next-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(115deg, rgba(212,149,42,.15), rgba(106,158,90,.08));
+  border: 1px solid rgba(212,149,42,.3);
+  border-radius: var(--radius-md);
+  box-shadow: inset 3px 0 0 var(--amber), var(--shadow-sm);
+}
+.next-move-kicker, .setup-kicker {
+  display: block;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--amber-l);
+  margin-bottom: 5px;
+}
+.next-move strong { display: block; font-family: var(--head); font-size: 16px; color: var(--text); }
+.next-move p { color: var(--text2); font-size: 11px; line-height: 1.35; margin-top: 3px; }
+.pick-card-button { width: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pick-card-button:hover { border-color: var(--border3); background: var(--panel2); }
+.pick-card-button[aria-pressed="true"] { border-color: var(--amber); box-shadow: inset 3px 0 0 var(--amber); }
+.setup-screen { padding: 28px 16px 100px; min-height: 100dvh; overflow-y: auto; }
+.setup-intro { color: var(--text2); font-size: 13px; line-height: 1.45; margin: 0 0 24px; max-width: 34rem; }
+
 .week-summary ul { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: var(--text2); font-size: 12px; line-height: 1.4; }
 .week-summary b, .action-impact strong, .save-help strong, .save-notice strong { color: var(--amber); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .action-impact { display: grid; gap: 6px; margin-top: 12px; color: var(--text2); font-size: 12px; line-height: 1.4; }
@@ -401,7 +430,8 @@ button.city-row { width: 100%; color: inherit; font: inherit; text-align: left; 
   letter-spacing: 0.08em;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-width: 56px;
+  min-width: 64px;
+  min-height: 48px;
   border-radius: var(--radius-md);
 }
 
@@ -412,6 +442,8 @@ button.city-row { width: 100%; color: inherit; font: inherit; text-align: left; 
   color: var(--amber);
   background: var(--amber-d);
 }
+
+.badge-dot { min-width: 7px; min-height: 7px; }
 
 .nav-btn .nav-icon {
   font-size: 20px;
@@ -1323,6 +1355,13 @@ input[type="range"] {
   -webkit-overflow-scrolling: touch;
   animation: scaleIn 0.25s ease;
   position: relative;
+}
+.modal-box:focus { outline: none; }
+
+@media (max-width: 390px) {
+  .next-move { align-items: flex-start; }
+  .next-move .btn { flex: 0 0 auto; }
+  .setup-screen { padding-inline: 14px; }
 }
 
 .modal-title {

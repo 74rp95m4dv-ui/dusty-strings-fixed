@@ -6,6 +6,7 @@ import {
   FESTIVALS,
   type SetlistConfig,
 } from "../gameLogic";
+import Dialog from "./ui/Dialog";
 
 export default function LiveTab(game: any) {
   const {
@@ -115,7 +116,7 @@ export default function LiveTab(game: any) {
               <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={() => setConfirmTour(true)}>
                 Launch Tour ({fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))})
               </button>
-              {confirmTour && <div className="modal-overlay"><section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="live-tour-confirm"><div className="modal-title" id="live-tour-confirm">Launch this tour?</div><p className="tip-text">You will pay the route cost now and commit to {state.tourQueue.length} stop{state.tourQueue.length === 1 ? "" : "s"}. You can still abort later at a reputation cost.</p><div className="modal-footer"><button className="btn btn-lime" onClick={() => { doStartTour(); setConfirmTour(false); }}>Launch tour</button><button className="btn btn-ghost" onClick={() => setConfirmTour(false)}>Review route</button></div></section></div>}
+              {confirmTour && <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmTour(false); }}><Dialog titleId="live-tour-confirm" onClose={() => setConfirmTour(false)}><div className="modal-title" id="live-tour-confirm">Launch this tour?</div><p className="tip-text">You will pay the route cost now and commit to {state.tourQueue.length} stop{state.tourQueue.length === 1 ? "" : "s"}. You can still abort later at a reputation cost.</p><div className="modal-footer"><button data-dialog-initial className="btn btn-lime" onClick={() => { doStartTour(); setConfirmTour(false); }}>Launch tour</button><button className="btn btn-ghost" onClick={() => setConfirmTour(false)}>Review route</button></div></Dialog></div>}
             </>
           )}
         </div>

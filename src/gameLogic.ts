@@ -4786,7 +4786,22 @@ export interface GameState {
   selloutScore: number;
   totalPublishingRevenue: number;
   distributorFee: number;
+  // Deterministic career simulation and a compact player-facing weekly audit trail.
+  simulation: { seed: number; cursor: number };
+  weeklyLedger: WeeklyLedgerEntry[];
 
+}
+
+export interface WeeklyLedgerEntry {
+  week: number;
+  cashDelta: number;
+  fanDelta: number;
+  fameDelta: number;
+  repDelta: number;
+  energyDelta: number;
+  burnoutDelta: number;
+  rolls: number;
+  highlights: string[];
 }
 
 export const INITIAL_STATE: GameState = {
@@ -4902,6 +4917,8 @@ export const INITIAL_STATE: GameState = {
   selloutScore: 0,
   totalPublishingRevenue: 0,
   distributorFee: 0,
+  simulation: { seed: 1, cursor: 0 },
+  weeklyLedger: [],
 
 };
 

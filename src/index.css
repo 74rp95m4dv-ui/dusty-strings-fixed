@@ -256,6 +256,16 @@ button.city-row { width: 100%; color: inherit; font: inherit; text-align: left; 
 .pick-card-button[aria-pressed="true"] { border-color: var(--amber); box-shadow: inset 3px 0 0 var(--amber); }
 .setup-screen { padding: 28px 16px 100px; min-height: 100dvh; overflow-y: auto; }
 .setup-intro { color: var(--text2); font-size: 13px; line-height: 1.45; margin: 0 0 24px; max-width: 34rem; }
+.career-ledger { margin-top: var(--space-5); border: 1px solid var(--border2); border-radius: var(--radius-md); background: rgba(232,216,176,.025); }
+.career-ledger summary { display: flex; justify-content: space-between; gap: 10px; padding: var(--space-3); cursor: pointer; color: var(--text); font-family: var(--head); font-weight: 700; }
+.career-ledger summary small { color: var(--muted2); font: 10px/1.3 var(--mono); text-align: right; }
+.career-ledger-list { display: grid; gap: 8px; padding: 0 var(--space-3) var(--space-3); }
+.career-ledger-context { display: flex; flex-wrap: wrap; gap: 5px 10px; color: var(--muted2); font: 10px/1.35 var(--mono); }
+.career-ledger-entry { padding: 10px; border-radius: var(--radius-sm); background: var(--bg3); border-left: 2px solid var(--amber); }
+.career-ledger-topline, .career-ledger-deltas { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 11px; }
+.career-ledger-topline span { color: var(--muted2); font-family: var(--mono); }
+.career-ledger-deltas { margin-top: 6px; color: var(--text2); }
+.career-ledger-entry p { margin-top: 7px; color: var(--muted2); font-size: 11px; line-height: 1.35; }
 
 .week-summary ul { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: var(--text2); font-size: 12px; line-height: 1.4; }
 .week-summary b, .action-impact strong, .save-help strong, .save-notice strong { color: var(--amber); font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }

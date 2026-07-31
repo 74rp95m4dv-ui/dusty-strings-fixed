@@ -69,6 +69,7 @@ import {
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
 import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
+import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -668,7 +669,7 @@ function maybeSpawnArc(s: GameState): void {
 }
 
 // ─── ADVANCE WEEK ─────────────────────────────────────────
-function advance(prev:GameState): GameState {
+export function advanceCareerWeek(prev:GameState): GameState {
   const s:GameState = JSON.parse(JSON.stringify(prev));
   s.pendingEvent = null; s.modal = null;
   s.week++; s.weeksSinceRelease++;
@@ -1437,7 +1438,29 @@ function advance(prev:GameState): GameState {
   tickArcs(s);
   maybeSpawnArc(s);
 
-  saveToDisk(s);
+  return s;
+}
+
+function advance(prev: GameState): GameState {
+  const before = JSON.parse(JSON.stringify(prev)) as GameState;
+  const simulation = withSimulationRandom(prev, () => advanceCareerWeek(prev));
+  const s = simulation.result;
+  const highlights = s.log
+    .filter(entry => entry.week === s.week)
+    .slice(0, 3)
+    .map(entry => entry.msg);
+  const entry = {
+    week: s.week,
+    cashDelta: Math.round(s.money - before.money),
+    fanDelta: Math.round(s.fans - before.fans),
+    fameDelta: Number((s.fame - before.fame).toFixed(1)),
+    repDelta: Number((s.rep - before.rep).toFixed(1)),
+    energyDelta: Math.round(s.energy - before.energy),
+    burnoutDelta: Number(((s.burnout ?? 0) - (before.burnout ?? 0)).toFixed(1)),
+    rolls: simulation.rolls,
+    highlights,
+  };
+  s.weeklyLedger = [entry, ...(s.weeklyLedger ?? [])].slice(0, 16);
   return s;
 }
 
@@ -1509,6 +1532,8 @@ export function useGameState() {
       activeArcs: saved.activeArcs ?? [],
       completedArcs: saved.completedArcs ?? [],
       pendingArcChoice: saved.pendingArcChoice ?? null,
+      simulation: normalizeSimulation(saved.simulation),
+      weeklyLedger: saved.weeklyLedger ?? [],
     };
     return {...INITIAL_STATE};
   });
@@ -1516,7 +1541,12 @@ export function useGameState() {
   const hasSave = state.hasSave || !!initialLoad.state;
 
   const upd = useCallback((fn:(s:GameState)=>GameState)=>{
-    setState(prev=>{ const next=fn(JSON.parse(JSON.stringify(prev))); saveToDisk(next); return next; });
+    setState(prev=>{
+      const next = JSON.parse(JSON.stringify(prev)) as GameState;
+      const result = withSimulationRandom(next, () => fn(next)).result;
+      saveToDisk(result);
+      return result;
+    });
   },[]);
 
   const goToMenu  = useCallback(()=>setState(p=>({...p,screen:"menu"})),[]);
@@ -1574,6 +1604,8 @@ export function useGameState() {
     activeArcs: s.activeArcs ?? [],
     completedArcs: s.completedArcs ?? [],
     pendingArcChoice: s.pendingArcChoice ?? null,
+    simulation: normalizeSimulation(s.simulation),
+    weeklyLedger: s.weeklyLedger ?? [],
       // ── Touring Features v2.0 migration ──
       setlistConfig: s.setlistConfig ?? { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
       venueReputations: s.venueReputations ?? {},
@@ -1590,7 +1622,7 @@ export function useGameState() {
   const clearSave = useCallback(()=>{
     if (typeof window !== "undefined") clearGameState(window.localStorage);
     setSaveIssue(null);
-    setState({...INITIAL_STATE});
+    setState({...INITIAL_STATE, simulation: createSimulation(), weeklyLedger: []});
   },[]);
   const restoreBackup = useCallback(()=>{
     if (typeof window === "undefined") return;
@@ -1603,16 +1635,16 @@ export function useGameState() {
   const dismissSaveIssue = useCallback(() => setSaveIssue(null), []);
 
   const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string)=>{
-    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,artistName:name,genre,city,archetype,
+    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
       qualityBase:archHas(archetype,"acousticQBonus")?35+archVal(archetype):35,
-      trends:{Country:0.8+Math.random()*0.5,Blues:0.8+Math.random()*0.5},
+      trends:{Country:1,Blues:1},
       themeCounts:{},
-      currentTrendTheme: pickTrendTheme(null),
+      currentTrendTheme: null,
       producerWorkCounts:{},
       regional:{[city]:0},
       // Seed the scene with rival artists (#4) so the world feels populated
       // from week 1. They'll release, beef, and chart in parallel.
-      rivals: seedRivals(0),
+      rivals: [],
       currentPublishing: null,
       pendingPublishingOffers: [],
       pendingSyncOffers: [],
@@ -1620,10 +1652,19 @@ export function useGameState() {
       totalPublishingRevenue: 0,
 
     };
+    withSimulationRandom(s, () => {
+      s.trends = { Country: 0.8 + Math.random() * 0.5, Blues: 0.8 + Math.random() * 0.5 };
+      s.currentTrendTheme = pickTrendTheme(null);
+      s.rivals = seedRivals(0);
+    });
     saveToDisk(s); setState({ ...s, hasSave: true });
   },[]);
 
-  const doAdvance       = useCallback(()=>setState(prev=>advance(prev)),[]);
+  const doAdvance = useCallback(() => setState(prev => {
+    const next = advance(JSON.parse(JSON.stringify(prev)) as GameState);
+    saveToDisk(next);
+    return next;
+  }), []);
   const doDismissEvent     = useCallback(()=>upd(s=>{s.pendingEvent=null;return s;}),[upd]);
   const dismissModal       = useCallback(()=>upd(s=>{s.modal=null;return s;}),[upd]);
   const dismissNewspaper   = useCallback(()=>upd(s=>{s.pendingNewspaperJson=null;return s;}),[upd]);

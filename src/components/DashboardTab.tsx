@@ -347,6 +347,31 @@ export default function DashboardTab(props: DashboardProps) {
             <div className="empty-state">No events yet. Start your career!</div>
           )}
         </div>
+
+        <details className="career-ledger">
+          <summary><span>Career ledger</span><small>Why recent weeks moved</small></summary>
+          <div className="career-ledger-list">
+            <div className="career-ledger-context">
+              <span>Recurring pressure: {fmtMoney(s.weeklyExpenses)}/wk</span>
+              <span>Burnout: {Math.round(s.burnout ?? 0)}/100</span>
+              {s.currentLabel && <span>Label term: {s.currentLabel.weeksLeft}wk</span>}
+              {s.tourActive && <span>On tour: fatigue {Math.round(s.tourFatigue ?? 0)}</span>}
+            </div>
+            {(s.weeklyLedger ?? []).length === 0 && <div className="empty-state">End a week to start your career ledger.</div>}
+            {(s.weeklyLedger ?? []).slice(0, 6).map((entry: any) => (
+              <article className="career-ledger-entry" key={entry.week}>
+                <div className="career-ledger-topline"><b>Week {entry.week}</b><span>{entry.rolls} career roll{entry.rolls === 1 ? "" : "s"}</span></div>
+                <div className="career-ledger-deltas">
+                  <span className={entry.cashDelta >= 0 ? "text-sage" : "text-rust"}>{entry.cashDelta >= 0 ? "+" : ""}{fmtMoney(entry.cashDelta)}</span>
+                  <span className={entry.fanDelta >= 0 ? "text-sage" : "text-rust"}>{entry.fanDelta >= 0 ? "+" : ""}{fmt(entry.fanDelta)} fans</span>
+                  <span>Fame {entry.fameDelta >= 0 ? "+" : ""}{entry.fameDelta}</span>
+                  <span>Rep {entry.repDelta >= 0 ? "+" : ""}{entry.repDelta}</span>
+                </div>
+                {entry.highlights?.length > 0 && <p>{entry.highlights.join(" · ")}</p>}
+              </article>
+            ))}
+          </div>
+        </details>
       </div>
       {confirmation && <div className="modal-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmation(null); }}>
         <Dialog titleId="confirm-action-title" onClose={() => setConfirmation(null)}>

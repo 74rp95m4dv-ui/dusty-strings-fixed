@@ -1,10 +1,11 @@
 import React from "react";
 import { fmt, fmtMoney, getTrackDevelopment } from "../gameLogic";
 
-export function ReleaseCinematic({ state, doCloseReleasePresentation, isTourWrap = false }: any) {
+export function ReleaseCinematic({ state, doCloseReleasePresentation, doCloseTourWrapPresentation, isTourWrap = false }: any) {
   const presentation = isTourWrap ? state.tourWrapPresentation : state.releasePresentation;
+  const onClose = isTourWrap ? doCloseTourWrapPresentation : doCloseReleasePresentation;
   if (!presentation) return null;
-  if (isTourWrap) return <div className="modal-overlay" onClick={doCloseReleasePresentation}><div className="modal-box" onClick={event => event.stopPropagation()}><div className="modal-title">Tour Complete</div><div className="signing-title">{presentation.tourName}</div><div className="release-result-grid"><ResultStat label="Shows" value={String(presentation.completedShows)} /><ResultStat label="Net" value={fmtMoney(presentation.netProfit)} /></div><button className="btn btn-lime btn-block" onClick={doCloseReleasePresentation}>Continue</button></div></div>;
+  if (isTourWrap) return <div className="modal-overlay" onClick={onClose}><div className="modal-box" onClick={event => event.stopPropagation()}><div className="modal-title">Tour Complete</div><div className="signing-title">{presentation.tourName}</div><div className="release-result-grid"><ResultStat label="Shows" value={String(presentation.completedShows)} /><ResultStat label="Net" value={fmtMoney(presentation.netProfit)} /></div><button className="btn btn-lime btn-block" onClick={onClose}>Continue</button></div></div>;
 
   const lead = presentation.leadTrackIndex !== undefined ? presentation.tracks?.[presentation.leadTrackIndex] : null;
   const leadDevelopment = lead ? getTrackDevelopment(lead) : null;

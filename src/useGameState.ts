@@ -70,6 +70,7 @@ import {
 import { generateNashvilleTimes } from "./nashvilleTimes";
 import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
+import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -488,7 +489,7 @@ function readStoredGame(): StoredGame {
 
 function saveToDisk(s:GameState) {
   if (typeof window === "undefined") return false;
-  return saveGameState(window.localStorage, s);
+  return saveGameState(window.localStorage, normalizeGameState(s));
 }
 
 // ─── RIVALS / ARCS HELPERS ─────────────────────────────────
@@ -1473,7 +1474,7 @@ export function useGameState() {
   const [saveIssue, setSaveIssue] = useState<string | null>(() => initialLoad.message);
   const [state,setState] = useState<GameState>(()=>{
     const saved=initialLoad.state;
-    if (saved) return {
+    if (saved) return normalizeGameState({
       ...saved,
       ...migrateMarketState(saved),
       hasSave:true,
@@ -1491,7 +1492,7 @@ export function useGameState() {
         royaltyRate:0.15, recoupRate:1.0, merchCut:0, syncCut:0, publishingCut:0,
         marketingCommitment:0, marketingSpendYTD:0, albumsCommitted:1, albumsDelivered:0,
         optionsRemaining:0, optionWeeks:52, weeksLeft:104, totalWeeks:104,
-        signedAtWeek:saved.week ?? 0, totalAdvance:0,
+        signedAtWeek:saved.week ?? 0,
         crossCollateralization:false, controlledComposition:1.0, controlledCompositionCap:12,
         suspensionRights:false, keyPersonClause:false, creativeControl:50, approvalRights:[],
         isRecouped:false, perks:[], type:"indie" as const,
@@ -1537,8 +1538,8 @@ export function useGameState() {
       pendingArcChoice: saved.pendingArcChoice ?? null,
       simulation: normalizeSimulation(saved.simulation),
       weeklyLedger: saved.weeklyLedger ?? [],
-    };
-    return {...INITIAL_STATE};
+    });
+    return normalizeGameState({...INITIAL_STATE});
   });
 
   const hasSave = state.hasSave || !!initialLoad.state;
@@ -1546,7 +1547,7 @@ export function useGameState() {
   const upd = useCallback((fn:(s:GameState)=>GameState)=>{
     setState(prev=>{
       const next = JSON.parse(JSON.stringify(prev)) as GameState;
-      const result = withSimulationRandom(next, () => fn(next)).result;
+      const result = normalizeGameState(withSimulationRandom(next, () => fn(next)).result);
       saveToDisk(result);
       return result;
     });
@@ -1556,7 +1557,7 @@ export function useGameState() {
   const goToSetup = useCallback(()=>setState(p=>({...p,screen:"setup"})),[]);
   const loadGame  = useCallback(()=>{ const loaded = readStoredGame(); const s=loaded.state; setSaveIssue(loaded.message); if(s) {
     if (loaded.migrated || loaded.message) saveToDisk(s);
-    setState({
+    setState(normalizeGameState({
     ...s, hasSave:true, pendingEvent:null, modal:null,
     ...migrateMarketState(s),
     themeCounts: s.themeCounts ?? {},
@@ -1620,12 +1621,12 @@ export function useGameState() {
       pendingFestivalOffers: s.pendingFestivalOffers ?? [],
       completedFestivals: s.completedFestivals ?? [],
       lastBusBreakdownWeek: s.lastBusBreakdownWeek ?? 0,
-    });
+    }));
   } },[]);
   const clearSave = useCallback(()=>{
     if (typeof window !== "undefined") clearGameState(window.localStorage);
     setSaveIssue(null);
-    setState({...INITIAL_STATE, simulation: createSimulation(), weeklyLedger: []});
+    setState(normalizeGameState({...INITIAL_STATE, simulation: createSimulation(), weeklyLedger: []}));
   },[]);
   const restoreBackup = useCallback(()=>{
     if (typeof window === "undefined") return;
@@ -1660,11 +1661,11 @@ export function useGameState() {
       s.currentTrendTheme = pickTrendTheme(null);
       s.rivals = seedRivals(0);
     });
-    saveToDisk(s); setState({ ...s, hasSave: true });
+    normalizeGameState(s); saveToDisk(s); setState({ ...s, hasSave: true });
   },[]);
 
   const doAdvance = useCallback(() => setState(prev => {
-    const next = advanceWithSimulation(JSON.parse(JSON.stringify(prev)) as GameState);
+    const next = normalizeGameState(advanceWithSimulation(JSON.parse(JSON.stringify(prev)) as GameState));
     saveToDisk(next);
     return next;
   }), []);
@@ -1675,6 +1676,7 @@ export function useGameState() {
 
   // Project
   const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard")=>upd(s=>{
+    if (s.project) { s.pendingEvent={msg:"Finish or scrap the current project first.",type:"bad"}; return s; }
     // Dynamic recording time: base weeks + track count × studio × producer × mode
     const mint:Record<string,number>={Single:1,EP:3,Album:8,"Live Album":4};
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
@@ -1745,6 +1747,10 @@ export function useGameState() {
     opts?: { featId?: string; cowriterId?: string }
   )=>upd(s=>{
     if (!s.project||s.project.tracks.length>=s.project.maxTracks) return s;
+    name = name.trim();
+    if (!name || s.project.tracks.some(track => track.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      s.pendingEvent={msg:"Choose a unique track title.",type:"bad"}; return s;
+    }
     // featId and cowriterId are mutually exclusive — featId wins if both given.
     const featId = opts?.featId || undefined;
     const cowriterId = featId ? undefined : (opts?.cowriterId || undefined);
@@ -1761,7 +1767,7 @@ export function useGameState() {
   }),[upd]);
 
   const doRemoveTrack = useCallback((i:number)=>upd(s=>{
-    if (!s.project) return s;
+    if (!s.project || !Number.isInteger(i) || i < 0 || i >= s.project.tracks.length) return s;
     s.project.tracks.splice(i,1);
     recalculateProjectWeeks(s.project);
     return s;
@@ -1854,7 +1860,7 @@ export function useGameState() {
     s.burnout = Math.min(100, (s.burnout ?? 0) + burnAdd);
     s.qualityBase = Math.min(95, s.qualityBase + roll(1,4));
     s.unreleased.push({
-      id: "p" + Date.now(), type: p.type, genre: p.genre, title: p.title,
+      id: createGameEntityId(s, "project"), type: p.type, genre: p.genre, title: p.title,
       producerId: p.producerId, studioId: p.studioId, themeId: p.themeId, tracks: p.tracks,
       avgQuality, avgAppeal, hypeSnapshot: s.hype, marketingBudget: p.marketingBudget,
     });
@@ -2182,7 +2188,7 @@ export function useGameState() {
     // still bite (final s.rep is clamped 0..100 downstream anyway).
     const repFromCritic=(criticBand.rep + writingMix.critRepBonus + pressBonus) * (s.currentCareerIdentity === "critic_darling" ? 1.20 : 1);
     const headline=rnd(criticBand.headlines);
-    const cid="r"+Date.now()+Math.random().toString(36).slice(2,6);
+    const cid=createGameEntityId(s, "release");
     s.catalog.push({
     id:cid,title:p.title,type:p.type,genre:p.genre,quality:q,appeal:avgAppeal,leadTrackIndex,outcome,lifecycle,
     decayRate:lcP.decayRate,streamFloor:Math.floor(peakStr*lcP.floorPct),
@@ -2337,6 +2343,7 @@ export function useGameState() {
   // Grind
   const doGrind = useCallback((id:string)=>upd(s=>{
     const a=GRIND_ACTIONS.find(x=>x.id===id); if(!a) return s;
+    if((s.cooldowns?.[a.id] ?? 0)>0){s.pendingEvent={msg:`${a.name} is on cooldown.`,type:"bad"};return s;}
     if(s.energy<a.e){s.pendingEvent={msg:"Not enough energy.",type:"bad"};return s;}
     if(a.mc&&s.money<a.mc){s.pendingEvent={msg:"Not enough money.",type:"bad"};return s;}
     s.energy-=a.e; if(a.mc)s.money-=a.mc; s.cooldowns[a.id]=a.cd;
@@ -2364,6 +2371,7 @@ export function useGameState() {
 
   // Tour
   const doToggleTourCity = useCallback((cityName:string)=>upd(s=>{
+    if (s.tourActive) { s.pendingEvent={msg:"Finish or abort the current tour before changing the route.",type:"bad"}; return s; }
     const city=CITIES.find(c=>c.name===cityName); if(!city) return s;
     const inQ=s.tourQueue.findIndex(q=>q.cityName===cityName);
     if(inQ>=0){s.tourQueue.splice(inQ,1);return s;}
@@ -2374,6 +2382,7 @@ export function useGameState() {
   }),[upd]);
 
   const doSetVenueTier = useCallback((tier:number)=>upd(s=>{
+    if (!Number.isInteger(tier) || tier < 1 || s.tourActive) return s;
     s.tourVenue=tier;
     s.tourQueue=s.tourQueue.map(stop=>{
       const city=CITIES.find(c=>c.name===stop.cityName); if(!city) return stop;
@@ -2383,9 +2392,10 @@ export function useGameState() {
     return s;
   }),[upd]);
 
-  const doSetTicketMult = useCallback((mult:number)=>upd(s=>{s.tourTicketMult=mult;return s;}),[upd]);
+  const doSetTicketMult = useCallback((mult:number)=>upd(s=>{if(Number.isFinite(mult)) s.tourTicketMult=clamp(mult,0.5,2.5);return s;}),[upd]);
 
   const doStartTour = useCallback(()=>upd(s=>{
+    if(s.tourActive){s.pendingEvent={msg:"A tour is already underway.",type:"bad"};return s;}
     if(!s.tourQueue.length) return s;
     const mult=tourCostMult(s.archetype);
     // Upfront tour costs: travel + venue deposit + crew advance
@@ -2428,6 +2438,7 @@ export function useGameState() {
 
   const doShootMusicVideo = useCallback((id:string)=>upd(s=>{
     const existing = s.catalog.find(x=>x.id===id);
+    if (!existing) { s.pendingEvent={msg:"That release is no longer available.",type:"bad"}; return s; }
     if (existing?.hasMusicVideo) { s.pendingEvent={msg:"This release already has a music video.",type:"bad"}; return s; }
     if(s.money<1200){s.pendingEvent={msg:"Need $1,200 for music video.",type:"bad"};return s;}
     s.money-=1200; s.fame=clamp(s.fame+3,0,100); s.rep=clamp(s.rep+2,0,100); s.hype=clamp(s.hype+22,0,100); s.fans+=900;
@@ -2476,6 +2487,7 @@ export function useGameState() {
   // More
   const doSignBrandDeal = useCallback((id:string)=>upd(s=>{
     const b=BRAND_DEALS.find(x=>x.id===id); if(!b) return s;
+    if (s.activeBrandDeals.some(deal => deal.id === b.id)) { s.pendingEvent={msg:`${b.name} is already an active deal.`,type:"bad"}; return s; }
     s.activeBrandDeals.push({id:b.id,name:b.name,weeklyIncome:b.weeklyIncome,weeksLeft:b.duration});
     if(b.rep)s.rep=clamp(s.rep+Math.floor(b.rep*0.5),0,100); if(b.famePerk)s.fame=clamp(s.fame+Math.floor(b.famePerk*0.5),0,100);
     const selloutHit = getBrandDealSellout(id);
@@ -2487,6 +2499,7 @@ export function useGameState() {
 
   // Accept / reject a queued label offer. Accepting locks in the contract & pays the advance.
   const doAcceptLabelOffer = useCallback((labelId:string)=>upd(s=>{
+    if (s.currentLabel) { s.pendingEvent={msg:"End the current label contract before signing another.",type:"bad"}; return s; }
     const offer = s.pendingLabelOffers.find(o => o.labelId === labelId);
     if (!offer) return s;
     const L = getLabel(labelId);
@@ -2552,6 +2565,7 @@ export function useGameState() {
 
   // Accept / reject a queued manager offer.
   const doAcceptManagerOffer = useCallback((managerId:string)=>upd(s=>{
+    if (s.currentManager) { s.pendingEvent={msg:"Part ways with the current manager before signing another.",type:"bad"}; return s; }
     const offer = s.pendingManagerOffers.find(o => o.managerId === managerId);
     if (!offer) return s;
     const M = getManager(managerId);
@@ -2701,6 +2715,7 @@ export function useGameState() {
 
   // ── PUBLISHING ───────────────────────────────────────────
   const doAcceptPublishingOffer = useCallback((id:string)=>upd(s=>{
+    if (s.currentPublishing) { s.pendingEvent={msg:"Wait for the current publishing deal to end before signing another.",type:"bad"}; return s; }
     const offer = s.pendingPublishingOffers.find(o => o.id === id);
     if (!offer) return s;
     s.money += offer.advance;
@@ -2761,6 +2776,7 @@ export function useGameState() {
   }),[upd]);
 
   const doResolveScenario = useCallback((scenarioId: string, choiceIdx: number, rollSuccess?: boolean) => upd(s => {
+    if (s.pendingScenarioId !== scenarioId) return s;
     const scenario = RANDOM_SCENARIOS.find(sc => sc.id === scenarioId);
     if (!scenario) return s;
     const choice = scenario.choices[choiceIdx];
@@ -2791,13 +2807,18 @@ export function useGameState() {
 
   // ── Setlist Builder ──
   const doSetSetlist = useCallback((config: SetlistConfig) => upd(s => {
-    s.setlistConfig = config;
+    const counts = [config.deepCutCount, config.hitCount, config.newMaterialCount];
+    if (!counts.every(Number.isInteger) || counts.some(count => count < 0)) {
+      s.pendingEvent = { msg: "Setlist counts must be whole, non-negative numbers.", type: "bad" };
+      return s;
+    }
     const total = config.deepCutCount + config.hitCount + config.newMaterialCount;
     const slots = s.tourActive && s.tourActive.shows.length > 5 ? 22 : 6;
-    if (total !== slots) {
+    if (total !== slots || config.totalSlots !== slots) {
       s.pendingEvent = { msg: `Setlist must have exactly ${slots} songs. You have ${total}.`, type: "bad" };
     } else {
-      const sat = calculateSetlistSatisfaction(config, s.catalog, slots);
+      s.setlistConfig = { ...config, totalSlots: slots };
+      const sat = calculateSetlistSatisfaction(s.setlistConfig, s.catalog, slots);
       s.pendingEvent = { msg: `Setlist updated: ${sat.label} (${sat.score}/100). ${sat.feedback}`, type: sat.score >= 75 ? "good" : "neutral" };
     }
     return s;
@@ -2809,6 +2830,10 @@ export function useGameState() {
     if (!offer) return s;
     if (s.tourActive) {
       s.pendingEvent = { msg: "Can't take an opening act while on your own tour.", type: "bad" };
+      return s;
+    }
+    if (s.activeOpeningAct) {
+      s.pendingEvent = { msg: "Finish the current opening-act run before accepting another.", type: "bad" };
       return s;
     }
     s.activeOpeningAct = offer;
@@ -2832,6 +2857,10 @@ export function useGameState() {
     const offer = s.pendingFestivalOffers.find(f => f.festivalId === festivalId);
     if (!offer) return s;
     if (!s.festivalBookings) s.festivalBookings = [];
+    if (s.festivalBookings.some(booking => booking.festivalId === festivalId && !booking.completed)) {
+      s.pendingEvent = { msg: "That festival is already booked.", type: "bad" };
+      return s;
+    }
     s.festivalBookings.push({ ...offer, completed: false });
     s.pendingFestivalOffers = s.pendingFestivalOffers.filter(f => f.festivalId !== festivalId);
     s.log.unshift({ week: s.week, msg: `Booked ${offer.festivalName}! Performing week ${offer.performanceWeek}.`, type: "great" });
@@ -2963,7 +2992,7 @@ export function useGameState() {
     const variantTag = opts?.variantName && opts.variantName !== "Standard Black" && opts.variantName !== "Standard Jewel Case" && opts.variantName !== "Black Shell" ? ` (${opts.variantName})` : "";
     const baseName = name.trim() || tmpl.defaultName(tied?.title ?? null, s.artistName);
     const item: MerchItem = {
-      id: "m" + Date.now() + Math.random().toString(36).slice(2,5),
+      id: createGameEntityId(s, "merch"),
       type, name: baseName + variantTag + editionTag,
       emoji: tmpl.emoji,
       tiedToReleaseId: tiedReleaseId,
@@ -3018,7 +3047,7 @@ export function useGameState() {
       const variantTag = sel.variantName && sel.variantName !== "Standard Black" && sel.variantName !== "Standard Jewel Case" && sel.variantName !== "Black Shell" ? ` (${sel.variantName})` : "";
       const editionTag = sel.editionName && sel.editionName !== "Standard" ? ` — ${sel.editionName}` : "";
       const item: MerchItem = {
-        id: "m" + Date.now() + Math.random().toString(36).slice(2,5) + pressed,
+        id: createGameEntityId(s, "merch"),
         type: sel.type,
         name: tmpl.defaultName(rel.title, s.artistName) + variantTag + editionTag,
         emoji: tmpl.emoji,
@@ -3097,6 +3126,7 @@ export function useGameState() {
   }), [upd]);
 
   const doSwitchGenre = useCallback((genre:Genre)=>upd(s=>{
+    if (genre === s.genre) { s.pendingEvent={msg:`You're already making ${genre} music.`,type:"neutral"}; return s; }
     s.genre=genre; s.rep=clamp(s.rep-10,0,100);
     // Superfans signed up for who you were. A pivot loses ~25% of them.
     const sfLost = Math.floor((s.superfans ?? 0) * 0.25);

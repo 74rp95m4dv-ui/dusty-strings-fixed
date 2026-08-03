@@ -1441,10 +1441,13 @@ export function advanceCareerWeek(prev:GameState): GameState {
   return s;
 }
 
-function advance(prev: GameState): GameState {
+export function advanceWithSimulation(prev: GameState): GameState {
   const before = JSON.parse(JSON.stringify(prev)) as GameState;
   const simulation = withSimulationRandom(prev, () => advanceCareerWeek(prev));
   const s = simulation.result;
+  // advanceCareerWeek works on a snapshot. Carry the PRNG state updated on the
+  // source snapshot onto the returned career so the next week continues the run.
+  s.simulation = { ...prev.simulation };
   const highlights = s.log
     .filter(entry => entry.week === s.week)
     .slice(0, 3)
@@ -1661,7 +1664,7 @@ export function useGameState() {
   },[]);
 
   const doAdvance = useCallback(() => setState(prev => {
-    const next = advance(JSON.parse(JSON.stringify(prev)) as GameState);
+    const next = advanceWithSimulation(JSON.parse(JSON.stringify(prev)) as GameState);
     saveToDisk(next);
     return next;
   }), []);

@@ -24,6 +24,15 @@ describe("career persistence", () => {
     expect(result).toMatchObject({ kind: "success", migrated: true, source: "primary" });
   });
 
+  it("preserves simulation and ledger metadata in current saves", () => {
+    const storage = new MemoryStorage();
+    const state = { ...career, simulation: { seed: 42, cursor: 7 }, weeklyLedger: [{ week: 8, rolls: 3 }] };
+    saveGameState(storage, state);
+    const result = loadGameState<typeof state>(storage);
+    expect(result).toMatchObject({ kind: "success" });
+    if (result.kind === "success") expect(result.state.simulation).toEqual({ seed: 42, cursor: 7 });
+  });
+
   it("keeps a valid last-known-good backup and restores it after corruption", () => {
     const storage = new MemoryStorage();
     saveGameState(storage, career);

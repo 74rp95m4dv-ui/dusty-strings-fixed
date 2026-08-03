@@ -4951,17 +4951,30 @@ export interface ChartEntry {
   isMe: boolean; id?: string; lifecycle?: SongLifecycle;
 }
 
+function createChartRandom(week: number) {
+  let seed = (0x9e3779b9 ^ Math.imul(week || 1, 0x85ebca6b)) >>> 0;
+  return () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let value = seed;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function buildChart(catalog: CatalogEntry[], week: number): ChartEntry[] {
   const entries: ChartEntry[] = [];
+  const random = createChartRandom(week);
   // Generate 100 chart songs from real artists
   const seen = new Set<string>();
   for (let i = 0; i < 200 && entries.length < 95; i++) {
-    const a = CHART_ARTISTS[Math.floor(Math.random() * CHART_ARTISTS.length)];
-    const song = a.songs[Math.floor(Math.random() * a.songs.length)];
+    const a = CHART_ARTISTS[Math.floor(random() * CHART_ARTISTS.length)];
+    const song = a.songs[Math.floor(random() * a.songs.length)];
     const key = a.name + "|" + song;
     if (seen.has(key)) continue;
     seen.add(key);
-    const base = a.tier === 3 ? roll(5000000, 18000000) : a.tier === 2 ? roll(800000, 5000000) : roll(80000, 800000);
+    const range = a.tier === 3 ? [5000000, 18000000] : a.tier === 2 ? [800000, 5000000] : [80000, 800000];
+    const base = range[0] + random() * (range[1] - range[0]);
     const wobble = 0.7 + Math.sin(week * 0.37 + entries.length * 1.1) * 0.3;
     entries.push({ pos: 0, title: song, artist: a.name, streams: Math.floor(base * wobble), isMe: false });
   }

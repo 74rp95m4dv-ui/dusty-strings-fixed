@@ -5,6 +5,7 @@ import {
   MANAGERS, CAREER_IDENTITIES, type LabelOffer,
 } from "../gameLogic";
 import ActionCard from "./ui/ActionCard";
+import { forecastRecurringEconomy } from "../weeklyEconomy";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   const {
@@ -16,6 +17,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   } = game;
 
   const [sub, setSub] = useState<"deals" | "merch" | "awards" | "rivals" | "finances">("deals");
+  const recurringForecast = forecastRecurringEconomy(state);
 
   const totalIncome =
     (state.catalog.reduce((s: number, t: any) => s + (t.streamStats?.weeklyRevenue || 0), 0)) +
@@ -256,50 +258,41 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       {sub === "finances" && (
         <div className="stagger-1">
           <div className="card">
-            <div className="card-title">Weekly Income Breakdown</div>
+            <div className="card-title">Expected Recurring Week</div>
             <div className="finance-row">
               <span className="finance-label">Streaming</span>
               <span className="finance-value text-sage">
-                {fmtMoney(state.catalog.reduce((s: number, t: any) => s + (t.streamStats?.weeklyRevenue || 0), 0))}
+                {fmtMoney(recurringForecast.market)}
               </span>
             </div>
             <div className="finance-row">
               <span className="finance-label">Brand Deals</span>
               <span className="finance-value text-sage">
-                {fmtMoney(state.activeBrandDeals.reduce((s: number, d: any) => s + d.weeklyIncome, 0))}
+                {fmtMoney(recurringForecast.brands)}
               </span>
             </div>
             <div className="finance-row">
-              <span className="finance-label">Merch</span>
-              <span className="finance-value text-sage">
-                {fmtMoney(state.merchShop?.reduce((s: number, m: any) => {
-                  const recent = m.weeklySales.slice(-1)[0] || 0;
-                  return s + recent * (m.price - m.cost);
-                }, 0) || 0)}
-              </span>
-            </div>
-            <div className="finance-row">
-              <span className="finance-label">Publishing</span>
-              <span className="finance-value text-sage">
-                {fmtMoney(state.totalPublishingRevenue || 0)}
+              <span className="finance-label">Studio (active project)</span>
+              <span className="finance-value text-rust">
+                {recurringForecast.studio ? `-${fmtMoney(recurringForecast.studio)}` : "—"}
               </span>
             </div>
             <hr />
             <div className="finance-row">
-              <span className="finance-label">Weekly Expenses</span>
-              <span className="finance-value text-rust">{fmtMoney(state.weeklyExpenses)}</span>
+              <span className="finance-label">Recurring overhead</span>
+              <span className="finance-value text-rust">{fmtMoney(recurringForecast.overhead)}</span>
             </div>
             <div className="finance-row">
               <span className="finance-label">Manager Fee</span>
               <span className="finance-value text-rust">
-                {fmtMoney(state.currentManager?.weeklyFee || 0)}
+                {fmtMoney(recurringForecast.manager)}
               </span>
             </div>
             <hr />
             <div className="finance-row">
-              <span className="finance-label">Net Cash</span>
-              <span className="finance-value" style={{ color: "var(--amber)", fontSize: 16 }}>
-                {fmtMoney(state.money)}
+              <span className="finance-label">Expected recurring net</span>
+              <span className={`finance-value ${recurringForecast.net >= 0 ? "text-sage" : "text-rust"}`} style={{ fontSize: 16 }}>
+                {recurringForecast.net >= 0 ? "+" : ""}{fmtMoney(recurringForecast.net)}
               </span>
             </div>
             <div className="finance-row">

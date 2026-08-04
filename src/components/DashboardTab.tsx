@@ -367,6 +367,14 @@ export default function DashboardTab(props: DashboardProps) {
                   <span>Fame {entry.fameDelta >= 0 ? "+" : ""}{entry.fameDelta}</span>
                   <span>Rep {entry.repDelta >= 0 ? "+" : ""}{entry.repDelta}</span>
                 </div>
+                {(entry.incomeByCategory || entry.costByCategory) && <details className="career-ledger-breakdown">
+                  <summary>Money breakdown</summary>
+                  <div className="career-ledger-deltas">
+                    {Object.entries(entry.incomeByCategory ?? {}).map(([label, amount]: [string, any]) => <span className="text-sage" key={`in-${label}`}>+{fmtMoney(amount)} {label}</span>)}
+                    {Object.entries(entry.costByCategory ?? {}).map(([label, amount]: [string, any]) => <span className="text-rust" key={`out-${label}`}>-{fmtMoney(amount)} {label}</span>)}
+                  </div>
+                  <p>Cash: {fmtMoney(entry.openingCash)} → {fmtMoney(entry.closingCash)}</p>
+                </details>}
                 {entry.highlights?.length > 0 && <p>{entry.highlights.join(" · ")}</p>}
               </article>
             ))}

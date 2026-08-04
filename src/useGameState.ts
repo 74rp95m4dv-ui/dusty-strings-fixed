@@ -71,6 +71,7 @@ import { generateNashvilleTimes } from "./nashvilleTimes";
 import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
+import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -1429,7 +1430,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
   // have reduced s.fans below s.superfans).
   s.superfans = Math.max(0, Math.min(s.superfans ?? 0, s.fans));
 
-  s.weeklyExpenses = Math.max(380, 340 + s.fans*0.008 + s.fame*6 + (s.totalShows*0.12));
+  s.weeklyExpenses = calculateWeeklyOverhead(s);
 
   // ── #4 Rivals + #5 Story Arcs (tick after all base sim updates) ──
   // Order matters: tick rivals first (may add log entries), then arcs (may
@@ -1453,7 +1454,7 @@ export function advanceWithSimulation(prev: GameState): GameState {
     .filter(entry => entry.week === s.week)
     .slice(0, 3)
     .map(entry => entry.msg);
-  const entry = {
+  const entry = buildWeeklyEconomyLedger(before, s, {
     week: s.week,
     cashDelta: Math.round(s.money - before.money),
     fanDelta: Math.round(s.fans - before.fans),
@@ -1463,7 +1464,7 @@ export function advanceWithSimulation(prev: GameState): GameState {
     burnoutDelta: Number(((s.burnout ?? 0) - (before.burnout ?? 0)).toFixed(1)),
     rolls: simulation.rolls,
     highlights,
-  };
+  });
   s.weeklyLedger = [entry, ...(s.weeklyLedger ?? [])].slice(0, 16);
   return s;
 }
@@ -1661,6 +1662,7 @@ export function useGameState() {
       s.currentTrendTheme = pickTrendTheme(null);
       s.rivals = seedRivals(0);
     });
+    s.weeklyExpenses = calculateWeeklyOverhead(s);
     normalizeGameState(s); saveToDisk(s); setState({ ...s, hasSave: true });
   },[]);
 
@@ -2297,7 +2299,7 @@ export function useGameState() {
       week: s.week, genre: p.genre, tracks: p.tracks,
       fanReviews: genFanReviews(outcome),
     };
-    s.weeklyExpenses=Math.max(100,80+s.fans*0.003+s.fame*5);
+    s.weeklyExpenses=calculateWeeklyOverhead(s);
     s.pendingPressing = { releaseId: cid, releaseTitle: p.title, releaseType: p.type };
     return s;
   }),[upd]);

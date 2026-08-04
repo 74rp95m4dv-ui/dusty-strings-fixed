@@ -4795,6 +4795,10 @@ export interface GameState {
 export interface WeeklyLedgerEntry {
   week: number;
   cashDelta: number;
+  openingCash?: number;
+  closingCash?: number;
+  incomeByCategory?: WeeklyFinanceCategories;
+  costByCategory?: WeeklyFinanceCategories;
   fanDelta: number;
   fameDelta: number;
   repDelta: number;
@@ -4803,6 +4807,8 @@ export interface WeeklyLedgerEntry {
   rolls: number;
   highlights: string[];
 }
+
+export type WeeklyFinanceCategories = Record<string, number>;
 
 export const INITIAL_STATE: GameState = {
   screen: "menu",

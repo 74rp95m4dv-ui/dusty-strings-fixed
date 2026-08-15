@@ -72,6 +72,7 @@ import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } 
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
+import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -219,7 +220,8 @@ function addIdentityScore(s: GameState, identity: CareerIdentity, amount: number
   }
 }
 
-function resolveAlbumCampaignWeek(s: GameState) {
+/* Extracted to gameSystems/albumCampaign.ts.
+function resolveAlbumCampaignWeekLegacy(s: GameState) {
   const campaign = s.activeAlbumCampaign;
   if (!campaign) return;
   const release = s.catalog.find(item => item.id === campaign.releaseId);
@@ -292,6 +294,7 @@ function resolveAlbumCampaignWeek(s: GameState) {
   }
 }
 
+*/
 const SONG_STAGE_NEXT: Record<SongStage, SongStage> = { writing: "recording", recording: "mixing", mixing: "complete", complete: "complete" };
 const SONG_DIRECTION_EFFECTS: Record<SongDirection, { quality: number; appeal: number; risky: boolean }> = {
   commercial: { quality: -0.15, appeal: 0.75, risky: false },
@@ -703,7 +706,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
     s.campaignRadioBoostWeeks--;
     if (s.campaignRadioBoostWeeks === 0) s.campaignRadioBoost = 0;
   }
-  resolveAlbumCampaignWeek(s);
+  resolveAlbumCampaignWeekSystem(s, Math.random, addIdentityScore);
   for (const k of Object.keys(s.cooldowns)) if(s.cooldowns[k]>0) s.cooldowns[k]--;
   // Burnout slowly recovers each week — but only meaningfully when not actively
   // grinding (touring counters this in the show block below).
@@ -2467,22 +2470,7 @@ export function useGameState() {
   }),[upd]);
 
   const doAlbumCampaignAction = useCallback((action:AlbumCampaignAction, trackIndex?:number)=>upd(s=>{
-    const campaign = s.activeAlbumCampaign;
-    if (!campaign || campaign.pendingAction) { s.pendingEvent={msg:"That campaign week already has a move planned.",type:"bad"}; return s; }
-    const release = s.catalog.find(item => item.id === campaign.releaseId);
-    if (!release || campaign.actionsUsed.includes(action)) { s.pendingEvent={msg:"That campaign move has already been used.",type:"bad"}; return s; }
-    if (action === "follow_up_single") {
-      if (trackIndex === undefined || trackIndex === release.leadTrackIndex || !release.tracks[trackIndex]) {
-        s.pendingEvent={msg:"Choose a non-lead album track as the follow-up single.",type:"bad"}; return s;
-      }
-      campaign.followUpTrackIndex = trackIndex;
-    }
-    if ((action === "radio_push" || action === "music_video") && campaign.followUpTrackIndex === null) {
-      s.pendingEvent={msg:"Choose a follow-up single before promoting it.",type:"bad"}; return s;
-    }
-    campaign.pendingAction = action;
-    campaign.actionTakenWeek = s.week;
-    s.pendingEvent={msg:`${action === "hold_steady" ? "Holding steady" : "Campaign move locked in"}. It resolves when you end the week.`,type:"good"};
+    queueAlbumCampaignAction(s, action, trackIndex);
     return s;
   }),[upd]);
 

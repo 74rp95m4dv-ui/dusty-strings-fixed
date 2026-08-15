@@ -73,6 +73,7 @@ import { createSimulation, normalizeSimulation, withSimulationRandom } from "./s
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
 import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
+import { getTrackRatingBounds } from "./recordingForecast";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -317,41 +318,12 @@ function recalculateProjectWeeks(project: NonNullable<GameState["project"]>) {
 }
 
 function resolveTrackRating(state: GameState, project: NonNullable<GameState["project"]>, track: TrackEntry) {
-  const development = getTrackDevelopment(track);
-  const producer = PRODUCERS.find(item => item.id === project.producerId);
-  const studio = getStudio(project.studioId);
-  const relationship = producer ? getProducerRelationship(producer.id, state.producerWorkCounts) : null;
-  const themeFit = producer && project.themeId && (PRODUCER_THEMES[producer.id] ?? []).includes(project.themeId) ? 0.35 : 0;
-  const stages = SONG_STAGES.map(stage => development[stage]);
-  const directionQuality = stages.reduce((sum, stage) => sum + SONG_DIRECTION_EFFECTS[stage.direction].quality + (stage.riskQuality ?? 0), 0);
-  const directionAppeal = stages.reduce((sum, stage) => sum + SONG_DIRECTION_EFFECTS[stage.direction].appeal + (stage.riskAppeal ?? 0), 0);
-  const focused = stages.filter(stage => stage.investment === "focused").length;
-  const archetypeBonus = (applyArchQuality(state.archetype, state.qualityBase) - state.qualityBase) / 10;
-  const burnoutPenalty = burnoutQualityPenalty(state.burnout ?? 0) / 10;
-  const pushPenalty = -0.2 * (project.pushThroughCount ?? 0);
-  const modeBonus = RECORDING_MODE_CONFIG[project.mode ?? "standard"].qualityMod / 10;
-  const coWriterBonus = track.cowriterId ? 0.30 : 0;
-  const featureAppeal = track.featId ? 0.45 : 0;
-  const quality = clamp(
-    1.55 + state.qualityBase * 0.06 + (producer?.qB ?? 0) * 0.045 + (studio?.qB ?? 0) * 0.035 +
-    (relationship?.qBonus ?? 0) * 0.04 + themeFit + directionQuality + focused * 0.22 + coWriterBonus + archetypeBonus + burnoutPenalty + pushPenalty + modeBonus,
-    1, 10,
-  );
-  const appeal = clamp(
-    3.5 + (producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09 + directionAppeal + focused * 0.10 + featureAppeal + (track.cowriterId ? 0.12 : 0),
-    1, 10,
-  );
+  const rating = getTrackRatingBounds(state, project, track);
   return {
-    quality: Number(quality.toFixed(1)),
-    appeal: Number(appeal.toFixed(1)),
-    qualityBreakdown: {
-      craft: Number((1.55 + state.qualityBase * 0.06).toFixed(2)), team: Number(((producer?.qB ?? 0) * 0.045 + (studio?.qB ?? 0) * 0.035 + (relationship?.qBonus ?? 0) * 0.04 + themeFit).toFixed(2)),
-      choices: Number((directionQuality + focused * 0.22 + coWriterBonus).toFixed(2)), condition: Number((archetypeBonus + burnoutPenalty + pushPenalty + modeBonus).toFixed(2)),
-    },
-    appealBreakdown: {
-      direction: Number(directionAppeal.toFixed(2)), team: Number(((producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09).toFixed(2)),
-      collaboration: Number((featureAppeal + (track.cowriterId ? 0.12 : 0)).toFixed(2)), focused: Number((focused * 0.10).toFixed(2)),
-    },
+    quality: rating.quality.expected,
+    appeal: rating.appeal.expected,
+    qualityBreakdown: rating.qualityBreakdown,
+    appealBreakdown: rating.appealBreakdown,
   };
 }
 

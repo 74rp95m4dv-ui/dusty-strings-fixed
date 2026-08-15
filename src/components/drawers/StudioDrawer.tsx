@@ -5,6 +5,7 @@ import {
   getProjectPipelineStage, getProducerEffectiveCost, getTrackDevelopment,
   type RecordingMode, type ReleaseType, type SessionInvestment, type SongDevelopmentStage, type SongDirection, type SongStage,
 } from "../../gameLogic";
+import { getRecordingSessionForecast } from "../../recordingForecast";
 
 type SettingPicker = "producer" | "studio" | "theme" | null;
 
@@ -50,9 +51,23 @@ function ActiveProject({ state, advance, doUpdateProject, doAddTrack, doRemoveTr
       {project.tracks.length < project.maxTracks && stage === "writing" && <div className="studio-add-track"><div className="studio-add-track-row"><input aria-label="Track title" value={trackName} placeholder="Track title" onChange={event => setTrackName(event.target.value)} onKeyDown={event => { if (event.key === "Enter") addTrack(); }} /><button className="btn btn-sm" title="Generate track title" aria-label="Generate track title" onClick={() => setTrackName(project.themeId ? genThemedTrackName(project.themeId) : genTrackName())}>🎲</button><button className="btn btn-sm btn-lime" onClick={addTrack}>Add</button></div></div>}
     </section>
 
+    <SessionForecast state={state} />
+
     <details className="studio-session-details"><summary>Session details</summary><div className="studio-session-content"><div className="studio-mini-panel"><div className="studio-option-label">This week</div><div className="studio-option-buttons"><button className="btn btn-sm" onClick={doTakeStudioBreak}>Take Break</button><button className="btn btn-sm" onClick={doPushThrough}>Push Through</button><button className="btn btn-sm btn-ghost" onClick={doCancelStudioChoice}>Cancel</button></div><div className="tip-text">A focused pass charges when the week ends. Breaks hold progress; pushing through exhaustion hurts every final rating.</div></div><button className="btn btn-danger btn-block" onClick={doScrubProject}>Scrub Project</button></div></details>
     <button className="btn btn-end-week btn-block" onClick={advance}>⏭ End Week</button><button className="btn btn-lime btn-block" disabled={!canFinish} onClick={doFinishProject} style={{ marginTop: 8 }}>Finish Recording</button><button className="btn btn-ghost btn-block" onClick={onBack} style={{ marginTop: 6 }}>Back</button>
   </div></div>;
+}
+
+function SessionForecast({ state }: { state: any }) {
+  const forecast = getRecordingSessionForecast(state);
+  if (!forecast) return null;
+  const status = forecast.status === "complete" ? "No creative pass remains" : forecast.status === "break" ? "Break selected — progress will hold" : forecast.status === "stalled" ? "Too exhausted to record — progress will stall" : forecast.status === "push_through" ? "Pushing through exhaustion — quality penalty applies" : `${forecast.stage[0].toUpperCase() + forecast.stage.slice(1)} pass will progress`;
+  const expenses = [
+    forecast.studioCost > 0 ? `${fmtMoney(forecast.studioCost)} studio rent` : null,
+    forecast.focusedCost > 0 ? `${fmtMoney(forecast.focusedCost)} focused work` : null,
+    forecast.featureCost > 0 ? `${fmtMoney(forecast.featureCost)} feature fee` : null,
+  ].filter(Boolean).join(" · ");
+  return <section className="studio-section-card" aria-label="Session forecast"><div className="studio-section-heading"><div><div className="studio-section-eyebrow">Session forecast</div><div className="studio-section-note">{status}</div></div></div><div className="music-detail-metrics"><span>Cash {fmtMoney(forecast.cashCost)}</span><span>Label fund {fmtMoney(forecast.labelFundCost)}</span><span>Energy {forecast.energyChange}</span><span>Burnout +{forecast.burnoutChange}</span></div>{forecast.status !== "complete" && <div className="tip-text" style={{ marginTop: 8 }}>{expenses}{forecast.cashCost > state.money && <><br /><strong>Insufficient cash: this pass cannot run.</strong></>}</div>}<details className="song-score-breakdown" style={{ marginTop: 8 }}><summary>Projected final ratings</summary><div className="music-detail-metrics">{forecast.trackRatings.map(track => <span key={track.name}>{track.name}: Q {track.rating.quality.min}–{track.rating.quality.max} · A {track.rating.appeal.min}–{track.rating.appeal.max}{track.rating.hasUnresolvedRisk ? " · risk" : ""}</span>)}</div><div className="tip-text" style={{ marginTop: 6 }}>Ranges reflect the current plan. Artistic passes keep their uncertainty until the session resolves.</div></details></section>;
 }
 
 function ProjectSettings({ state, project, picker, setPicker, doUpdateProject }: any) {

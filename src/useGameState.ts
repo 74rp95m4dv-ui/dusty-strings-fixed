@@ -74,6 +74,7 @@ import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
 import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
 import { getTrackRatingBounds } from "./recordingForecast";
+import { PROJECT_DIRECTIONS, canChangeProjectDirection, getRegionalDemand, getLiveCatalogMultiplier, getSongStrengths } from "./gameSystems/careerDepth";
 
 function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus === bonus; }
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
@@ -1018,6 +1019,8 @@ export function advanceCareerWeek(prev:GameState): GameState {
       }
     } else {
     let demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
+    const regionalDemand = getRegionalDemand(s, show.cityName);
+    demand = Math.floor(demand * regionalDemand.multiplier * getLiveCatalogMultiplier(s));
     if (s.campaignLiveBoostWeeks > 0) demand = Math.floor(demand * (1 + s.campaignLiveBoost));
     if (s.currentCareerIdentity === "road_warrior") demand = Math.floor(demand * 1.08);
     const burnoutMult = burnoutShowMult(s.burnout ?? 0);
@@ -1046,7 +1049,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
       setlistRepBonus = setlistSatisfaction.deepCutBonus;
     }
 
-    const fill=calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult * setlistFillMod;
+    const fill=clamp(calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult * setlistFillMod, 0, 1);
     const seats=Math.floor(fill*show.venueCap);
     // Realistic indie ticket pricing by venue tier + fame premium
     const baseTicketByTier = [8, 12, 18, 25, 35, 55, 85];
@@ -1113,6 +1116,8 @@ export function advanceCareerWeek(prev:GameState): GameState {
 
     if (!s.regional[show.region]) s.regional[show.region]=0;
     s.regional[show.region]++;
+    s.cityLastPlayed = { ...s.cityLastPlayed, [show.cityName]: s.week };
+    s.log.unshift({ week:s.week, msg:`${show.cityName}: regional demand ${Math.round((regionalDemand.multiplier - 1) * 100)}%; live repertoire ${Math.round((getLiveCatalogMultiplier(s) - 1) * 100)}%. Regional following grew.`, type:"neutral" });
     if (!s.tourHistory) s.tourHistory=[];
     const gross = doorGross;
     s.tourHistory.unshift({
@@ -1667,6 +1672,10 @@ export function useGameState() {
   const doUpdateProject = useCallback((ch:Partial<GameState["project"]>)=>upd(s=>{
     if (!s.project || !ch) return s;
     const p = s.project;
+    if (ch.creativeDirection !== undefined && (!Object.prototype.hasOwnProperty.call(PROJECT_DIRECTIONS, ch.creativeDirection) || !canChangeProjectDirection(p))) {
+      s.pendingEvent = { msg: "Choose your project direction before the first writing pass.", type: "bad" };
+      return s;
+    }
 
     // ── Charge cost deltas upfront when producer or studio is swapped ──
     // Producer fees apply the relationship discount (built up from past projects).
@@ -1811,6 +1820,7 @@ export function useGameState() {
       development.stage = "complete";
       development.qualityRating = rating.quality;
       development.appealRating = rating.appeal;
+      development.strengths = getSongStrengths(track, p);
       development.qualityBreakdown = rating.qualityBreakdown;
       development.appealBreakdown = rating.appealBreakdown;
       track.development = development;
@@ -2219,9 +2229,9 @@ export function useGameState() {
     if (!label || p.producerId === "self") addIdentityScore(s, "independent_spirit", 2);
     s.discography.push({id:cid,type:p.type,title:p.title,genre:p.genre,themeId:p.themeId,tracks:p.tracks,avgQuality:q,outcome,revenue,fansGained:fansG,fameDelta:famD,repDelta:repD+repFromCritic,releasedWeek:s.week,peakStreams:peakStr,criticHeadline:headline,lifecycle,hasMusicVideo:false,format,releasedEraId:era.id});
     if (p.type === "Album") {
-      s.activeAlbumCampaign = { releaseId:cid, releaseTitle:p.title, startWeek:s.week, endWeek:s.week + 4,
+      s.activeAlbumCampaign = { releaseId:cid, releaseTitle:p.title, startWeek:s.week, endWeek:s.week + 12,
         followUpTrackIndex:null, actionsUsed:[], actionHistory:[], pendingAction:null, actionTakenWeek:null };
-      s.log.unshift({ week:s.week, msg:`Album campaign started for "${p.title}". Choose one move before each of the next four weeks.`, type:"great" });
+      s.log.unshift({ week:s.week, msg:`Album campaign started for "${p.title}". Twelve weeks to build discovery, follow listener feedback, and give the record a second life.`, type:"great" });
     }
     if (label) {
       label.marketingSpendYTD += deployedCampaign;

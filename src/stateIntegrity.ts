@@ -32,6 +32,8 @@ function uniqueByKey<T>(items: T[] | undefined, keyFor: (item: T) => string | un
  */
 export function normalizeGameState(state: GameState): GameState {
   state.simulation = normalizeSimulation(state.simulation);
+  state.regional = Object.fromEntries(Object.entries(state.regional ?? {}).map(([region, count]) => [region, wholeAtLeast(count, 0)]));
+  state.cityLastPlayed = Object.fromEntries(Object.entries(state.cityLastPlayed ?? {}).filter(([city]) => CITIES.some(item => item.name === city)).map(([city, week]) => [city, wholeAtLeast(week, 0)]));
   state.week = wholeAtLeast(state.week, 1);
   state.currentYear = wholeAtLeast(state.currentYear, 1990);
   state.money = finite(state.money, 0);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import AlbumCampaignPanel from "./AlbumCampaignPanel";
 import { buildChart, fmt, fmtMoney, getTrackDevelopment, SPOTIFY_MIN_STREAMS, STREAMING_PLATFORMS, getMarketEra, getReleaseFormat, RELEASE_FORMATS, CAREER_IDENTITIES, type CampaignAllocation, type ReleaseFormat } from "../gameLogic";
 
 const DEFAULT_ALLOCATION: CampaignAllocation = { streaming: 25, radio: 25, press: 25, live: 25 };
@@ -8,7 +9,6 @@ export default function MusicTab(game: any) {
   const [view, setView] = useState<"releases" | "insights">("releases");
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [releaseTarget, setReleaseTarget] = useState<any | null>(null);
-  const [followUpIndex, setFollowUpIndex] = useState<number>(-1);
   const weeklyStreams = state.catalog.reduce((sum: number, item: any) => sum + (item.weeklyStreams || 0), 0);
   const weeklyRevenue = state.catalog.reduce((sum: number, item: any) => sum + (item.weeklyRevenue || 0), 0);
   const chart = buildChart(state.catalog, state.week);
@@ -17,7 +17,6 @@ export default function MusicTab(game: any) {
 
   const era = getMarketEra(state.currentYear);
   const activeCampaign = state.activeAlbumCampaign;
-  const campaignRelease = activeCampaign ? state.catalog.find((item: any) => item.id === activeCampaign.releaseId) : null;
   const identity = state.currentCareerIdentity ? CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES] : null;
   const launch = (projectId: string, leadIndex: number, allocation?: CampaignAllocation, override = false, format?: ReleaseFormat) => {
     doReleaseProject(projectId, leadIndex, allocation, override, format);
@@ -28,7 +27,7 @@ export default function MusicTab(game: any) {
     <header className="music-header"><div><div className="pg-title">Music</div><div className="tip-text">Choose the lead, then decide how a label campaign reaches listeners.</div></div><div className="music-header-stat"><span>This week</span><strong>{fmt(weeklyStreams)}</strong><small>{fmtMoney(weeklyRevenue)}</small></div></header>
     <section className="music-insight-summary music-market-summary"><div><span>Market year</span><strong>{state.currentYear}</strong></div><div className="music-market-brief"><span>{era.name}</span><strong>{era.marketNote}</strong><small>{era.promotionNote}</small></div><div><span>Formats</span><strong>{era.formats.map(format => RELEASE_FORMATS[format].short).join(" · ")}</strong></div></section>
     {identity && <div className="tip-text" style={{ marginTop: 8 }}>Public identity: <b>{identity.title}</b> · {identity.perk}</div>}
-    {activeCampaign && campaignRelease && <section className="card" style={{ marginTop: 14, borderColor: "var(--lime)" }}><div className="card-title">Album campaign · {campaignRelease.title}</div><div className="tip-text">Week {Math.min(4, activeCampaign.actionHistory.length + 1)} of 4 · {activeCampaign.pendingAction ? "Move locked in — end the week to resolve it." : "Choose one move this week, or end the week to hold steady."}</div><div className="music-release-actions" style={{ marginTop: 10 }}><select value={followUpIndex} onChange={event => setFollowUpIndex(Number(event.target.value))} disabled={!!activeCampaign.pendingAction || activeCampaign.actionsUsed.includes("follow_up_single")}><option value={-1}>Choose follow-up single</option>{campaignRelease.tracks.map((track: any, index: number) => index !== campaignRelease.leadTrackIndex && <option key={index} value={index}>{track.name}</option>)}</select><button className="btn btn-sm btn-lime" disabled={!!activeCampaign.pendingAction || activeCampaign.actionsUsed.includes("follow_up_single") || followUpIndex < 0} onClick={() => doAlbumCampaignAction("follow_up_single", followUpIndex)}>Choose follow-up</button><button className="btn btn-sm" disabled={!!activeCampaign.pendingAction || activeCampaign.actionsUsed.includes("radio_push") || activeCampaign.followUpTrackIndex === null || state.money < 1000} onClick={() => doAlbumCampaignAction("radio_push")}>Radio ($1k)</button><button className="btn btn-sm" disabled={!!activeCampaign.pendingAction || activeCampaign.actionsUsed.includes("music_video") || activeCampaign.followUpTrackIndex === null || state.money < 1200 || campaignRelease.hasMusicVideo} onClick={() => doAlbumCampaignAction("music_video")}>Video ($1.2k)</button><button className="btn btn-sm" disabled={!!activeCampaign.pendingAction || activeCampaign.actionsUsed.includes("live_appearance") || state.energy < 15} onClick={() => doAlbumCampaignAction("live_appearance")}>Live appearance (15 energy)</button><button className="btn btn-sm btn-ghost" disabled={!!activeCampaign.pendingAction} onClick={() => doAlbumCampaignAction("hold_steady")}>Hold steady</button></div>{activeCampaign.followUpTrackIndex !== null && <div className="text-sage" style={{ marginTop: 8 }}>Follow-up: {campaignRelease.tracks[activeCampaign.followUpTrackIndex]?.name}</div>}{activeCampaign.actionHistory.length > 0 && <div className="text-muted" style={{ marginTop: 6 }}>Last move: {activeCampaign.actionHistory[activeCampaign.actionHistory.length - 1].outcome}</div>}</section>}
+    <AlbumCampaignPanel key={activeCampaign?.releaseId ?? "none"} state={state} onAction={doAlbumCampaignAction} />
     <div className="music-switcher" role="tablist" aria-label="Music views"><button role="tab" aria-selected={view === "releases"} className={view === "releases" ? "active" : ""} onClick={() => setView("releases")}>Releases</button><button role="tab" aria-selected={view === "insights"} className={view === "insights" ? "active" : ""} onClick={() => setView("insights")}>Insights</button></div>
 
     {view === "releases" && <div className="music-release-shelf stagger-1">

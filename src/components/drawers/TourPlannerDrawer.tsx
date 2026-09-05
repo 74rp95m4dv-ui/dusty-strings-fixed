@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CITIES, VENUES, fmtMoney } from "../../gameLogic";
+import { regionalDemandLabel } from "../../gameSystems/careerDepth";
 
 export default function TourPlannerDrawer({ state, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour, onClose, onSwitchTab }: any) {
   const [confirmLaunch, setConfirmLaunch] = useState(false);
@@ -40,6 +41,7 @@ export default function TourPlannerDrawer({ state, doToggleTourCity, doSetVenueT
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</div>
                   <div className="tip-text">{v.name} • {v.cap} cap • {fmtMoney(v.cost + c.travelCost)}</div>
+                  <div className="tip-text">{regionalDemandLabel(state, c.name)}</div>
                 </div>
                 <div style={{ fontSize: 18 }}>{isIn ? "✓" : "+"}</div>
               </button>

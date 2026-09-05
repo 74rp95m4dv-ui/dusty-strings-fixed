@@ -7,6 +7,7 @@ import {
   type SetlistConfig,
 } from "../gameLogic";
 import Dialog from "./ui/Dialog";
+import { regionalDemandLabel } from "../gameSystems/careerDepth";
 
 export default function LiveTab(game: any) {
   const {
@@ -105,6 +106,7 @@ export default function LiveTab(game: any) {
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700 }}>{c.name}</div>
                           <div className="tip-text">{v.name} • {v.cap} cap • {fmtMoney(v.cost + c.travelCost)}</div>
+                          <div className="tip-text">{regionalDemandLabel(state, c.name)}</div>
                         </div>
                         <div style={{ fontSize: 18 }}>{isIn ? "✓" : "+"}</div>
                       </button>

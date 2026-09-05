@@ -17,6 +17,7 @@ import {
   type TrackEntry,
 } from "./gameLogic";
 import { burnoutQualityPenalty } from "./gameLogic";
+import { getProjectDirection } from "./gameSystems/careerDepth";
 
 const DIRECTION_EFFECTS = {
   commercial: { quality: -0.15, appeal: 0.75 },
@@ -63,6 +64,7 @@ export function getTrackRatingBounds(
   track: TrackEntry,
 ): TrackRatingBounds {
   const development = getTrackDevelopment(track);
+  const projectDirection = getProjectDirection(project);
   const producer = PRODUCERS.find(item => item.id === project.producerId);
   const studio = getStudio(project.studioId);
   const relationship = producer ? getProducerRelationship(producer.id, state.producerWorkCounts) : null;
@@ -88,10 +90,10 @@ export function getTrackRatingBounds(
   const focused = stages.filter(pass => pass.investment === "focused").length;
   const craft = 1.55 + state.qualityBase * 0.06;
   const team = (producer?.qB ?? 0) * 0.045 + (studio?.qB ?? 0) * 0.035 + (relationship?.qBonus ?? 0) * 0.04 + themeFit;
-  const choices = directionQuality + focused * 0.22 + (track.cowriterId ? 0.30 : 0);
+  const choices = directionQuality + focused * 0.22 + (track.cowriterId ? 0.30 : 0) + projectDirection.quality;
   const condition = archetypeQualityBonus(state.archetype) + burnoutQualityPenalty(state.burnout ?? 0) / 10 - 0.2 * (project.pushThroughCount ?? 0) + RECORDING_MODE_CONFIG[project.mode ?? "standard"].qualityMod / 10;
   const quality = craft + team + choices + condition;
-  const appeal = 3.5 + (producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09 + directionAppeal + focused * 0.10 + (track.featId ? 0.45 : 0) + (track.cowriterId ? 0.12 : 0);
+  const appeal = 3.5 + (producer?.tier ?? 0) * 0.13 + (studio?.tier ?? 0) * 0.09 + directionAppeal + focused * 0.10 + (track.featId ? 0.45 : 0) + (track.cowriterId ? 0.12 : 0) + projectDirection.appeal;
   const boundedQuality = (value: number) => rounded(clamp(value, 1, 10));
   const boundedAppeal = (value: number) => rounded(clamp(value, 1, 10));
   return {

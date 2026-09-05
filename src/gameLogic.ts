@@ -1196,7 +1196,7 @@ export interface CampaignAllocation {
 }
 
 export type CareerIdentity = "critic_darling" | "radio_favorite" | "road_warrior" | "independent_spirit" | "crossover_act";
-export type AlbumCampaignAction = "follow_up_single" | "radio_push" | "music_video" | "live_appearance" | "hold_steady";
+export type AlbumCampaignAction = "follow_up_single" | "radio_push" | "music_video" | "live_appearance" | "acoustic_session" | "hold_steady";
 
 export interface AlbumCampaignHistory {
   week: number;
@@ -3835,6 +3835,8 @@ export interface TrackEntry {
 export type SongStage = "writing" | "recording" | "mixing" | "complete";
 export type SongDevelopmentStage = Exclude<SongStage, "complete">;
 export type SongDirection = "commercial" | "balanced" | "artistic";
+export type ProjectDirection = "balanced" | "intimate" | "polished" | "experimental" | "crowd_pleasing";
+export interface SongStrengths { lyrics: number; hook: number; live: number; }
 export type SessionInvestment = "standard" | "focused";
 
 export interface StageDevelopment {
@@ -3847,6 +3849,7 @@ export interface StageDevelopment {
 }
 
 export interface TrackDevelopment {
+  strengths?: SongStrengths;
   stage: SongStage;
   writing: StageDevelopment;
   recording: StageDevelopment;
@@ -3886,6 +3889,7 @@ export function getTrackDevelopment(track: TrackEntry): TrackDevelopment {
     recording: { ...EMPTY_STAGE, ...current.recording },
     mixing: { ...EMPTY_STAGE, ...current.mixing },
     qualityRating: current.qualityRating,
+    strengths: current.strengths,
     appealRating: current.appealRating,
     qualityBreakdown: current.qualityBreakdown,
     appealBreakdown: current.appealBreakdown,
@@ -4024,6 +4028,7 @@ export function producerStyleBonus(producer: Producer | undefined, track: TrackE
 }
 
 export interface RecordingProject {
+  creativeDirection?: ProjectDirection;
   type: ReleaseType;
   title: string;
   genre: Genre;
@@ -4702,6 +4707,8 @@ export interface GameState {
   totalShows: number;
   tourHistory: ShowResult[];
   regional: Record<string, number>;
+  /** Last completed headline show in each city; absent in older saves. */
+  cityLastPlayed?: Record<string, number>;
   // meta
   cooldowns: Record<string, number>;
   trends: Record<string, number>;

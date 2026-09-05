@@ -1365,6 +1365,11 @@ export function advanceCareerWeek(prev:GameState): GameState {
     s.currentTrendTheme = pickTrendTheme(s.currentTrendTheme);
     try {
       const issue = generateNashvilleTimes(s);
+      const automaticRepDelta = issue.automaticRepDelta ?? 0;
+      if (automaticRepDelta !== 0) {
+        s.rep = clamp(s.rep + automaticRepDelta, 0, 100);
+        s.log.unshift({ week: s.week, msg: `Nashville Times coverage: ${automaticRepDelta > 0 ? "+" : ""}${automaticRepDelta} reputation.`, type: automaticRepDelta > 0 ? "good" : "bad" });
+      }
       const json = JSON.stringify(issue);
       s.pendingNewspaperJson = json;
       if (!s.newspaperArchive) s.newspaperArchive = [];
@@ -1655,6 +1660,28 @@ export function useGameState() {
   const dismissModal       = useCallback(()=>upd(s=>{s.modal=null;return s;}),[upd]);
   const dismissNewspaper   = useCallback(()=>upd(s=>{s.pendingNewspaperJson=null;return s;}),[upd]);
   const openArchivedNewspaper = useCallback((json:string)=>upd(s=>{s.pendingNewspaperJson=json;return s;}),[upd]);
+  const doResolveNewspaperResponse = useCallback((storyIndex:number, choiceIndex:number)=>upd(s=>{
+    if (!s.pendingNewspaperJson) return s;
+    try {
+      const issue = JSON.parse(s.pendingNewspaperJson);
+      const story = issue?.stories?.[storyIndex];
+      const impact = story?.reputation;
+      const choice = impact?.type === "choice" ? impact.choices?.[choiceIndex] : null;
+      if (!choice || Number.isInteger(impact.resolvedChoice)) return s;
+      impact.resolvedChoice = choiceIndex;
+      s.rep = clamp(s.rep + choice.repDelta, 0, 100);
+      s.log.unshift({ week: s.week, msg: `Nashville Times response: ${choice.repDelta > 0 ? "+" : ""}${choice.repDelta} reputation.`, type: choice.repDelta > 0 ? "good" : "bad" });
+      const updated = JSON.stringify(issue);
+      s.pendingNewspaperJson = updated;
+      s.newspaperArchive = (s.newspaperArchive ?? []).map(saved => {
+        try {
+          const archived = JSON.parse(saved);
+          return archived.week === issue.week && archived.volume === issue.volume && archived.issue === issue.issue ? updated : saved;
+        } catch { return saved; }
+      });
+    } catch { /* malformed legacy issue: leave it untouched */ }
+    return s;
+  }),[upd]);
 
   // Project
   const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard")=>upd(s=>{
@@ -3113,7 +3140,7 @@ export function useGameState() {
   }),[upd]);
 
   return {
-    state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper,
+    state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper, doResolveNewspaperResponse,
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,

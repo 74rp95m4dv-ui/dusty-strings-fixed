@@ -6,6 +6,14 @@ export interface NewspaperStory {
   byline: string;
   body: string;
   isPlayer?: boolean;
+  reputation?: StoryReputationImpact;
+}
+
+export interface StoryReputationImpact {
+  type: "automatic" | "choice";
+  repDelta?: number;
+  choices?: { label: string; repDelta: number; detail: string }[];
+  resolvedChoice?: number;
 }
 
 export interface LetterToEditor {
@@ -22,6 +30,7 @@ export interface NewspaperIssue {
   weather: string;
   stories: NewspaperStory[];
   letters?: LetterToEditor[];
+  automaticRepDelta?: number;
 }
 
 const NPC_ARTISTS = [
@@ -77,6 +86,13 @@ const WEATHER = [
   "Long shadows, longer setlists. Festival season is here.",
   "Honky-tonk humidity. Pedal steels are crying.",
   "Dry winds out of Texas. Whiskey cures everything.",
+];
+
+const NPC_RELEASE_TITLES = [
+  "Porchlight Arithmetic","Low Water Gospel","The Quiet Side of Leaving","Railroad Ashes",
+  "Halfway to the County Line","Paper Moon Motel","Cinder & Clover","Sunday in the Rearview",
+  "Little Things Burning","Salt on the Dashboard","Blacktop Benediction","A Room Full of Weather",
+  "Wildflower Static","The Long Way Through","Mercy at the Mile Marker","Lanterns in the Rain",
 ];
 
 const FIRST = ["Annie","Bobby","Carla","Darlene","Earl","Frank","Gracie","Hank","Iris","Jesse","Kay","Lena","Mae","Otis","Pearl","Ruby","Sonny","Tommy","Vera","Willie"];
@@ -622,7 +638,18 @@ function playerStories(s: GameState): NewspaperStory[] {
     out.push({ section:"Front Page", isPlayer:true,
       headline:`${me.toUpperCase()} RELEASES "${r.title.toUpperCase()}" — CRITICS CALL IT ${verdict.toUpperCase()}`,
       byline:`By ${pick(REPORTERS)}`,
-      body:`The ${fmtType} pulled ${r.peakStreams.toLocaleString()} weekly streams at peak. ${publicTitle ? `The public has increasingly tagged ${me} as a ${publicTitle.toLowerCase()}. ` : ""}${r.criticHeadline ? `One critic wrote: "${r.criticHeadline}"` : "Reviews are still rolling in."}`});
+      body:`The ${fmtType} pulled ${r.peakStreams.toLocaleString()} weekly streams at peak. ${publicTitle ? `The public has increasingly tagged ${me} as a ${publicTitle.toLowerCase()}. ` : ""}${r.criticHeadline ? `One critic wrote: "${r.criticHeadline}"` : "Reviews are still rolling in."}`,
+      reputation: r.outcome === "Viral" || r.outcome === "Hit"
+        ? { type:"automatic", repDelta:1 }
+        : r.outcome === "Flop" ? { type:"automatic", repDelta:-1 } : undefined });
+    out.push({ section:"Industry", isPlayer:true,
+      headline:`TRADE PRESS REQUESTS STATEMENT FROM ${me.toUpperCase()}`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`Following the release, reporters are waiting to hear how ${me} wants to frame the next chapter.`,
+      reputation:{ type:"choice", choices:[
+        { label:"Talk about the songs", repDelta:2, detail:"Earn respect for keeping the focus on the work." },
+        { label:"Make it a victory lap", repDelta:-2, detail:"Some listeners read the tone as getting ahead of the story." },
+      ] } });
   }
 
   // Tour activity
@@ -637,7 +664,8 @@ function playerStories(s: GameState): NewspaperStory[] {
       out.push({ section:"Scene", isPlayer:true,
         headline:`${me.toUpperCase()} WRAPS RUN AT ${last.venueName.toUpperCase()}`,
         byline:`By ${pick(REPORTERS)}`,
-        body:`The ${last.cityName} date drew ${last.attendancePct}% capacity. ${last.attendancePct >= 80 ? "The room was packed wall to wall." : last.attendancePct >= 50 ? "Solid turnout, solid set." : "A quiet crowd, but the band played hard."}`});
+        body:`The ${last.cityName} date drew ${last.attendancePct}% capacity. ${last.attendancePct >= 80 ? "The room was packed wall to wall." : last.attendancePct >= 50 ? "Solid turnout, solid set." : "A quiet crowd, but the band played hard."}`,
+        reputation: last.attendancePct >= 80 ? { type:"automatic", repDelta:1 } : last.attendancePct < 40 ? { type:"automatic", repDelta:-1 } : undefined });
     }
   }
 
@@ -660,8 +688,107 @@ function playerStories(s: GameState): NewspaperStory[] {
       body:`The recognition continues to open doors. Bookings, press requests, and label interest are all reportedly up.`});
   }
 
+  if (s.activeAlbumCampaign && s.week % 4 === 0) {
+    out.push({ section:"Industry", isPlayer:true,
+      headline:`${me.toUpperCase()} CAMPAIGN DRAWS INDUSTRY ATTENTION`,
+      byline:`By ${pick(REPORTERS)}`,
+      body:`With the release campaign underway, a trade reporter has asked for a quote on what comes next.`,
+      reputation:{ type:"choice", choices:[
+        { label:"Credit the team and the fans", repDelta:2, detail:"The grounded answer travels well around town." },
+        { label:"Promise to change the whole game", repDelta:-2, detail:"The quote makes a few veteran bookers roll their eyes." },
+      ] } });
+  }
+
   return out;
 }
+
+// ── EXPANDED WORLD DESK ───────────────────────────────────
+// These additions deliberately reuse the existing section pools so every issue
+// keeps its established rhythm while drawing from a much deeper newsroom.
+COUNTRY_STORIES.push(
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} REVEALS "LOST" ${pick(["DEMO","DUET","LIVE SET","SONGWRITER TAPE"])}`,
+    byline:`By ${pick(REPORTERS)}`, body:`The newly surfaced recording, titled "${pick(NPC_RELEASE_TITLES)}," was cut years ago in ${pick(CITIES)}. Fans are already asking for a full archive release.` }),
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} BRINGS SONGWRITER ROUND TO ${pick(CITIES).toUpperCase()}`,
+    byline:`By ${pick(REPORTERS)}`, body:`The monthly night will pair established writers with local openers. No backing tracks, no phones, and a strict two-song limit.` }),
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} ANNOUNCES BENEFIT 45 AT ${pick(VENUES).toUpperCase()}`,
+    byline:`By ${pick(REPORTERS)}`, body:`Proceeds from the one-night show will support ${pick(["working musicians","flood recovery","a rural arts fund","the local food bank"])}.` }),
+  () => ({ section:"Country", headline:`RADIO PROGRAMMERS BACK ${pick(["SLOW BALLADS","TWO-STEP ANTHEMS","STEEL-GUITAR SINGLES","STRIPPED-BACK STORY SONGS"])}`,
+    byline:`By ${pick(REPORTERS)}`, body:`Several regional stations say listener calls are pushing the sound back into regular rotation.` }),
+);
+
+BLUES_STORIES.push(
+  () => ({ section:"Blues", headline:`${pick(NPC_ARTISTS).toUpperCase()} FINDS NEW AUDIENCE AT LATE-NIGHT RESIDENCY`, byline:`By ${pick(REPORTERS)}`,
+    body:`The ${pick(CITIES)} run started as four quiet Thursdays. It now has a line around the block before soundcheck.` }),
+  () => ({ section:"Blues", headline:`JUKEBOX LABEL LAUNCHES ${pick(["DELTA","HILL COUNTRY","ELECTRIC","GULF COAST"])} SERIES`, byline:`By ${pick(REPORTERS)}`,
+    body:`The first release, "${pick(NPC_RELEASE_TITLES)}," will be pressed in a small run with hand-numbered sleeves.` }),
+  () => ({ section:"Blues", headline:`${pick(NPC_ARTISTS).toUpperCase()} HOSTS GUITAR CLINIC FOR YOUNG PLAYERS`, byline:`By ${pick(REPORTERS)}`,
+    body:`The artist spent an afternoon at a community center discussing tone, timing, and why the wrong note can be the right one.` }),
+  () => ({ section:"Blues", headline:`ARCHIVISTS RESTORE TAPES FROM CLOSED ${pick(CITIES).toUpperCase()} CLUB`, byline:`By ${pick(REPORTERS)}`,
+    body:`More than ${num(20,90)} sets are being cleaned up for a public listening night this fall.` }),
+);
+
+INDUSTRY_STORIES.push(
+  () => ({ section:"Industry", headline:`INDEPENDENT DISTRIBUTOR OPENS DOOR TO REGIONAL ACTS`, byline:`By ${pick(REPORTERS)}`,
+    body:`The company promises transparent statements and a shorter path from a merch table to a wider release.` }),
+  () => ({ section:"Industry", headline:`${pick(LABELS).toUpperCase()} STARTS SONGWRITER RETREAT PROGRAM`, byline:`By ${pick(REPORTERS)}`,
+    body:`Selected writers will spend a week off-grid with producers, co-writers, and more coffee than anyone should drink.` }),
+  () => ({ section:"Industry", headline:`SMALL VENUES ASK FOR FAIRER TOURING TERMS`, byline:`By ${pick(REPORTERS)}`,
+    body:`Club owners and independent artists are negotiating guarantees that leave room for both gas money and a future.` }),
+  () => ({ section:"Industry", headline:`CATALOG SALES RISE AS LISTENERS DIG FOR DEEP CUTS`, byline:`By ${pick(REPORTERS)}`,
+    body:`Older albums are finding a second life through playlists built by fans rather than marketing departments.` }),
+);
+
+SCENE_STORIES.push(
+  () => ({ section:"Scene", headline:`MIDNIGHT PICKERS TURN ${pick(CITIES).toUpperCase()} PARKING LOT INTO JAM SESSION`, byline:`By ${pick(REPORTERS)}`,
+    body:`Nobody is certain who started the first chorus. By dawn, a crowd had formed around a borrowed upright bass.` }),
+  () => ({ section:"Scene", headline:`${pick(VENUES).toUpperCase()} ADDS WEEKLY LOCAL-OPENER SLOT`, byline:`By ${pick(REPORTERS)}`,
+    body:`The venue will pay each opener and keep the room open long enough for a proper second set.` }),
+  () => ({ section:"Scene", headline:`FANS REVIVE HAND-PAINTED SHOW POSTERS`, byline:`By ${pick(REPORTERS)}`,
+    body:`Screen printers across the region say small-run posters are selling before the headliner takes the stage.` }),
+  () => ({ section:"Scene", headline:`SUNDAY AFTERNOON LISTENING CLUB SELLS OUT AGAIN`, byline:`By ${pick(REPORTERS)}`,
+    body:`The rule remains simple: bring a record, tell a story, and let the whole side play.` }),
+);
+
+LOCAL_STORIES.push(
+  () => ({ section:"Local", headline:`${pick(CITIES).toUpperCase()} DINER ADDS SONGWRITER SPECIAL TO MENU`, byline:`By ${pick(REPORTERS)}`,
+    body:`A late-night plate, an open booth, and coffee that keeps arriving until the last verse is finished.` }),
+  () => ({ section:"Local", headline:`COMMUNITY RADIO MARATHON RAISES MONEY FOR MUSIC CLASSES`, byline:`By ${pick(REPORTERS)}`,
+    body:`Requests ran from tearjerkers to barn burners, with every pledge matched by a local business.` }),
+  () => ({ section:"Local", headline:`NEIGHBORS SAVE OLD NEON SIGN FROM THE SCRAP YARD`, byline:`By ${pick(REPORTERS)}`,
+    body:`The restored sign will hang above a new all-ages room with a small stage and a stubbornly cheap cover.` }),
+  () => ({ section:"Local", headline:`RAIN DELAYS OUTDOOR SET, CROWD SINGS THROUGH IT`, byline:`By ${pick(REPORTERS)}`,
+    body:`The band never made it onstage, but the audience knew every word by the time the clouds cleared.` }),
+);
+
+CHART_STORIES.push(
+  () => ({ section:"Charts", headline:`LISTENER-MADE PLAYLISTS SEND STORY SONGS CLIMBING`, byline:`By ${pick(REPORTERS)}`,
+    body:`The month’s fastest-growing lists are built around lyrics, live takes, and songs that take their time getting somewhere.` }),
+  () => ({ section:"Charts", headline:`${pick(NPC_ARTISTS).toUpperCase()} GAINS GROUND WITH A B-SIDE`, byline:`By ${pick(REPORTERS)}`,
+    body:`The overlooked cut has become a crowd singalong after clips from the road began circulating online.` }),
+  () => ({ section:"Charts", headline:`VINYL PREORDERS LIFT INDIE RELEASE INTO TOP ${num(15,50)}`, byline:`By ${pick(REPORTERS)}`,
+    body:`A limited pressing and patient word of mouth did what a giant marketing budget could not.` }),
+);
+
+NPC_RIVALRY_STORIES.push(
+  () => { const a=pick(NPC_ARTISTS), b=pickOther(NPC_ARTISTS,a); return { section:"Front Page", headline:`${a.toUpperCase()} AND ${b.toUpperCase()} COMPETE FOR SAME PRODUCER`, byline:`By ${pick(REPORTERS)}`, body:`Both camps booked time with ${pick(PRODUCERS)} within days of each other. The producer’s answer was reportedly, "Send the songs."` }; },
+  () => { const a=pick(NPC_ARTISTS), b=pickOther(NPC_ARTISTS,a); return { section:"Scene", headline:`${a.toUpperCase()} ANSWERS ${b.toUpperCase()} WITH SURPRISE COVER`, byline:`By ${pick(REPORTERS)}`, body:`The choice of song felt pointed, though neither artist has said a word about it publicly.` }; },
+);
+NPC_COMEBACK_STORIES.push(
+  () => ({ section:"Front Page", headline:`${pick(NPC_ARTISTS).toUpperCase()} RETURNS TO THE ROAD WITH SMALL-ROOM TOUR`, byline:`By ${pick(REPORTERS)}`, body:`The comeback run skips arenas in favor of rooms where every seat is close enough to hear the pick scrape.` }),
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} REISSUES CULT FAVORITE "${pick(NPC_RELEASE_TITLES).toUpperCase()}"`, byline:`By ${pick(REPORTERS)}`, body:`The new edition includes live cuts, liner notes, and a promise that no one touched the original mix.` }),
+);
+NPC_PERSONAL_STORIES.push(
+  () => ({ section:"Scene", headline:`${pick(NPC_ARTISTS).toUpperCase()} OPENS DOORS FOR YOUNG WRITERS`, byline:`By ${pick(REPORTERS)}`, body:`A new monthly workshop gives unsigned writers a room, a mentor, and an honest critique.` }),
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} TAKES A QUIET MONTH OFF THE GRID`, byline:`By ${pick(REPORTERS)}`, body:`The artist’s camp says the break is for rest, family, and a stack of songs that can wait.` }),
+);
+NPC_LEGAL_STORIES.push(
+  () => ({ section:"Industry", headline:`${pick(NPC_ARTISTS).toUpperCase()} SETTLES ROYALTY DISPUTE WITH FORMER PARTNER`, byline:`By ${pick(REPORTERS)}`, body:`Both sides called the agreement private and fair, which is about as close to peace as Music Row gets.` }),
+  () => ({ section:"Industry", headline:`VENUE OWNERS PUSH BACK ON TICKET-BOT BILL`, byline:`By ${pick(REPORTERS)}`, body:`The proposed rules would limit bulk purchases and make more face-value tickets available to fans.` }),
+);
+NPC_ODD_STORIES.push(
+  () => ({ section:"Local", headline:`TOWN NAMES STREET AFTER ${pick(NPC_ARTISTS).toUpperCase()}'S TOUR BUS`, byline:`By ${pick(REPORTERS)}`, body:`The bus broke down there twice, which locals say is enough history for a plaque.` }),
+  () => ({ section:"Scene", headline:`${pick(NPC_ARTISTS).toUpperCase()} RECORDS ENTIRE EP IN A GRAIN SILO`, byline:`By ${pick(REPORTERS)}`, body:`The natural echo was the point. The engineer still has questions about the dust.` }),
+);
 
 // ── LETTERS TO THE EDITOR ──────────────────────────────────
 const LETTER_CITIES = [
@@ -820,6 +947,8 @@ function milestone(me: string, title: string, body: string): NewspaperStory {
      }
 
      const monthsIn = Math.floor(s.week / 4);
+     const automaticRepDelta = stories.reduce((total, story) =>
+       total + (story.reputation?.type === "automatic" ? story.reputation.repDelta ?? 0 : 0), 0);
      return {
        volume: 1 + Math.floor(monthsIn / 12),
        issue: (monthsIn % 12) + 1,
@@ -827,5 +956,6 @@ function milestone(me: string, title: string, body: string): NewspaperStory {
        weather: pick(WEATHER),
        stories,
        letters: generateLetters(s),
+       automaticRepDelta,
      };
    }

@@ -263,7 +263,7 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
   );
 }
 
- export function NewspaperModal({ state, dismissNewspaper }: any) {
+ export function NewspaperModal({ state, dismissNewspaper, doResolveNewspaperResponse }: any) {
    if (!state.pendingNewspaperJson) return null;
    let news: any = {};
    try {
@@ -300,6 +300,27 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
                  <div className="newspaper-body">
                    {story.body}
                  </div>
+                 {story.reputation?.type === "automatic" && story.reputation.repDelta ? (
+                   <div className="tip-text" style={{ marginTop: 6, color: story.reputation.repDelta > 0 ? "var(--lime)" : "var(--red)" }}>
+                     Reputation {story.reputation.repDelta > 0 ? "+" : ""}{story.reputation.repDelta}
+                   </div>
+                 ) : null}
+                 {story.reputation?.type === "choice" && (
+                   <div className="newspaper-response" style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                     {Number.isInteger(story.reputation.resolvedChoice) ? (
+                       <div className="tip-text" style={{ color: "var(--lime)" }}>
+                         Response sent: {story.reputation.choices?.[story.reputation.resolvedChoice]?.detail}
+                       </div>
+                     ) : (
+                       story.reputation.choices?.map((choice: any, choiceIndex: number) => (
+                         <button key={choice.label} className={choiceIndex === 0 ? "btn btn-lime btn-block" : "btn btn-ghost btn-block"} onClick={() => doResolveNewspaperResponse(i, choiceIndex)}>
+                           <div>{choice.label}</div>
+                           <div style={{ fontSize: 11, opacity: 0.75, fontWeight: 400, marginTop: 2 }}>{choice.detail} ({choice.repDelta > 0 ? "+" : ""}{choice.repDelta} rep)</div>
+                         </button>
+                       ))
+                     )}
+                   </div>
+                 )}
                </div>
              ))}
            </div>

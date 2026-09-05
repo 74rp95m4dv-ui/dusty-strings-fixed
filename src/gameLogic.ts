@@ -3476,6 +3476,47 @@ const AN = {
   ],
 };
 
+// Curated additions keep generated names fictional while broadening the rootsy
+// vocabulary beyond the original legacy-country defaults.
+AN.first.push(
+  "Avery","Bailey","Casey","Darby","Ellis","Emery","Frankie","Harper","Hollis","Jamie",
+  "Jules","Kendall","Larkin","Marlow","Merritt","Nico","Perry","Quinn","Reese","Remy",
+  "Rowan","Shiloh","Sidney","Tatum","Wren","Adair","Bellamy","Carmen","Della","Everett",
+  "Fletcher","Greer","Indigo","Jory","Kit","Landry","Mica","Nell","Orion","Parker",
+);
+AN.last.push(
+  "Alder","Bell","Briar","Calder","Darrow","Everly","Farrow","Gale","Hart","Iver",
+  "Jarrell","Kestrel","Lark","Morrow","North","Oakley","Pryor","Quill","Rook","Sayer",
+  "Thorne","Vale","Vesper","Wilder","Yarrow","Ashby","Crowell","Dunlow","Fenner","Hollis",
+  "Kincaid","Marsh","Nolan","Orchard","Pike","Rowe","Sable","Tanner","Wren","Yates",
+);
+AN.prefix.push(
+  "Hush","Cinder","Coyote","Hollow-Eyed","River","Ash","Foxfire","Lowland","Night","Rattlesnake",
+  "Sundown","Tobacco","Wandering","Willow","Worn","Backroad","Cedar","Chapel","Coal","Dawn",
+  "Feral","Gallows","Honey","Juniper","Lantern","Moss","Prairie","Raven","Ruin","Sable",
+);
+AN.band.push(
+  "& the River Saints","& the Hush Money","& the Paper Moons","& the Cinder Choir","& the Low Water Boys",
+  "& the Porchlights","& the Blacktop Flowers","& the Hollow Men","& the Wild Mercy","& the Night Freight",
+  "& the Tin Cans","& the Long Shadows","& the Sawmill Sons","& the Fireline","& the Ragged Maps",
+);
+AN.single.push(
+  "Porchlight","Holloway","Cinderline","Rainsong","Foxfire","Sundown","Brimstone","Lowwater","Driftwood","Mourning",
+  "Wayfarer","Bellwether","Hinterland","Blackbird","Juniper","Larkspur","Nightjar","Thistledown","Rivermouth","Wilder",
+);
+ANAME.pre.push(
+  "Cinder","Porchlight","Low Water","Blacktop","Wildflower","Hinterland","Tobacco","Rainswept","Quiet","Sable",
+  "Lantern","Riverstone","Thistle","Hearthside","Northbound","Hollow","Bramble","Distant","Worn-Out","Wintering",
+);
+ANAME.noun.push(
+  "Cardinals","Backroads","Mornings","Mileposts","Chapel","Kerosene","Undertow","Meadow","Sparrows","Railway",
+  "Matches","Thistles","Fireflies","Horizon","Barstools","Creekbeds","Papers","Hollows","Headlights","Dusk",
+);
+ANAME.suf.push(
+  "Field Notes","Night Shift","For the Leaving","The Roadside Tapes","A Little Longer","Northbound",
+  "For Anyone Listening","The Home Stretch","At First Light","Songs from the County Line",
+);
+
 export function genArtistName(): string {
   const r = Math.random();
   if (r < 0.10) return rnd(AN.single);

@@ -836,6 +836,8 @@ export function generateLawyerNote(offer: LabelOffer): string {
 
 export function generateLabelOffers(s: GameState): LabelOffer[] {
   const sig = getSignatureTheme(s.themeCounts);
+  const readiness = getCareerReadiness(s);
+  if (!readiness.canAccessIndustry) return [];
   const eligible = LABELS.filter(
     (L) =>
       s.fame >= L.minFame &&
@@ -915,6 +917,7 @@ export function generateLabelOffers(s: GameState): LabelOffer[] {
 }
 
 export function generateManagerOffers(s: GameState): ManagerOffer[] {
+  if (!getCareerReadiness(s).canAccessIndustry) return [];
   const eligible = MANAGERS.filter(m => s.fame >= m.minFame && s.rep >= m.minRep);
   if (!eligible.length) return [];
   const scored = eligible.map(m => ({ m, score: Math.random() + (m.minFame <= s.fame ? 0.3 : 0) }))
@@ -2216,6 +2219,7 @@ export function getVenuePerkDisplay(venueName: string, playCount: number): { lab
 
 // ── OPENING ACT GENERATOR ──────────────────────────────────
 export function generateOpeningActOffer(s: GameState): OpeningActOffer | null {
+  if (!getCareerReadiness(s).canAccessIndustry) return null;
   const eligible = OPENING_ACT_HEADLINERS.filter(h =>
     h.genre === s.genre && s.fame >= h.minPlayerFame && s.fame < h.fame - 10
   );
@@ -2250,6 +2254,7 @@ export function generateOpeningActOffer(s: GameState): OpeningActOffer | null {
 
 // ── FESTIVAL GENERATOR ─────────────────────────────────────
 export function generateFestivalOffers(s: GameState): FestivalBooking[] {
+  if (!getCareerReadiness(s).canAccessIndustry) return [];
   const bookings: FestivalBooking[] = [];
   for (const fest of FESTIVALS) {
     if (s.fame >= fest.fameReq && s.rep >= fest.repReq) {
@@ -4697,6 +4702,8 @@ export function getStoryArc(id: string): StoryArc | undefined {
 export interface GameState {
   screen: GameScreen;
   hasSave: boolean;
+  /** Legacy saves retain their original tuning; newly started careers use the slower progression curve. */
+  balanceProfile: "legacy" | "progression_v2";
   // player
   artistName: string;
   genre: Genre;
@@ -4858,9 +4865,41 @@ export interface WeeklyLedgerEntry {
 
 export type WeeklyFinanceCategories = Record<string, number>;
 
+export interface CareerReadiness {
+  phase: "foundation" | "building" | "established";
+  releaseMultiplier: number;
+  outcomeCap: "Moderate" | "Hit" | "Viral";
+  fameCap: number;
+  repCap: number;
+  canAccessIndustry: boolean;
+}
+
+export function getCareerReadiness(state: Pick<GameState, "balanceProfile" | "totalReleases" | "totalShows" | "fans">): CareerReadiness {
+  if (state.balanceProfile !== "progression_v2") {
+    return { phase:"established", releaseMultiplier:1, outcomeCap:"Viral", fameCap:100, repCap:100, canAccessIndustry:true };
+  }
+  const releases = state.totalReleases ?? 0;
+  const shows = state.totalShows ?? 0;
+  const fans = state.fans ?? 0;
+  if (releases < 3 || shows < 4 || fans < 500) {
+    return { phase:"foundation", releaseMultiplier:0.4, outcomeCap:"Moderate", fameCap:10, repCap:15, canAccessIndustry:false };
+  }
+  if (releases < 6 || shows < 10 || fans < 2500) {
+    return { phase:"building", releaseMultiplier:0.65, outcomeCap:"Hit", fameCap:25, repCap:35, canAccessIndustry:false };
+  }
+  return { phase:"established", releaseMultiplier:1, outcomeCap:"Viral", fameCap:100, repCap:100, canAccessIndustry:true };
+}
+
+export function applyCareerProgressionCaps(state: GameState): void {
+  const readiness = getCareerReadiness(state);
+  state.fame = Math.min(state.fame, readiness.fameCap);
+  state.rep = Math.min(state.rep, readiness.repCap);
+}
+
 export const INITIAL_STATE: GameState = {
   screen: "menu",
   hasSave: false,
+  balanceProfile: "legacy",
   artistName: "",
   genre: "Country",
   city: "Nashville, TN",
@@ -5088,6 +5127,7 @@ export const PUBLISHING_PUBLISHERS = [
 ];
 
 export function generatePublishingOffers(s: GameState): PublishingOffer[] {
+  if (!getCareerReadiness(s).canAccessIndustry) return [];
   const eligible = PUBLISHING_PUBLISHERS.filter(p => s.fame >= p.minFame && s.rep >= p.minRep);
   if (!eligible.length) return [];
   const catalogValue = s.catalog.reduce((sum, c) => sum + c.totalStreams * 0.001, 0);
@@ -5155,7 +5195,7 @@ export const SYNC_SHOWS = [
 ];
 
 export function generateSyncOffers(s: GameState): SyncOffer[] {
-  if (s.catalog.length === 0 || s.fame < 15) return [];
+  if (s.catalog.length === 0 || s.fame < 15 || !getCareerReadiness(s).canAccessIndustry) return [];
   if (Math.random() > 0.15) return [];
   const offers: SyncOffer[] = [];
   const count = Math.random() < 0.3 ? 2 : 1;

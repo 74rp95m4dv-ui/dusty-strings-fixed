@@ -32,6 +32,8 @@ function uniqueByKey<T>(items: T[] | undefined, keyFor: (item: T) => string | un
  */
 export function normalizeGameState(state: GameState): GameState {
   state.simulation = normalizeSimulation(state.simulation);
+  // Careers created before the progression rebalance keep their established tuning.
+  state.balanceProfile = state.balanceProfile === "progression_v2" ? "progression_v2" : "legacy";
   state.regional = Object.fromEntries(Object.entries(state.regional ?? {}).map(([region, count]) => [region, wholeAtLeast(count, 0)]));
   state.cityLastPlayed = Object.fromEntries(Object.entries(state.cityLastPlayed ?? {}).filter(([city]) => CITIES.some(item => item.name === city)).map(([city, week]) => [city, wholeAtLeast(week, 0)]));
   state.week = wholeAtLeast(state.week, 1);

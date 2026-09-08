@@ -6,7 +6,7 @@ import {
   ScenarioEffect, CatalogEntry, TourStop,
   RIVALS, RivalState, STORY_ARCS, getStoryArc, ArcInstance, StoryArc,
   Award, TourWrapPresentation, SigningPresentation, AwardPresentation, CareerMilestonePresentation,
-  CAREER_TIERS, getCareerTierIdx,
+  CAREER_TIERS, getCareerTierIdx, getCareerReadiness, applyCareerProgressionCaps,
   burnoutQualityPenalty, burnoutShowMult, burnoutCancelChance, getBurnoutTier, pickRivalTitle,
   MerchType, MerchItem, MERCH_TEMPLATES, generateMerchReview,
   getPressingVariants, isPhysicalFormat, MERCH_EDITIONS, priceDemandMultiplier,
@@ -384,8 +384,10 @@ function resolveProjectSongSession(state: GameState, project: NonNullable<GameSt
   return true;
 }
 
-function calcTourDemand(fans:number, fame:number, rep:number, genreMod:Record<string,number>, genre:Genre, decayIdx:number) {
-  const base = fans*0.06 + fame*50 + rep*20;
+function calcTourDemand(fans:number, fame:number, rep:number, genreMod:Record<string,number>, genre:Genre, decayIdx:number, balanceProfile: GameState["balanceProfile"]) {
+  const base = balanceProfile === "progression_v2"
+    ? 15 + fans*0.04 + fame*12 + rep*6
+    : fans*0.06 + fame*50 + rep*20;
   const gMod = genreMod[genre] ?? 1.0;
   return Math.floor(base * gMod * Math.max(0.5, 1 - decayIdx*0.04));
 }
@@ -442,6 +444,7 @@ function classifyLifecycle(quality:number, outcome:string, mkt:number, score:num
 }
 
 function runAwardCheck(s:GameState): Award|null {
+  if (!getCareerReadiness(s).canAccessIndustry) return null;
   for (const award of AWARDS) {
     if (s.awardsWon.includes(award.id)) continue;
     if (s.fame>=award.fameReq && s.rep>=award.repReq && Math.random()<0.08) {
@@ -1018,7 +1021,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
         s.log.unshift({ week:s.week, msg:"Tour ended early.", type:"neutral" });
       }
     } else {
-    let demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex);
+    let demand=calcTourDemand(s.fans,s.fame,s.rep,show.genreMod,s.genre,s.tourActive.demandDecayIndex,s.balanceProfile);
     const regionalDemand = getRegionalDemand(s, show.cityName);
     demand = Math.floor(demand * regionalDemand.multiplier * getLiveCatalogMultiplier(s));
     if (s.campaignLiveBoostWeeks > 0) demand = Math.floor(demand * (1 + s.campaignLiveBoost));
@@ -1435,6 +1438,7 @@ export function advanceWithSimulation(prev: GameState): GameState {
   // advanceCareerWeek works on a snapshot. Carry the PRNG state updated on the
   // source snapshot onto the returned career so the next week continues the run.
   s.simulation = { ...prev.simulation };
+  applyCareerProgressionCaps(s);
   const highlights = s.log
     .filter(entry => entry.week === s.week)
     .slice(0, 3)
@@ -1533,7 +1537,9 @@ export function useGameState() {
   const upd = useCallback((fn:(s:GameState)=>GameState)=>{
     setState(prev=>{
       const next = JSON.parse(JSON.stringify(prev)) as GameState;
-      const result = normalizeGameState(withSimulationRandom(next, () => fn(next)).result);
+      const updated = withSimulationRandom(next, () => fn(next)).result;
+      applyCareerProgressionCaps(updated);
+      const result = normalizeGameState(updated);
       saveToDisk(result);
       return result;
     });
@@ -1625,7 +1631,7 @@ export function useGameState() {
   const dismissSaveIssue = useCallback(() => setSaveIssue(null), []);
 
   const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string)=>{
-    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
+    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,balanceProfile:"progression_v2",artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
       qualityBase:archHas(archetype,"acousticQBonus")?35+archVal(archetype):35,
       trends:{Country:1,Blues:1},
       themeCounts:{},
@@ -2096,6 +2102,7 @@ export function useGameState() {
     const campaignAvailable = label ? Math.max(0, label.marketingCommitment - label.marketingSpendYTD) : 0;
     const deployedCampaign = Math.min(Math.floor(campaignBase * plannedDeploymentPct), campaignAvailable);
     const deploymentPct = campaignBase > 0 ? deployedCampaign / campaignBase : 0;
+    const readiness = getCareerReadiness(s);
     const labelMktBoost = label
       ? 1 + (label.marketingBoost - 1) * deploymentPct
       : (s.labelSigned ? 1.3 : 1);
@@ -2159,11 +2166,17 @@ export function useGameState() {
     if (sat >= 75) score = Math.min(score, 73);
 
     type O="Flop"|"Moderate"|"Hit"|"Viral";
-    const outcome:O=score<30?"Flop":score<52?"Moderate":score<74?"Hit":"Viral";
+    let outcome:O=score<30?"Flop":score<52?"Moderate":score<74?"Hit":"Viral";
+    const outcomeRank: Record<O, number> = { Flop:0, Moderate:1, Hit:2, Viral:3 };
+    if (outcomeRank[outcome] > outcomeRank[readiness.outcomeCap]) outcome = readiness.outcomeCap;
     const rm={Flop:0.1,Moderate:0.4,Hit:1,Viral:4};
     const fm={Flop:0.2,Moderate:0.6,Hit:1,Viral:3.5};
-    const famD={Flop:-2,Moderate:2,Hit:6,Viral:15}[outcome];
-    const repD={Flop:-4,Moderate:1,Hit:4,Viral:3}[outcome];
+    const famD=(s.balanceProfile === "progression_v2"
+      ? {Flop:-1,Moderate:0,Hit:2,Viral:5}
+      : {Flop:-2,Moderate:2,Hit:6,Viral:15})[outcome];
+    const repD=(s.balanceProfile === "progression_v2"
+      ? {Flop:-2,Moderate:0,Hit:2,Viral:3}
+      : {Flop:-4,Moderate:1,Hit:4,Viral:3})[outcome];
     const bRev={Single:450,EP:1200,Album:3500,"Live Album":800}[p.type]??450;
     const bFan={Single:350,EP:1000,Album:4200,"Live Album":650}[p.type]??350;
     // ── ALBUM WRITING MIX ──
@@ -2171,8 +2184,8 @@ export function useGameState() {
     // party-heavy = more streams + fans, literary-heavy = critic rep but slower
     // commercial pickup. Co-writers add a smaller-than-feature fan bump.
     const writingMix = computeAlbumWritingMix(p.tracks);
-    const revenue=Math.floor(bRev*rm[outcome]*roll(0.7,1.4)*revMult2);
-    let fansG=Math.floor(bFan*fm[outcome]*roll(0.7,1.4)*fanMult*themeFanMult*writingMix.fanMult);
+    const revenue=Math.floor(bRev*rm[outcome]*roll(0.7,1.4)*revMult2*readiness.releaseMultiplier);
+    let fansG=Math.floor(bFan*fm[outcome]*roll(0.7,1.4)*fanMult*themeFanMult*writingMix.fanMult*readiness.releaseMultiplier);
     for(const t of p.tracks){
       if(t.featId){
         const f=FEATURES.find(x=>x.id===t.featId);
@@ -2200,7 +2213,8 @@ export function useGameState() {
     // of it. The mix is averaged per-track so one cut won't tank the verdict.
     // We do NOT floor at 0 — bad albums' negative crit rep punishment must
     // still bite (final s.rep is clamped 0..100 downstream anyway).
-    const repFromCritic=(criticBand.rep + writingMix.critRepBonus + pressBonus) * (s.currentCareerIdentity === "critic_darling" ? 1.20 : 1);
+    const criticReadinessMult = readiness.phase === "foundation" ? 0.25 : readiness.phase === "building" ? 0.6 : 1;
+    const repFromCritic=(criticBand.rep + writingMix.critRepBonus + pressBonus) * (s.currentCareerIdentity === "critic_darling" ? 1.20 : 1) * criticReadinessMult;
     const headline=rnd(criticBand.headlines);
     const cid=createGameEntityId(s, "release");
     s.catalog.push({
@@ -2357,6 +2371,10 @@ export function useGameState() {
   // Grind
   const doGrind = useCallback((id:string)=>upd(s=>{
     const a=GRIND_ACTIONS.find(x=>x.id===id); if(!a) return s;
+    if (["radio", "sync", "festival"].includes(a.id) && !getCareerReadiness(s).canAccessIndustry) {
+      s.pendingEvent={msg:"Build a real local career first: 6 releases, 10 shows, and 2,500 fans unlock industry opportunities.",type:"bad"};
+      return s;
+    }
     if((s.cooldowns?.[a.id] ?? 0)>0){s.pendingEvent={msg:`${a.name} is on cooldown.`,type:"bad"};return s;}
     if(s.energy<a.e){s.pendingEvent={msg:"Not enough energy.",type:"bad"};return s;}
     if(a.mc&&s.money<a.mc){s.pendingEvent={msg:"Not enough money.",type:"bad"};return s;}
@@ -2486,6 +2504,7 @@ export function useGameState() {
   // More
   const doSignBrandDeal = useCallback((id:string)=>upd(s=>{
     const b=BRAND_DEALS.find(x=>x.id===id); if(!b) return s;
+    if (!getCareerReadiness(s).canAccessIndustry) { s.pendingEvent={msg:"Brands want a proven regional act. Build your catalog, live record, and audience first.",type:"bad"}; return s; }
     if (s.activeBrandDeals.some(deal => deal.id === b.id)) { s.pendingEvent={msg:`${b.name} is already an active deal.`,type:"bad"}; return s; }
     s.activeBrandDeals.push({id:b.id,name:b.name,weeklyIncome:b.weeklyIncome,weeksLeft:b.duration});
     if(b.rep)s.rep=clamp(s.rep+Math.floor(b.rep*0.5),0,100); if(b.famePerk)s.fame=clamp(s.fame+Math.floor(b.famePerk*0.5),0,100);

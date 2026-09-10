@@ -1576,6 +1576,7 @@ export function useGameState() {
       simulation: normalizeSimulation(saved.simulation),
       weeklyLedger: saved.weeklyLedger ?? [],
       activeLoan: saved.activeLoan ?? null,
+      overheadModel: saved.overheadModel ?? "legacy",
     });
     return normalizeGameState({...INITIAL_STATE});
   });
@@ -1653,6 +1654,7 @@ export function useGameState() {
     simulation: normalizeSimulation(s.simulation),
     weeklyLedger: s.weeklyLedger ?? [],
     activeLoan: s.activeLoan ?? null,
+    overheadModel: s.overheadModel ?? "legacy",
       // ── Touring Features v2.0 migration ──
       setlistConfig: s.setlistConfig ?? { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
       venueReputations: s.venueReputations ?? {},
@@ -1682,7 +1684,7 @@ export function useGameState() {
   const dismissSaveIssue = useCallback(() => setSaveIssue(null), []);
 
   const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string)=>{
-    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,balanceProfile:"progression_v2",artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
+    const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,balanceProfile:"progression_v2",overheadModel:"gentle_ramp",artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
       qualityBase:archHas(archetype,"acousticQBonus")?35+archVal(archetype):35,
       trends:{Country:1,Blues:1},
       themeCounts:{},

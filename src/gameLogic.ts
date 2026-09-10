@@ -4739,6 +4739,8 @@ export interface GameState {
   // market saturation
   marketSaturation: number;
   // economy
+  /** Existing careers retain the original overhead curve; newly created careers ramp into it. */
+  overheadModel: "legacy" | "gentle_ramp";
   weeklyExpenses: number;
   totalEarned: number;
   // releases
@@ -4943,6 +4945,7 @@ export const INITIAL_STATE: GameState = {
   streamHistory: [],
   peakWeeklyStreams: 0,
   marketSaturation: 0,
+  overheadModel: "legacy",
   weeklyExpenses: 100,
   totalEarned: 0,
   project: null,

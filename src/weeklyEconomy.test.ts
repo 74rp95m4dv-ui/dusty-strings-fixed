@@ -12,6 +12,12 @@ describe("weekly economy", () => {
     expect(calculateWeeklyOverhead({ fans: 50000, fame: 40, totalShows: 120 })).toBeGreaterThan(380);
   });
 
+  it("gives newly created careers a gentle overhead ramp while preserving legacy costs", () => {
+    expect(calculateWeeklyOverhead({ overheadModel: "gentle_ramp", totalReleases: 0, fans: 0, fame: 0, totalShows: 0 })).toBe(120);
+    expect(calculateWeeklyOverhead({ overheadModel: "gentle_ramp", totalReleases: 3, fans: 500, fame: 0, totalShows: 4 })).toBe(224);
+    expect(calculateWeeklyOverhead({ overheadModel: "gentle_ramp", totalReleases: 6, fans: 2500, fame: 0, totalShows: 10 })).toBe(361);
+  });
+
   it("reconciles categorized income and costs to the cash balance", () => {
     const before = clone();
     const after = clone();

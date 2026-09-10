@@ -5,8 +5,14 @@ const add = (bucket: WeeklyFinanceCategories, key: string, amount: number) => {
   bucket[key] = Math.round((bucket[key] ?? 0) + amount);
 };
 
-export function calculateWeeklyOverhead(state: Pick<GameState, "fans" | "fame" | "totalShows">): number {
-  return Math.max(380, Math.round(340 + state.fans * 0.008 + state.fame * 6 + state.totalShows * 0.12));
+export function calculateWeeklyOverhead(state: Pick<GameState, "fans" | "fame" | "totalShows"> & Partial<Pick<GameState, "overheadModel" | "totalReleases">>): number {
+  const scalingCosts = state.fans * 0.008 + state.fame * 6 + state.totalShows * 0.12;
+  if (state.overheadModel !== "gentle_ramp") return Math.max(380, Math.round(340 + scalingCosts));
+
+  const foundation = (state.totalReleases ?? 0) < 3 || state.totalShows < 4 || state.fans < 500;
+  const building = (state.totalReleases ?? 0) < 6 || state.totalShows < 10 || state.fans < 2500;
+  const base = foundation ? 120 : building ? 220 : 340;
+  return Math.round(base + scalingCosts);
 }
 
 export function forecastRecurringEconomy(state: GameState) {

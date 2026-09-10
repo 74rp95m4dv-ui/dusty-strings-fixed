@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateRecordingWeeks, clamp, runPublishingAccounting, type SignedPublishing } from "./gameLogic";
+import { calculateRecordingWeeks, clamp, createLabelMoment, getLabelRelationshipMood, runPublishingAccounting, type SignedLabel, type SignedPublishing } from "./gameLogic";
 
 describe("core career economy", () => {
   it("keeps recording schedules within the three-week minimum", () => {
@@ -18,5 +18,14 @@ describe("core career economy", () => {
       artistSplit: 0.5, termWeeks: 52, weeksLeft: 52, isRecouped: false, signedAtWeek: 1,
     };
     expect(runPublishingAccounting(publishing, 400)).toEqual({ artistShare: 200, recouped: 100, isRecouped: true });
+  });
+
+  it("gives each label type a release-cycle support playbook", () => {
+    const label = { labelId: "test", name: "Test Records", exec: "A&R", type: "major" } as SignedLabel;
+    const moment = createLabelMoment(label, "release", "First Light");
+    expect(moment.supportLabel).toBe("Radio & national reach");
+    expect(moment.choices.some(choice => choice.releaseSupportBoost === 0.18)).toBe(true);
+    expect(getLabelRelationshipMood(75)).toBe("supportive");
+    expect(getLabelRelationshipMood(35)).toBe("strained");
   });
 });

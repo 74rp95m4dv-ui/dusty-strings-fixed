@@ -2,6 +2,32 @@ import { fmt, fmtMoney, RANDOM_SCENARIOS, STORY_ARCS } from "../gameLogic";
 import SignComponent from "./SignComponent";
 import { ReleaseCinematic } from "./CinematicModals";
 
+export function LabelMomentModal({ state, doResolveLabelMoment }: any) {
+  const moment = state.pendingLabelMoment;
+  const label = state.currentLabel;
+  if (!moment || !label) return null;
+  return (
+    <div className="modal-overlay">
+      <section className="modal-box" role="dialog" aria-modal="true" aria-labelledby="label-moment-title">
+        <div className="label-moment-kicker">{moment.supportLabel}</div>
+        <div className="signing-emoji">{moment.emoji}</div>
+        <div className="modal-title" id="label-moment-title">{moment.title}</div>
+        <div className="signing-title" style={{ fontSize: 17 }}>{label.name}</div>
+        <p style={{ fontSize: 14, lineHeight: 1.6, margin: "12px 0 16px" }}>{moment.description}</p>
+        <div className="label-moment-trust">A&amp;R trust <b>{label.aRTrust ?? 55}/100</b> · {label.relationshipMood ?? "neutral"}</div>
+        <div className="label-moment-choices">
+          {moment.choices.map((choice: any, index: number) => (
+            <button className="label-moment-choice" key={choice.label} onClick={() => doResolveLabelMoment(index)}>
+              <span><b>{choice.label}</b><small>{choice.sub}</small></span>
+              <em>{choice.trustDelta >= 0 ? "+" : ""}{choice.trustDelta} trust</em>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function ReleaseModal({ state, doCloseReleasePresentation }: any) {
   const pres = state.releasePresentation;
   if (!pres) return null;

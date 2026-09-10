@@ -22,6 +22,7 @@ import {
   LABELS, MANAGERS, getLabel, getManager,
   generateLabelOffers, generateManagerOffers,
   getLabelDeliverySummary, getLabelRecoupableBalance, getLabelRecoupmentRemaining,
+  createLabelMoment, getLabelRelationshipMood,
   rnd, roll, clamp, fmt, fmtMoney,
   genAlbumName, genFanReviews, genThemedTrackName,
   // Recording time system (v2.0)
@@ -52,6 +53,7 @@ import {
   type TrackEntry,
   type CampaignAllocation,
   type LabelSubmission,
+  type LabelMomentChoice,
   type CareerIdentity,
   type AlbumCampaignAction,
   CAREER_IDENTITIES,
@@ -165,7 +167,8 @@ function processLabelSubmissionReview(state: GameState) {
   const averageAppeal = project.avgAppeal ?? 5;
   const commercialShare = (submission.allocation.streaming + submission.allocation.radio) / 100;
   const approvalScore = leadAppeal * 0.6 + averageAppeal * 0.25 + commercialShare * 2.5 + (project.avgQuality / 10) * 0.15;
-  const threshold = label.creativeControl < 40 ? 7.1 : label.creativeControl < 70 ? 6.4 : 5.8;
+  const trust = label.aRTrust ?? 55;
+  const threshold = (label.creativeControl < 40 ? 7.1 : label.creativeControl < 70 ? 6.4 : 5.8) + (trust < 40 ? 0.35 : trust >= 70 ? -0.15 : 0);
   if (approvalScore >= threshold) {
     submission.status = "approved";
     submission.reviewNote = `${label.exec} approved the release and released the full campaign allocation.`;
@@ -181,6 +184,44 @@ function processLabelSubmissionReview(state: GameState) {
   submission.status = "held";
   submission.reviewNote = `${label.exec} is holding the release. You can revise later or override the label and launch with reduced support.`;
   state.log.unshift({ week: state.week, msg: `${label.name} held "${project.title}" after final review.`, type: "bad" });
+}
+
+function queueLabelMoment(state: GameState, stage: "recording" | "release" | "campaign" | "tour", releaseTitle?: string) {
+  const label = state.currentLabel;
+  if (!label || state.pendingLabelMoment) return;
+  const moment = createLabelMoment(label, stage, releaseTitle);
+  if ((label.completedMomentIds ?? []).includes(moment.id)) return;
+  state.pendingLabelMoment = moment;
+}
+
+function applyLabelMomentChoice(state: GameState, choice: LabelMomentChoice) {
+  const label = state.currentLabel;
+  const moment = state.pendingLabelMoment;
+  if (!label || !moment) return;
+  label.aRTrust = clamp((label.aRTrust ?? 55) + choice.trustDelta, 0, 100);
+  label.relationshipMood = getLabelRelationshipMood(label.aRTrust);
+  if (choice.recordingFundBonus) label.recordingFund += choice.recordingFundBonus;
+  if (choice.releaseSupportBoost) label.releaseSupportBoost = choice.releaseSupportBoost;
+  if (choice.campaignChannel === "radio") {
+    state.campaignRadioBoost = Math.max(state.campaignRadioBoost ?? 0, 0.2);
+    state.campaignRadioBoostWeeks = Math.max(state.campaignRadioBoostWeeks ?? 0, 2);
+  }
+  if (choice.campaignChannel === "live") {
+    state.campaignLiveBoost = Math.max(state.campaignLiveBoost ?? 0, 0.18);
+    state.campaignLiveBoostWeeks = Math.max(state.campaignLiveBoostWeeks ?? 0, 2);
+  }
+  if (choice.campaignChannel === "press") {
+    state.rep = clamp(state.rep + 3, 0, 100);
+    state.hype = clamp(state.hype + 8, 0, 100);
+  }
+  if (choice.money) state.money += choice.money;
+  if (choice.fans) state.fans += choice.fans;
+  if (choice.fame) state.fame = clamp(state.fame + choice.fame, 0, 100);
+  if (choice.rep) state.rep = clamp(state.rep + choice.rep, 0, 100);
+  label.completedMomentIds = [...(label.completedMomentIds ?? []), moment.id];
+  label.relationshipHistory = [{ week: state.week, type: moment.stage, outcome: choice.label, relationshipChange: choice.trustDelta }, ...(label.relationshipHistory ?? [])].slice(0, 6);
+  state.log.unshift({ week: state.week, msg: `${label.name}: ${choice.label} (${choice.trustDelta >= 0 ? "+" : ""}${choice.trustDelta} A&R trust).`, type: choice.trustDelta >= 0 ? "good" : "neutral" });
+  state.pendingLabelMoment = null;
 }
 
 function migrateMarketState(saved: Partial<GameState>) {
@@ -1501,6 +1542,7 @@ export function useGameState() {
       selloutScore: saved.selloutScore ?? 0,
       totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
       pendingLabelSubmission: saved.pendingLabelSubmission ?? null,
+      pendingLabelMoment: saved.pendingLabelMoment ?? null,
       pendingReissue: saved.pendingReissue ?? null,
       activeAlbumCampaign: saved.activeAlbumCampaign ?? null,
       identityScores: { ...EMPTY_IDENTITY_SCORES, ...(saved.identityScores ?? {}) },
@@ -1581,6 +1623,7 @@ export function useGameState() {
     selloutScore: s.selloutScore ?? 0,
     totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
     pendingLabelSubmission: s.pendingLabelSubmission ?? null,
+    pendingLabelMoment: s.pendingLabelMoment ?? null,
     pendingReissue: s.pendingReissue ?? null,
     activeAlbumCampaign: s.activeAlbumCampaign ?? null,
     identityScores: { ...EMPTY_IDENTITY_SCORES, ...(s.identityScores ?? {}) },
@@ -1699,6 +1742,7 @@ export function useGameState() {
     const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
     s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing",labelFunding:false};
     s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
+    if (type === "Album") queueLabelMoment(s, "recording", s.project.title);
     return s;
   }),[upd]);
 
@@ -2028,6 +2072,7 @@ export function useGameState() {
       projectId, leadTrackIndex, releaseFormat:format, allocation: {...allocation}, submittedWeek:s.week, reviewWeek:s.week + 1,
       revisionUsed: existing?.revisionUsed ?? false, status:"under_review",
     };
+    queueLabelMoment(s, "release", project.title);
     s.log.unshift({ week:s.week, msg:`Submitted "${project.title}" to ${label.name} A&R. Review returns next week.`, type:"neutral" });
     s.pendingEvent = { msg:`A&R has "${project.title}". Check back in week ${s.week + 1}.`, type:"good" };
     return s;
@@ -2103,13 +2148,17 @@ export function useGameState() {
     const deployedCampaign = Math.min(Math.floor(campaignBase * plannedDeploymentPct), campaignAvailable);
     const deploymentPct = campaignBase > 0 ? deployedCampaign / campaignBase : 0;
     const readiness = getCareerReadiness(s);
+    const relationshipSupport = label
+      ? ((label.aRTrust ?? 55) >= 70 ? 0.10 : (label.aRTrust ?? 55) < 40 ? -0.08 : 0) + (label.releaseSupportBoost ?? 0)
+      : 0;
     const labelMktBoost = label
-      ? 1 + (label.marketingBoost - 1) * deploymentPct
+      ? 1 + (label.marketingBoost - 1 + relationshipSupport) * deploymentPct
       : (s.labelSigned ? 1.3 : 1);
     const streamingPush = 1 + (campaignAllocation.streaming / 100) * 0.30 * deploymentPct;
     const pressBonus = (campaignAllocation.press / 100) * 8 * deploymentPct;
     const radioFameBonus = Math.floor((campaignAllocation.radio / 25) * deploymentPct);
     const liveConversionBonus = (campaignAllocation.live / 100) * 0.012 * deploymentPct;
+    if (label) label.releaseSupportBoost = 0;
 
     // ── Market Saturation gate ──
     const sat = s.marketSaturation ?? 0;
@@ -2273,6 +2322,7 @@ export function useGameState() {
       s.activeAlbumCampaign = { releaseId:cid, releaseTitle:p.title, startWeek:s.week, endWeek:s.week + 12,
         followUpTrackIndex:null, actionsUsed:[], actionHistory:[], pendingAction:null, actionTakenWeek:null };
       s.log.unshift({ week:s.week, msg:`Album campaign started for "${p.title}". Twelve weeks to build discovery, follow listener feedback, and give the record a second life.`, type:"great" });
+      queueLabelMoment(s, "campaign", p.title);
     }
     if (label) {
       label.marketingSpendYTD += deployedCampaign;
@@ -2441,6 +2491,7 @@ export function useGameState() {
     s.money-=upfront;
     s.tourActive={shows:[...s.tourQueue],progress:0,ticketMult:s.tourTicketMult,demandDecayIndex:0};
     s.tourQueue=[];
+    queueLabelMoment(s, "tour", `week ${s.week}`);
     s.log.unshift({week:s.week,msg:`Tour started: ${s.tourActive.shows.map(sh=>sh.cityName).join(" → ")}`,type:"good"});
     // Trigger tour intro cinematic when starting a tour
     s.pendingEvent={msg:"On the road! End a week to play your first show.",type:"great"};
@@ -2538,6 +2589,7 @@ export function useGameState() {
       deliveryDeadlineWeek: s.week + Math.max(12, Math.floor(offer.termWeeks / Math.max(1, offer.albumsCommitted))),
       deliveryStatus: "good", deliveryExtensions: 0, fundingFrozen: false,
       approvalStrikes: 0, campaignFrozen: false,
+      aRTrust: 55, relationshipMood: "neutral", relationshipHistory: [], completedMomentIds: [], releaseSupportBoost: 0,
       crossCollateralization: offer.crossCollateralization,
       controlledComposition: offer.controlledComposition,
       controlledCompositionCap: offer.controlledCompositionCap,
@@ -2580,6 +2632,14 @@ export function useGameState() {
     s.pendingLabelOffers = [];
     return s;
   }),[upd]);
+
+  const doResolveLabelMoment = useCallback((choiceIndex: number) => upd(s => {
+    const moment = s.pendingLabelMoment;
+    const choice = moment?.choices[choiceIndex];
+    if (!moment || !choice) return s;
+    applyLabelMomentChoice(s, choice);
+    return s;
+  }), [upd]);
 
   // Accept / reject a queued manager offer.
   const doAcceptManagerOffer = useCallback((managerId:string)=>upd(s=>{
@@ -3168,6 +3228,7 @@ export function useGameState() {
     doPromoteTrack, doShootMusicVideo, doAlbumCampaignAction,
     doSignBrandDeal, doSignLabel, doSwitchGenre,
     doAcceptLabelOffer, doDismissLabelOffers, doAcceptManagerOffer, doDismissManagerOffers,
+    doResolveLabelMoment,
     doAcceptFeatureRequest, doDismissFeatureRequests,
     doDropLabel, doDropManager,
     doAddMerchItem, doToggleMerchItem, doRemoveMerchItem,

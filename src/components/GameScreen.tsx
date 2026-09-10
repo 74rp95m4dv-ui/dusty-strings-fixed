@@ -5,7 +5,7 @@ import MusicTab from "./MusicTab";
 import OfficeTab from "./OfficeTab";
 import LiveTab from "./LiveTab";
 import {
-  ReleaseModal, TourWrapModal, SigningModal, AwardModal,
+  ReleaseModal, TourWrapModal, SigningModal, AwardModal, LabelMomentModal,
   MilestoneModal, ScenarioModal, NewspaperModal, ArcModal,
   FeatureModal, ManagerOfferModal, PressingModal, SignComponent,
   ReleaseCinematic
@@ -203,6 +203,7 @@ const s = game.state;
       )}
       {s.pendingManagerOffers?.length > 0 && <ManagerOfferModal {...game} />}
       {s.pendingPressing && <PressingModal {...game} />}
+      {s.pendingLabelMoment && <LabelMomentModal {...game} />}
       
       {/* Tour Intro Cinematic */}
       {tourIntro && (

@@ -322,6 +322,8 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
     const fundRemaining = Math.max(0, lbl.recordingFund - lbl.recordingFundUsed);
     const campaignPerAlbum = Math.floor(lbl.marketingCommitment / Math.max(1, lbl.albumsCommitted));
     const campaignRemaining = Math.max(0, lbl.marketingCommitment - lbl.marketingSpendYTD);
+    const trust = lbl.aRTrust ?? 55;
+    const relationshipMood = lbl.relationshipMood ?? (trust >= 70 ? "supportive" : trust < 40 ? "strained" : "neutral");
 
     return (
       <div className="card label-contract-card">
@@ -335,6 +337,14 @@ function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
           }}>
             {lbl.isRecouped ? "✓ RECOUPED" : "RECOUPING"}
           </div>
+        </div>
+
+        <div className="contract-section">
+          <div className="contract-section-title">A&amp;R Partnership</div>
+          <div className="recoup-bar-bg"><div className="recoup-bar-fill" style={{ width: `${trust}%`, background: relationshipMood === "supportive" ? "var(--sage)" : relationshipMood === "strained" ? "var(--rust)" : "var(--amber)" }} /></div>
+          <div className="recoup-numbers"><span>{lbl.exec} · {trust}/100 trust</span><span className="text-muted" style={{ textTransform: "capitalize" }}>{relationshipMood}</span></div>
+          <div className="tip-text" style={{ marginTop: 7 }}>{relationshipMood === "supportive" ? "Premium label support is available on your next release." : relationshipMood === "strained" ? "The label is honoring the deal, but extra support is harder to win." : "Release-cycle choices will shape how hard the label goes to bat for you."}</div>
+          {lbl.relationshipHistory?.[0] && <div className="tip-text" style={{ marginTop: 6 }}>Last A&amp;R decision: {lbl.relationshipHistory[0].outcome}</div>}
         </div>
 
         <div className="contract-section">

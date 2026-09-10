@@ -430,6 +430,13 @@ export interface SignedLabel {
   // Release approval and label-campaign standing.
   approvalStrikes?: number;
   campaignFrozen?: boolean;
+  /** A&R partnership state. Kept on the contract so it survives saves and label changes. */
+  aRTrust?: number;
+  relationshipMood?: LabelRelationshipMood;
+  relationshipHistory?: LabelNegotiation[];
+  completedMomentIds?: string[];
+  /** One-release support secured during a release strategy conversation. */
+  releaseSupportBoost?: number;
 
   // Legal
   crossCollateralization: boolean;
@@ -4767,6 +4774,7 @@ export interface GameState {
   producerWorkCounts: Record<string, number>;
   // Active label / manager contracts (null when unsigned)
   currentLabel: SignedLabel | null;
+  pendingLabelMoment: LabelMoment | null;
   currentManager: SignedManager | null;
   pendingLabelSubmission: LabelSubmission | null;
   pendingReissue: { releaseId: string; format: ReleaseFormat; eraId: string } | null;
@@ -4946,6 +4954,7 @@ export const INITIAL_STATE: GameState = {
   currentTrendTheme: "heartbreak",
   producerWorkCounts: {},
   currentLabel: null,
+  pendingLabelMoment: null,
   currentManager: null,
   pendingLabelSubmission: null,
   pendingReissue: null,
@@ -5390,41 +5399,8 @@ export function computeChemistry(base: number, arch1: string, arch2: string): nu
 // • Relationship meter with the exec
 // • Events where the label wants something you don't
 
-export type LabelRelationshipMood = "supportive" | "neutral" | "frustrated" | "hostile";
-
-export interface SignedLabelV2 extends SignedLabel {
-  // New fields for relationship tracking
-  aRExecName: string;            // A&R executive's full name (or use existing exec)
-  execRelationship: number;      // -100 to +100 with your A&R
-  labelMood: LabelRelationshipMood;
-  lastCheckInWeek: number;       // when was the last A&R check-in?
-  negotiationHistory: LabelNegotiation[];
-
-  // Quarterly "check-in" events that present real choices
-  pendingCheckIns: LabelCheckIn[];
-}
-
-export interface LabelCheckIn {
-  id: string;
-  weekOffered: number;
-  quarter: number;              // which label quarter (1-4)
-  type: "budget_increase" | "single_approval" | "creative_disagreement" | "festival_push" | "cross_genre";
-  title: string;
-  description: string;
-  emoji: string;
-  choices: Array<{
-    label: string;
-    sub: string;
-    effect: {
-      execRelationshipDelta?: number;
-      labelMoodChange?: LabelRelationshipMood;
-      recordingFundBonus?: number;
-      marketingBonus?: number;
-      creativeRisk?: number;     // -10 to +10 quality risk
-      careerRisk?: number;       // -10 to +10 career risk
-    };
-  }>;
-}
+export type LabelRelationshipMood = "supportive" | "neutral" | "strained";
+export type LabelMomentStage = "recording" | "release" | "campaign" | "tour";
 
 export interface LabelNegotiation {
   week: number;
@@ -5433,54 +5409,80 @@ export interface LabelNegotiation {
   relationshipChange: number;
 }
 
-// A&R executives that manage your label relationship
-const AR_EXECUTIVES = [
-  { name: "Diane Moreland", personality: "supportive", emoji: "👩‍💼", blurb: "Genuinely believes in artists. Fights for you internally." },
-  { name: "Rick Vasquez", personality: "neutral", emoji: "🤵", blurb: "Professional, pragmatic. Cares about numbers more than art." },
-  { name: "Tanya Crossfield", personality: "frustrated", emoji: "💅", blurb: "Impatient. Wants bigger hits, less artist development." },
-  { name: "Marcus Chen", personality: "hostile", emoji: "😤", blurb: "Thinks you're past your prime. Looking for reasons to shake you." },
-];
+export interface LabelMomentChoice {
+  label: string;
+  sub: string;
+  trustDelta: number;
+  recordingFundBonus?: number;
+  releaseSupportBoost?: number;
+  campaignChannel?: "radio" | "live" | "press";
+  money?: number;
+  fans?: number;
+  fame?: number;
+  rep?: number;
+}
 
-// Generate quarterly check-in events
-export function generateLabelCheckIn(
-  label: SignedLabel,
-  currentWeek: number,
-  playerFame: number,
-  playerRep: number,
-): LabelCheckIn | null {
-  const quarter = Math.floor(currentWeek / 13) % 4;
-  // Generate check-ins based on game state
-  if (label.albumsDelivered < label.albumsCommitted && quarter === 0) {
-    return {
-      id: "checkin_deliver",
-      weekOffered: currentWeek,
-      quarter,
-      type: "creative_disagreement",
-      title: "Album Delivery Pressure",
-      description: "Your label wants to know about the next album. They're pushing for a faster turnaround.",
-      emoji: "📅",
-      choices: [
-        { label:"Give them what they want — fast track it", sub:"More money, less quality control", effect:{ creativeRisk:-5, marketingBonus:5000 } },
-        { label:"Respectfully push back — take the time you need", sub:"Protect the art, risk tension", effect:{ creativeRisk:+3 } },
-      ],
-    };
-  }
-  if (playerFame > 50 && Math.random() < 0.4) {
-    return {
-      id: "checkin_festival",
-      weekOffered: currentWeek,
-      quarter,
-      type: "festival_push",
-      title: "Festival Push Request",
-      description: "The label wants you to play a major festival slot — but they want you to change your setlist for 'radio appeal.'",
-      emoji: "🎪",
-      choices: [
-        { label:"Comply — play the radio hits", sub:"Label happy, fans maybe not", effect:{ marketingBonus:10000 } },
-        { label:"Play what you want", sub:"Artistic integrity over corporate wants", effect:{ creativeRisk:+2 } },
-      ],
-    };
-  }
-  return null;
+export interface LabelMoment {
+  id: string;
+  stage: LabelMomentStage;
+  emoji: string;
+  title: string;
+  description: string;
+  supportLabel: string;
+  choices: LabelMomentChoice[];
+}
+
+export function getLabelRelationshipMood(trust = 55): LabelRelationshipMood {
+  if (trust >= 70) return "supportive";
+  if (trust < 40) return "strained";
+  return "neutral";
+}
+
+const LABEL_SUPPORT: Record<LabelType, { lane: string; recording: string; launch: string; campaign: string; tour: string; fund: number; tourAdvance: number; tourFans: number }> = {
+  major: { lane: "Radio & national reach", recording: "a radio-minded producer", launch: "a national radio plan", campaign: "a broadcast and video push", tour: "their national routing desk", fund: 6000, tourAdvance: 2500, tourFans: 900 },
+  americana: { lane: "Press & festival credibility", recording: "a trusted roots producer", launch: "a critic and public-radio campaign", campaign: "editorial coverage and a session", tour: "their festival partners", fund: 3500, tourAdvance: 1500, tourFans: 700 },
+  specialty: { lane: "Genre legacy & regional circuit", recording: "a genre specialist", launch: "the blues and heritage press circuit", campaign: "a physical release and specialist press push", tour: "their regional circuit", fund: 3000, tourAdvance: 1200, tourFans: 750 },
+  indie: { lane: "Grassroots & road growth", recording: "a scene-tested producer", launch: "a grassroots rollout", campaign: "community radio and a live session", tour: "their club-booking network", fund: 2500, tourAdvance: 1000, tourFans: 600 },
+  boutique: { lane: "Curated crossover", recording: "a handpicked collaborator", launch: "a targeted crossover campaign", campaign: "a selective press and brand moment", tour: "their curated promoter network", fund: 4000, tourAdvance: 1800, tourFans: 800 },
+};
+
+export function createLabelMoment(label: SignedLabel, stage: LabelMomentStage, releaseTitle?: string): LabelMoment {
+  const profile = LABEL_SUPPORT[label.type] ?? LABEL_SUPPORT.indie;
+  const name = releaseTitle ? ` for “${releaseTitle}”` : "";
+  const id = `${stage}:${releaseTitle ?? "career"}`;
+  if (stage === "recording") return {
+    id, stage, emoji: "🎛️", title: "A&R Wants In", supportLabel: profile.lane,
+    description: `${label.exec} offers ${profile.recording}${name}. It comes with resources—and a vote of confidence in the direction.`,
+    choices: [
+      { label: "Build it with the label", sub: `Add ${fmtMoney(profile.fund)} to the recording fund and strengthen the partnership.`, trustDelta: 8, recordingFundBonus: profile.fund },
+      { label: "Keep the session yours", sub: "Protect your process; the label gives you more room, but less momentum.", trustDelta: -5, rep: 2 },
+    ],
+  };
+  if (stage === "release") return {
+    id, stage, emoji: "📣", title: "Release Strategy Meeting", supportLabel: profile.lane,
+    description: `${label.exec} wants to build ${profile.launch}${name}. Their playbook can make the release louder, if you are willing to share the steering wheel.`,
+    choices: [
+      { label: "Greenlight their campaign", sub: "Secure stronger label marketing for this release.", trustDelta: 9, releaseSupportBoost: 0.18, fame: 1 },
+      { label: "Negotiate a middle path", sub: "Keep more authorship while retaining a smaller campaign lift.", trustDelta: 2, releaseSupportBoost: 0.08, rep: 1 },
+      { label: "Release on your terms", sub: "No extra support; core fans respect the line you drew.", trustDelta: -7, rep: 3 },
+    ],
+  };
+  if (stage === "campaign") return {
+    id, stage, emoji: "⚡", title: "Campaign Pivot", supportLabel: profile.lane,
+    description: `The first week is in. ${label.exec} can activate ${profile.campaign}${name}, or let the record breathe.`,
+    choices: [
+      { label: "Activate the label push", sub: "Give the campaign a lane-specific boost and build trust.", trustDelta: 6, campaignChannel: label.type === "major" ? "radio" : label.type === "specialty" ? "press" : "live" },
+      { label: "Hold the course", sub: "Keep the campaign intimate and recover some goodwill with your core audience.", trustDelta: -2, rep: 2 },
+    ],
+  };
+  return {
+    id, stage, emoji: "🗺️", title: "Tour Support Call", supportLabel: profile.lane,
+    description: `${label.exec} offers ${profile.tour} for this run. The help arrives as a small tour advance and more eyes in the right rooms.`,
+    choices: [
+      { label: "Route it with the label", sub: `${fmtMoney(profile.tourAdvance)} tour support and a stronger draw.`, trustDelta: 5, money: profile.tourAdvance, fans: profile.tourFans },
+      { label: "Keep the route independent", sub: "Maintain control of the rooms and the story around the run.", trustDelta: -4, rep: 2 },
+    ],
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════

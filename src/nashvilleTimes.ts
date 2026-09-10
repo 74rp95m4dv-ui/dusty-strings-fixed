@@ -819,46 +819,15 @@ const PRAISE_LETTERS: LetterFn[] = [
     body:`Editor — Heard ${me} on the radio while driving home from a double shift. Sat in my truck in the driveway until the song ended. That's the highest compliment a working person can pay an artist.` }),
 ];
 
-const CRITICAL_LETTERS: LetterFn[] = [
-  (_s,me) => ({ tone:"critical", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — With respect, ${me} sounds like every other act trying to dress up a slow week as profound. The genre deserves better than recycled heartache. Sincerely, a paying ticket holder who wants their money back.` }),
-  (_s,me) => ({ tone:"critical", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Dear Editor — I read your glowing coverage of ${me} with a furrowed brow. Let us not confuse a good haircut and a label budget for substance. Time will sort the wheat from the chaff.` }),
-  (_s,me) => ({ tone:"critical", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — When did "country" become a marketing demographic? I'd take one Loretta over a hundred ${me}s. Print this if you've got the spine.` }),
-  (_s,me) => ({ tone:"critical", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Sir — I attended the recent show by ${me} expecting an evening of music and instead received an evening of merchandise advertisements between songs. The music industry has lost its way.` }),
-];
-
-const FAN_LETTERS: LetterFn[] = [
-  (_s,me) => ({ tone:"fan", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor!! I waited four hours outside the venue and ${me} signed my guitar AND my forearm. I am getting the autograph tattooed before it washes off. My mother is furious. WORTH IT.` }),
-  (_s,me) => ({ tone:"fan", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`To the Editor — My wedding song this fall will be a ${me} cut. My fiancée doesn't know yet but she'll come around. She always does. Please send my regards to the band.` }),
-  (_s,me) => ({ tone:"fan", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — I have started a fan club out of my garage. We have nine members so far, including the dog. ${me} fans of the world, unite!` }),
-  (_s,me) => ({ tone:"fan", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Dear Editor — Please tell ${me} that I named my new mule after them. The mule is stubborn, beautiful, and refuses to take direction. Felt like a tribute.` }),
-];
-
-const INDUSTRY_LETTERS: LetterFn[] = [
-  (_s,me) => ({ tone:"industry", signature:letterSignature()+", Programming Director", city:pick(LETTER_CITIES),
-    body:`Editor — As a small market PD, I want to thank you for covering acts like ${me}. Phone lines lit up the first time we spun the new single. Real listener response, not chart payola. Keep it coming.` }),
-  (_s,me) => ({ tone:"industry", signature:letterSignature()+", Songwriter", city:pick(LETTER_CITIES),
-    body:`Editor — Caught a writers round in town last week and ${me} held the room without raising their voice once. That's a craft they don't teach you in the publishing seminars.` }),
-  (_s,me) => ({ tone:"industry", signature:letterSignature()+", Venue Owner", city:pick(LETTER_CITIES),
-    body:`Editor — In thirty years of running a club, I can count on two hands the artists who left the green room cleaner than they found it. ${me} is on that list. Take it for what it's worth.` }),
-];
-
-const WEIRD_LETTERS: LetterFn[] = [
-  (_s,me) => ({ tone:"weird", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — My rooster crows at exactly the moment ${me}'s song hits the bridge, every single morning. I do not know what this means but I felt the public should know.` }),
-  (_s,me) => ({ tone:"weird", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`To the Editor — I have written ${me} eleven letters proposing marriage and have received no reply. I will continue to write. The mail moves slow these days.` }),
-  (_s,me) => ({ tone:"weird", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — I am convinced ${me} is the reincarnation of my late uncle Royce, who also played guitar and also could not parallel park. Coincidence? You decide.` }),
-  (_s,me) => ({ tone:"weird", signature:letterSignature(), city:pick(LETTER_CITIES),
-    body:`Editor — I run a small bait shop and have started playing ${me} over the loudspeakers. Worm sales are up 14%. The crawdads seem to enjoy it as well. Print this in the science section.` }),
+// Letters should make the paper feel like a community publication, not a fan
+// inbox. These react to the wider scene and do not mention the player.
+const WORLD_LETTERS: LetterFn[] = [
+  (_s,_me) => ({ tone:"industry", signature:letterSignature()+", Promoter", city:pick(LETTER_CITIES), body:`Editor — Everybody is arguing about ticket prices, but nobody is talking about the little rooms keeping music alive. Give me a packed club and a fair bar tab over another sponsored arena any night.` }),
+  (_s,_me) => ({ tone:"critical", signature:letterSignature()+", Listener", city:pick(LETTER_CITIES), body:`To the Editor — If one more label announces a "roots revival" with a pop star in a denim jacket, I may move to the woods. The real songs are already being played in rooms nobody is filming.` }),
+  (_s,_me) => ({ tone:"fan", signature:letterSignature()+", Festival Volunteer", city:pick(LETTER_CITIES), body:`Editor — The new festival grounds need shade, water, and fewer VIP fences. The bands are doing their part. Maybe the people selling the $18 lemonade could do theirs.` }),
+  (_s,_me) => ({ tone:"industry", signature:letterSignature()+", Record Store Owner", city:pick(LETTER_CITIES), body:`Dear Editor — Customers still want something they can hold. They ask for old records, local demos, and liner notes. Streaming is convenient; a good record has a pulse.` }),
+  (_s,_me) => ({ tone:"weird", signature:letterSignature()+", Concerned Neighbor", city:pick(LETTER_CITIES), body:`Editor — The songwriter round down the street ends at midnight on paper and at 2 a.m. in reality. I support the arts. I also support sleep. Please print both sides.` }),
+  (_s,_me) => ({ tone:"critical", signature:letterSignature()+", Former Roadie", city:pick(LETTER_CITIES), body:`Sir or Madam — Every band says the road builds character. The road builds potholes, unpaid invoices, and a deep knowledge of truck-stop coffee. Still, I miss it.` }),
 ];
 
 function generateLetters(s: GameState): LetterToEditor[] {
@@ -867,22 +836,16 @@ function generateLetters(s: GameState): LetterToEditor[] {
   if (fame < 10) return [];
 
   const pools: LetterFn[][] = [];
-  // Always at least one praise letter once you're known
-  pools.push(PRAISE_LETTERS);
-  // Critical letters appear once you're more visible (more haters as you grow)
-  if (fame >= 20) pools.push(CRITICAL_LETTERS);
-  // Fan letters skew with bigger fan base
-  if ((s.fans ?? 0) >= 500) pools.push(FAN_LETTERS);
-  // Industry letters once you're a working artist
-  if (fame >= 35 || (s.totalReleases ?? 0) >= 3) pools.push(INDUSTRY_LETTERS);
-  // Weird letters always possible past a threshold
-  if (fame >= 25) pools.push(WEIRD_LETTERS);
+  // World letters are the default voice of the paper.
+  pools.push(WORLD_LETTERS);
+  // Player-directed praise/criticism/fan mail is selected separately below so
+  // the main column remains about the wider community.
 
   const targetCount = fame >= 60 ? 4 : fame >= 30 ? 3 : 2;
   const out: LetterToEditor[] = [];
   const usedBodies = new Set<string>();
   let attempts = 0;
-  while (out.length < targetCount && attempts < 25) {
+  while (out.length < targetCount && attempts < 35) {
     attempts++;
     const pool = pick(pools);
     const letter = pick(pool)(s, me);
@@ -890,6 +853,12 @@ function generateLetters(s: GameState): LetterToEditor[] {
     if (usedBodies.has(key)) continue;
     usedBodies.add(key);
     out.push(letter);
+  }
+  // Add one player letter only when the artist is established enough to have
+  // public mail, and never let it displace the wider community voice.
+  if (fame >= 20 && out.length < targetCount + 1) {
+    const letter = pick(PRAISE_LETTERS)(s, me);
+    if (!out.some(item => item.body.slice(0, 40) === letter.body.slice(0, 40))) out.push(letter);
   }
   return out;
 }
@@ -914,14 +883,18 @@ function milestone(me: string, title: string, body: string): NewspaperStory {
        return true;
      }
 
-     // Player stories (capped at 8 — recording, releases, milestones, business)
+     // Player stories are selective: the paper is about the whole Nashville
+     // scene, with room reserved for the player's genuinely important news.
      const player = playerStories(s);
      const rec = playerRecordingStories(s);
      const pub = playerPublishingStories(s);
      const sync = playerSyncStories(s);
      const brand = playerBrandStories(s);
      const mgr = playerManagerStories(s);
-     for (const st of [...rec, ...player, ...pub, ...sync, ...brand, ...mgr].slice(0, 8)) tryAdd(st);
+     const playerCandidates = [...rec, ...player, ...pub, ...sync, ...brand, ...mgr]
+       .map((story, index) => ({ story, index, score: (story.section === "Front Page" ? 4 : 0) + (story.reputation ? 3 : 0) + (story.section === "Charts" ? 2 : 0) - index * 0.001 }))
+       .sort((a, b) => b.score - a.score);
+     for (const entry of playerCandidates.slice(0, 3)) tryAdd(entry.story);
 
      // Always one chart/trend story
      tryAdd(pick(CHART_STORIES)(s));

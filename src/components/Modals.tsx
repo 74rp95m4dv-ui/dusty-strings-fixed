@@ -305,15 +305,19 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
    return (
      <div className="modal-overlay" onClick={dismissNewspaper}>
        <div className="modal-box newspaper-modal" onClick={(e) => e.stopPropagation()}>
-         <div className="modal-title">📰 Nashville Times</div>
-         <div className="newspaper-header">
-           <div className="newspaper-issue">Issue {news.issue || 1}, Week {week}</div>
-           <div className="newspaper-date">{news.weather || "No weather report"}</div>
+         <div className="newspaper-masthead">
+           <div className="newspaper-kicker">Music Row · Country · Blues · The South</div>
+           <div className="newspaper-name">The Nashville Times</div>
+           <div className="newspaper-rule" />
+           <div className="newspaper-header">
+             <div className="newspaper-issue">Vol. {news.volume || 1} · No. {news.issue || 1} · Week {week}</div>
+             <div className="newspaper-date">{news.weather || "No weather report"}</div>
+           </div>
          </div>
          {stories.length > 0 ? (
            <div className="newspaper-stories">
              {stories.map((story: any, i: number) => (
-               <div key={i} className="newspaper-story">
+               <article key={i} className={`newspaper-story ${i === 0 ? "newspaper-story--lead" : i < 4 ? "newspaper-story--secondary" : ""} ${story.isPlayer ? "newspaper-story--player" : ""}`}>
                  <div className="newspaper-section">
                    {story.section}
                  </div>
@@ -347,14 +351,14 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
                      )}
                    </div>
                  )}
-               </div>
+               </article>
              ))}
            </div>
          ) : (
            <div className="tip-text">No article content available.</div>
          )}
          {letters.length > 0 && (
-           <div className="newspaper-letters-section">
+           <section className="newspaper-letters-section">
              <div className="newspaper-section-divider">Letters to the Editor</div>
              {letters.map((letter: any, i: number) => (
                <div key={i} className="newspaper-letter">
@@ -366,7 +370,7 @@ export function ScenarioModal({ state, doResolveScenario }: any) {
                  </div>
                </div>
              ))}
-           </div>
+           </section>
          )}
          <div className="modal-footer">
            <button className="btn btn-lime btn-block" onClick={dismissNewspaper}>Continue</button>

@@ -1271,23 +1271,33 @@ input[type="range"] {
 
  /* ─── NEWSPAPER MODAL STYLING ──────────────────────────────── */
  .newspaper-modal {
-   max-width: 800px !important; /* Allow wider view on PC */
+   background: #f1e7cf !important;
+   border: 1px solid #b9a889 !important;
+   box-shadow: 0 24px 70px rgba(22, 16, 9, .46), inset 0 0 0 5px rgba(115, 83, 39, .08);
+   color: #211b14 !important;
+   max-width: 1000px !important;
    width: 95% !important;
    margin: 10px auto;
  }
 
+ .newspaper-masthead { font-family: Georgia, "Times New Roman", serif; text-align: center; }
+ .newspaper-kicker { color: #796342; font-family: var(--mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
+ .newspaper-name { color: #211b14; font-size: clamp(34px, 6vw, 66px); font-weight: 900; letter-spacing: -.055em; line-height: .95; margin: 8px 0 10px; }
+ .newspaper-rule { border-top: 3px double #211b14; }
+
  .newspaper-header {
    text-align: center;
    padding: var(--space-3) var(--space-4);
-   border-bottom: 2px solid var(--amber);
+   border-bottom: 1px solid #8d7958;
    margin-bottom: var(--space-4);
  }
 
  .newspaper-issue {
-   font-family: var(--head);
+   color: #211b14;
+   font-family: Georgia, "Times New Roman", serif;
    font-size: 18px;
    font-weight: 900;
-   color: var(--amber);
+   letter-spacing: .02em;
    letter-spacing: -0.5px;
    margin-bottom: 4px;
  }
@@ -1295,19 +1305,27 @@ input[type="range"] {
  .newspaper-date {
    font-family: var(--mono);
    font-size: 12px;
-   color: var(--muted2);
+   color: #796342;
    text-transform: uppercase;
    letter-spacing: 0.8px;
  }
 
  .newspaper-stories {
+   display: grid;
+   gap: 0 18px;
+   grid-template-columns: repeat(3, minmax(0, 1fr));
    margin-bottom: var(--space-4);
  }
 
  .newspaper-story {
    padding: var(--space-3) 0;
-   border-bottom: 1px dashed var(--border);
+   border-bottom: 1px solid #b9a889;
+   break-inside: avoid;
  }
+
+ .newspaper-story--lead { grid-column: span 2; padding-top: 4px; }
+ .newspaper-story--secondary { border-bottom: 2px solid #8d7958; }
+ .newspaper-story--player { border-left: 3px solid #9b3929; padding-left: 12px; }
 
  .newspaper-story:last-child {
    border-bottom: none;
@@ -1318,38 +1336,38 @@ input[type="range"] {
    font-size: 11px;
    text-transform: uppercase;
    letter-spacing: 1.2px;
-   color: var(--amber);
+   color: #8c3827;
    font-weight: 800;
    margin-bottom: var(--space-1);
  }
 
  .newspaper-headline {
-   font-family: var(--head);
+   color: #211b14;
+   font-family: Georgia, "Times New Roman", serif;
    font-size: 18px;
    font-weight: 900;
    font-style: italic;
    line-height: 1.3;
-   color: var(--text);
    margin-bottom: var(--space-2);
  }
 
  .newspaper-byline {
    font-family: var(--mono);
    font-size: 11px;
-   color: var(--muted2);
+   color: #796342;
    margin-bottom: var(--space-2);
  }
 
  .newspaper-body {
    font-size: 14px;
    line-height: 1.6;
-   color: var(--text2);
+   color: #493d2e;
  }
 
  .newspaper-letters-section {
    margin-top: var(--space-4);
    padding-top: var(--space-4);
-   border-top: 1px solid var(--border);
+   border-top: 3px double #211b14;
  }
 
  .newspaper-section-divider {
@@ -1357,7 +1375,7 @@ input[type="range"] {
    font-size: 12px;
    text-transform: uppercase;
    letter-spacing: 0.8px;
-   color: var(--amber);
+   color: #8c3827;
    font-weight: 800;
    margin-bottom: var(--space-3);
    text-align: center;
@@ -1371,15 +1389,22 @@ input[type="range"] {
    font-size: 13px;
    line-height: 1.6;
    font-style: italic;
-   color: var(--text2);
+   color: #493d2e;
    margin-bottom: var(--space-2);
  }
 
  .newspaper-letter-signature {
    font-family: var(--mono);
    font-size: 11px;
-   color: var(--muted2);
+   color: #796342;
    text-align: right;
+ }
+
+ @media (max-width: 700px) {
+   .newspaper-modal { max-height: 94vh; overflow-y: auto; padding: 16px; }
+   .newspaper-stories { display: block; }
+   .newspaper-story--lead { padding-top: var(--space-3); }
+   .newspaper-story--player { padding-left: 9px; }
  }
 
 /* Full-screen modal */

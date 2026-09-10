@@ -86,6 +86,18 @@ export function saveGameState<T extends object>(storage: StorageLike, state: T):
   }
 }
 
+/** Replaces the current career without retaining it as a recoverable backup. */
+export function replaceGameState<T extends object>(storage: StorageLike, state: T): boolean {
+  try {
+    storage.removeItem(SAVE_KEY);
+    storage.removeItem(SAVE_BACKUP_KEY);
+    storage.setItem(SAVE_KEY, JSON.stringify(createSaveEnvelope(state)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function clearGameState(storage: StorageLike) {
   storage.removeItem(SAVE_KEY);
   storage.removeItem(SAVE_BACKUP_KEY);

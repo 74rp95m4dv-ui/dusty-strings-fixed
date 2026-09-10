@@ -6,6 +6,7 @@ import {
 } from "../gameLogic";
 import ActionCard from "./ui/ActionCard";
 import { forecastRecurringEconomy } from "../weeklyEconomy";
+import Dialog from "./ui/Dialog";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   const {
@@ -13,10 +14,11 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
     doDismissLabelOffers, doDismissManagerOffers, doAcceptLabelOffer,
     doAcceptManagerOffer, doAcceptPublishingOffer,
     doDismissPublishingOffers, doAcceptSyncOffer, doDismissSyncOffers,
-    doToggleMerchItem, doRemoveMerchItem, doAddMerchItem,
+    doToggleMerchItem, doRemoveMerchItem, doAddMerchItem, beginNewCareer,
   } = game;
 
-  const [sub, setSub] = useState<"deals" | "merch" | "awards" | "rivals" | "finances">("deals");
+  const [sub, setSub] = useState<"deals" | "merch" | "awards" | "rivals" | "finances" | "options">("deals");
+  const [confirmNewCareer, setConfirmNewCareer] = useState(false);
   const recurringForecast = forecastRecurringEconomy(state);
 
   const totalIncome =
@@ -35,7 +37,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
       </div>
 
       <div className="subtabs">
-        {(["deals", "merch", "awards", "rivals", "finances"] as const).map((t) => (
+        {(["deals", "merch", "awards", "rivals", "finances", "options"] as const).map((t) => (
           <button key={t} className={`subtab-btn ${sub === t ? "active" : ""}`} onClick={() => setSub(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -300,6 +302,33 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
               <span className="finance-value text-sage">{fmtMoney(state.totalEarned)}</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {sub === "options" && (
+        <div className="stagger-1">
+          <div className="card">
+            <div className="card-title">Career &amp; Save</div>
+            <p className="tip-text">Dusty Strings keeps one active local career on this device.</p>
+            <button className="btn btn-danger" onClick={() => setConfirmNewCareer(true)}>
+              Start New Career
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmNewCareer && (
+        <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmNewCareer(false); }}>
+          <Dialog titleId="new-career-confirm-title" onClose={() => setConfirmNewCareer(false)}>
+            <div className="modal-title" id="new-career-confirm-title">Start a new career?</div>
+            <p className="tip-text">Your current career is safe while you set up the new act. Selecting Start Career on the next screen permanently replaces this career and its recovery backup.</p>
+            <div className="modal-footer">
+              <button className="btn btn-danger" data-dialog-initial onClick={() => { setConfirmNewCareer(false); beginNewCareer?.(); }}>
+                Continue to Setup
+              </button>
+              <button className="btn btn-ghost" onClick={() => setConfirmNewCareer(false)}>Keep Current Career</button>
+            </div>
+          </Dialog>
         </div>
       )}
     </div>

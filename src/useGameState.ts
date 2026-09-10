@@ -70,7 +70,7 @@ import {
   BRAND_DEALS_V2, getBrandDealSellout,
 } from "./gameLogic";
 import { generateNashvilleTimes } from "./nashvilleTimes";
-import { clearGameState, loadGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
+import { clearGameState, loadGameState, replaceGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
@@ -1589,6 +1589,7 @@ export function useGameState() {
 
   const goToMenu  = useCallback(()=>setState(p=>({...p,screen:"menu"})),[]);
   const goToSetup = useCallback(()=>setState(p=>({...p,screen:"setup"})),[]);
+  const beginNewCareer = useCallback(()=>setState(p=>({...p,screen:"setup"})),[]);
   const loadGame  = useCallback(()=>{ const loaded = readStoredGame(); const s=loaded.state; setSaveIssue(loaded.message); if(s) {
     if (loaded.migrated || loaded.message) saveToDisk(s);
     setState(normalizeGameState({
@@ -1697,7 +1698,9 @@ export function useGameState() {
       s.rivals = seedRivals(0);
     });
     s.weeklyExpenses = calculateWeeklyOverhead(s);
-    normalizeGameState(s); saveToDisk(s); setState({ ...s, hasSave: true });
+    const next = normalizeGameState(s);
+    if (typeof window !== "undefined") replaceGameState(window.localStorage, next);
+    setState({ ...next, hasSave: true });
   },[]);
 
   const doAdvance = useCallback(() => setState(prev => {
@@ -3221,7 +3224,7 @@ export function useGameState() {
   return {
     state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper, doResolveNewspaperResponse,
     doCloseReleasePresentation, doResolveScenario,
-    goToMenu, goToSetup, loadGame, clearSave, startNewGame,
+    goToMenu, goToSetup, beginNewCareer, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
     doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doReissueRelease, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,

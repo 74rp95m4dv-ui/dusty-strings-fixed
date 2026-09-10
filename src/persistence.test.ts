@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SAVE_BACKUP_KEY, SAVE_KEY, createSaveEnvelope, loadGameState, saveGameState, type StorageLike } from "./persistence";
+import { SAVE_BACKUP_KEY, SAVE_KEY, createSaveEnvelope, loadGameState, replaceGameState, saveGameState, type StorageLike } from "./persistence";
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -42,6 +42,18 @@ describe("career persistence", () => {
     const result = loadGameState<typeof career>(storage);
     expect(result).toMatchObject({ kind: "success", source: "backup" });
     if (result.kind === "success") expect(result.state.week).toBe(8);
+  });
+
+  it("replaces a career without retaining its previous backup", () => {
+    const storage = new MemoryStorage();
+    saveGameState(storage, career);
+    saveGameState(storage, { ...career, week: 9 });
+    replaceGameState(storage, { ...career, artistName: "New Act", week: 1 });
+
+    expect(storage.getItem(SAVE_BACKUP_KEY)).toBeNull();
+    const result = loadGameState<typeof career>(storage);
+    expect(result).toMatchObject({ kind: "success", source: "primary" });
+    if (result.kind === "success") expect(result.state.artistName).toBe("New Act");
   });
 
   it("rejects incomplete and future-version saves without throwing", () => {

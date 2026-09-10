@@ -74,6 +74,7 @@ import { clearGameState, loadGameState, replaceGameState, restoreBackupToPrimary
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
+import { collectLoanPayment, createLoan, getLoanEligibility, getLoanOffer, payOffLoanEarly } from "./loanSystem";
 import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
 import { getTrackRatingBounds } from "./recordingForecast";
 import { PROJECT_DIRECTIONS, canChangeProjectDirection, getRegionalDemand, getLiveCatalogMultiplier, getSongStrengths } from "./gameSystems/careerDepth";
@@ -922,6 +923,8 @@ export function advanceCareerWeek(prev:GameState): GameState {
     }
   }
 
+  collectLoanPayment(s);
+
   // Label contract countdown — when expired, drop the contract.
   if (s.currentLabel) {
     s.currentLabel.weeksLeft -= 1;
@@ -1474,6 +1477,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
 
 export function advanceWithSimulation(prev: GameState): GameState {
   const before = JSON.parse(JSON.stringify(prev)) as GameState;
+  const loanBalanceBefore = before.activeLoan?.remainingBalance ?? 0;
   const simulation = withSimulationRandom(prev, () => advanceCareerWeek(prev));
   const s = simulation.result;
   // advanceCareerWeek works on a snapshot. Carry the PRNG state updated on the
@@ -1492,6 +1496,7 @@ export function advanceWithSimulation(prev: GameState): GameState {
     repDelta: Number((s.rep - before.rep).toFixed(1)),
     energyDelta: Math.round(s.energy - before.energy),
     burnoutDelta: Number(((s.burnout ?? 0) - (before.burnout ?? 0)).toFixed(1)),
+    loanPayment: Math.max(0, loanBalanceBefore - (s.activeLoan?.remainingBalance ?? 0)),
     rolls: simulation.rolls,
     highlights,
   });
@@ -1570,6 +1575,7 @@ export function useGameState() {
       pendingArcChoice: saved.pendingArcChoice ?? null,
       simulation: normalizeSimulation(saved.simulation),
       weeklyLedger: saved.weeklyLedger ?? [],
+      activeLoan: saved.activeLoan ?? null,
     });
     return normalizeGameState({...INITIAL_STATE});
   });
@@ -1646,6 +1652,7 @@ export function useGameState() {
     pendingArcChoice: s.pendingArcChoice ?? null,
     simulation: normalizeSimulation(s.simulation),
     weeklyLedger: s.weeklyLedger ?? [],
+    activeLoan: s.activeLoan ?? null,
       // ── Touring Features v2.0 migration ──
       setlistConfig: s.setlistConfig ?? { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
       venueReputations: s.venueReputations ?? {},
@@ -2556,6 +2563,33 @@ export function useGameState() {
   }),[upd]);
 
   // More
+  const doTakeLoan = useCallback((id:string)=>upd(s=>{
+    const offer = getLoanOffer(id);
+    if (!offer) return s;
+    const eligibility = getLoanEligibility(s, offer);
+    if (!eligibility.eligible) {
+      s.pendingEvent = { msg: eligibility.reason, type: "bad" };
+      return s;
+    }
+    s.activeLoan = createLoan(offer, s.week);
+    s.money += offer.principal;
+    s.log.unshift({ week:s.week, msg:`Loan accepted: ${offer.lenderName} advanced ${fmtMoney(offer.principal)}. ${fmtMoney(offer.weeklyPayment)}/wk due for ${offer.termWeeks} weeks.`, type:"neutral" });
+    s.pendingEvent = { msg:`${offer.lenderName} funded your career with ${fmtMoney(offer.principal)}. Read the Finance tab for repayment terms.`, type:"gold" };
+    return s;
+  }),[upd]);
+
+  const doPayOffLoan = useCallback(()=>upd(s=>{
+    const loan = s.activeLoan;
+    if (!loan) return s;
+    if (s.money < loan.remainingBalance) {
+      s.pendingEvent = { msg:`You need ${fmtMoney(loan.remainingBalance - s.money)} more to pay off ${loan.lenderName}.`, type:"bad" };
+      return s;
+    }
+    payOffLoanEarly(s);
+    s.log.unshift({ week:s.week, msg:`Paid off the ${loan.lenderName} loan early.`, type:"great" });
+    return s;
+  }),[upd]);
+
   const doSignBrandDeal = useCallback((id:string)=>upd(s=>{
     const b=BRAND_DEALS.find(x=>x.id===id); if(!b) return s;
     if (!getCareerReadiness(s).canAccessIndustry) { s.pendingEvent={msg:"Brands want a proven regional act. Build your catalog, live record, and audience first.",type:"bad"}; return s; }
@@ -3229,7 +3263,7 @@ export function useGameState() {
     doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doReissueRelease, doScrubProject,
     doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo, doAlbumCampaignAction,
-    doSignBrandDeal, doSignLabel, doSwitchGenre,
+    doTakeLoan, doPayOffLoan, doSignBrandDeal, doSignLabel, doSwitchGenre,
     doAcceptLabelOffer, doDismissLabelOffers, doAcceptManagerOffer, doDismissManagerOffers,
     doResolveLabelMoment,
     doAcceptFeatureRequest, doDismissFeatureRequests,

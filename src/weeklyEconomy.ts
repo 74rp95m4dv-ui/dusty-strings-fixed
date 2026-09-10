@@ -13,9 +13,10 @@ export function forecastRecurringEconomy(state: GameState) {
   const market = state.catalog.reduce((sum, release) => sum + Math.max(0, release.weeklyRevenue ?? 0), 0);
   const brands = state.activeBrandDeals.reduce((sum, deal) => sum + deal.weeklyIncome, 0) * (state.currentManager?.brandDealBoost ?? 1);
   const manager = state.currentManager?.weeklyFee ?? 0;
+  const loanPayment = state.activeLoan ? state.activeLoan.arrears + (state.activeLoan.paymentsDue < state.activeLoan.termWeeks ? Math.min(state.activeLoan.weeklyPayment, Math.max(0, state.activeLoan.remainingBalance - state.activeLoan.arrears)) : 0) : 0;
   const studio = state.project ? Math.floor((getStudio(state.project.studioId)?.perWeek ?? 0) * RECORDING_MODE_CONFIG[state.project.mode ?? "standard"].costMult) : 0;
   const overhead = calculateWeeklyOverhead(state);
-  return { market: Math.round(market), brands: Math.round(brands), overhead, manager, studio, net: Math.round(market + brands - overhead - manager - studio) };
+  return { market: Math.round(market), brands: Math.round(brands), overhead, manager, studio, loanPayment: Math.round(loanPayment), net: Math.round(market + brands - overhead - manager - studio - loanPayment) };
 }
 
 /** Builds a reconciled settlement entry without changing any gameplay formulas. */
@@ -33,6 +34,7 @@ export function buildWeeklyEconomyLedger(before: GameState, after: GameState, ba
   add(income, "Festivals", festivalPay);
   add(costs, "Recurring overhead", before.weeklyExpenses);
   add(costs, "Manager", before.currentManager?.weeklyFee ?? 0);
+  add(costs, "Loan payment", base.loanPayment ?? 0);
 
   const knownNet = Object.values(income).reduce((sum, amount) => sum + amount, 0) - Object.values(costs).reduce((sum, amount) => sum + amount, 0);
   const remainder = Math.round(after.money - before.money - knownNet);

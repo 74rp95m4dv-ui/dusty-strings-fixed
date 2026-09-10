@@ -4849,6 +4849,7 @@ export interface GameState {
   selloutScore: number;
   totalPublishingRevenue: number;
   distributorFee: number;
+  activeLoan: ActiveLoan | null;
   // Deterministic career simulation and a compact player-facing weekly audit trail.
   simulation: { seed: number; cursor: number };
   weeklyLedger: WeeklyLedgerEntry[];
@@ -4867,11 +4868,25 @@ export interface WeeklyLedgerEntry {
   repDelta: number;
   energyDelta: number;
   burnoutDelta: number;
+  loanPayment?: number;
   rolls: number;
   highlights: string[];
 }
 
 export type WeeklyFinanceCategories = Record<string, number>;
+
+export interface ActiveLoan {
+  lenderId: string;
+  lenderName: string;
+  principal: number;
+  totalRepayment: number;
+  weeklyPayment: number;
+  termWeeks: number;
+  paymentsDue: number;
+  remainingBalance: number;
+  arrears: number;
+  startedWeek: number;
+}
 
 export interface CareerReadiness {
   phase: "foundation" | "building" | "established";
@@ -5019,6 +5034,7 @@ export const INITIAL_STATE: GameState = {
   selloutScore: 0,
   totalPublishingRevenue: 0,
   distributorFee: 0,
+  activeLoan: null,
   simulation: { seed: 1, cursor: 0 },
   weeklyLedger: [],
 

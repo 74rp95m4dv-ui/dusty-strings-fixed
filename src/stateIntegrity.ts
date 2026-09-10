@@ -67,6 +67,19 @@ export function normalizeGameState(state: GameState): GameState {
   state.festivalBookings = uniqueByKey(state.festivalBookings, booking => booking?.festivalId);
   state.pendingFestivalOffers = uniqueByKey(state.pendingFestivalOffers, booking => booking?.festivalId);
   state.weeklyLedger = (Array.isArray(state.weeklyLedger) ? state.weeklyLedger : []).slice(0, 16);
+  if (!state.activeLoan || typeof state.activeLoan !== "object") state.activeLoan = null;
+  else {
+    const loan = state.activeLoan;
+    loan.principal = wholeAtLeast(loan.principal, 0);
+    loan.totalRepayment = wholeAtLeast(loan.totalRepayment, loan.principal);
+    loan.weeklyPayment = wholeAtLeast(loan.weeklyPayment, 1);
+    loan.termWeeks = wholeAtLeast(loan.termWeeks, 1);
+    loan.paymentsDue = Math.min(loan.termWeeks, wholeAtLeast(loan.paymentsDue, 0));
+    loan.remainingBalance = wholeAtLeast(loan.remainingBalance, 0);
+    loan.arrears = Math.min(loan.remainingBalance, wholeAtLeast(loan.arrears, 0));
+    loan.startedWeek = wholeAtLeast(loan.startedWeek, 1);
+    if (!loan.lenderId || !loan.lenderName || loan.remainingBalance === 0) state.activeLoan = null;
+  }
 
   if (state.project) {
     const project = state.project;

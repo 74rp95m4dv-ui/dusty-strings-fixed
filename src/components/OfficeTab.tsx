@@ -6,6 +6,7 @@ import {
 } from "../gameLogic";
 import ActionCard from "./ui/ActionCard";
 import { forecastRecurringEconomy } from "../weeklyEconomy";
+import { getLoanDue, getLoanEligibility, LOAN_OFFERS } from "../loanSystem";
 import Dialog from "./ui/Dialog";
 
 export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
@@ -14,12 +15,14 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
     doDismissLabelOffers, doDismissManagerOffers, doAcceptLabelOffer,
     doAcceptManagerOffer, doAcceptPublishingOffer,
     doDismissPublishingOffers, doAcceptSyncOffer, doDismissSyncOffers,
-    doToggleMerchItem, doRemoveMerchItem, doAddMerchItem, beginNewCareer,
+    doToggleMerchItem, doRemoveMerchItem, doAddMerchItem, beginNewCareer, doTakeLoan, doPayOffLoan,
   } = game;
 
   const [sub, setSub] = useState<"deals" | "merch" | "awards" | "rivals" | "finances" | "options">("deals");
   const [confirmNewCareer, setConfirmNewCareer] = useState(false);
+  const [confirmLoanId, setConfirmLoanId] = useState<string | null>(null);
   const recurringForecast = forecastRecurringEconomy(state);
+  const loanOfferToConfirm = LOAN_OFFERS.find(offer => offer.id === confirmLoanId) ?? null;
 
   const totalIncome =
     (state.catalog.reduce((s: number, t: any) => s + (t.streamStats?.weeklyRevenue || 0), 0)) +
@@ -290,6 +293,12 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
                 {fmtMoney(recurringForecast.manager)}
               </span>
             </div>
+            <div className="finance-row">
+              <span className="finance-label">Loan payment</span>
+              <span className="finance-value text-rust">
+                {recurringForecast.loanPayment ? fmtMoney(recurringForecast.loanPayment) : "—"}
+              </span>
+            </div>
             <hr />
             <div className="finance-row">
               <span className="finance-label">Expected recurring net</span>
@@ -302,6 +311,37 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
               <span className="finance-value text-sage">{fmtMoney(state.totalEarned)}</span>
             </div>
           </div>
+
+          {state.activeLoan ? (
+            <div className="card">
+              <div className="card-title">Active Loan</div>
+              <div style={{ fontWeight: 700 }}>{state.activeLoan.lenderName}</div>
+              <div className="tip-text" style={{ marginTop: 3 }}>
+                {state.activeLoan.arrears > 0 ? "Past due — missed amounts are included in your next payment." : "In good standing"}
+              </div>
+              <div className="finance-row"><span className="finance-label">Remaining balance</span><span className="finance-value text-rust">{fmtMoney(state.activeLoan.remainingBalance)}</span></div>
+              <div className="finance-row"><span className="finance-label">Due next week</span><span className="finance-value">{fmtMoney(getLoanDue(state.activeLoan))}</span></div>
+              <div className="finance-row"><span className="finance-label">Term progress</span><span className="finance-value">{state.activeLoan.paymentsDue}/{state.activeLoan.termWeeks} weeks</span></div>
+              {state.activeLoan.arrears > 0 && <div className="finance-row"><span className="finance-label">Arrears</span><span className="finance-value text-rust">{fmtMoney(state.activeLoan.arrears)}</span></div>}
+              <button className="btn btn-danger" style={{ marginTop: 10 }} disabled={state.money < state.activeLoan.remainingBalance} onClick={doPayOffLoan}>
+                Pay Off Early ({fmtMoney(state.activeLoan.remainingBalance)})
+              </button>
+            </div>
+          ) : (
+            <div className="card">
+              <div className="card-title">Career Loans</div>
+              <p className="tip-text">One active loan at a time. Missing a payment creates arrears and costs 1 reputation.</p>
+              {LOAN_OFFERS.map(offer => {
+                const eligibility = getLoanEligibility(state, offer);
+                return <div className="pick-card" key={offer.id}>
+                  <div className="pick-name">{offer.lenderName}</div>
+                  <div className="pick-meta">{fmtMoney(offer.principal)} now • {fmtMoney(offer.weeklyPayment)}/wk for {offer.termWeeks} weeks • {fmtMoney(offer.totalRepayment)} total</div>
+                  <div className="tip-text" style={{ marginTop: 4 }}>{eligibility.eligible ? "Ready to apply" : eligibility.reason}</div>
+                  <button className="btn btn-sm" style={{ marginTop: 8 }} disabled={!eligibility.eligible} onClick={() => setConfirmLoanId(offer.id)}>Review Terms</button>
+                </div>;
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -327,6 +367,19 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
                 Continue to Setup
               </button>
               <button className="btn btn-ghost" onClick={() => setConfirmNewCareer(false)}>Keep Current Career</button>
+            </div>
+          </Dialog>
+        </div>
+      )}
+
+      {loanOfferToConfirm && (
+        <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmLoanId(null); }}>
+          <Dialog titleId="loan-confirm-title" onClose={() => setConfirmLoanId(null)}>
+            <div className="modal-title" id="loan-confirm-title">Accept {loanOfferToConfirm.lenderName} loan?</div>
+            <p className="tip-text">Receive {fmtMoney(loanOfferToConfirm.principal)} today. Repay {fmtMoney(loanOfferToConfirm.totalRepayment)} in {loanOfferToConfirm.termWeeks} weekly payments of {fmtMoney(loanOfferToConfirm.weeklyPayment)}. If cash cannot cover a payment, the unpaid amount becomes arrears and you lose 1 reputation.</p>
+            <div className="modal-footer">
+              <button className="btn btn-lime" data-dialog-initial onClick={() => { doTakeLoan(loanOfferToConfirm.id); setConfirmLoanId(null); }}>Accept Loan</button>
+              <button className="btn btn-ghost" onClick={() => setConfirmLoanId(null)}>Decline</button>
             </div>
           </Dialog>
         </div>

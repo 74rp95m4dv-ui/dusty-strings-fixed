@@ -696,6 +696,22 @@ export function advanceCareerWeek(prev:GameState): GameState {
   const s:GameState = JSON.parse(JSON.stringify(prev));
   s.pendingEvent = null; s.modal = null;
   s.week++; s.weeksSinceRelease++;
+  // Street Circuit shows are chosen during the week and settle alongside the
+  // rest of the week's income, so the ledger stays fully reconciled.
+  if (s.streetHustle?.pendingPerformance) {
+    const performance = s.streetHustle.pendingPerformance;
+    s.money += performance.income;
+    s.totalEarned += performance.income;
+    s.fans += performance.fans;
+    s.rep = clamp(s.rep + performance.credibility, 0, 100);
+    s.burnout = clamp((s.burnout ?? 0) + performance.burnout, 0, 100);
+    const hometown = CITIES.find(city => city.name === s.city);
+    if (hometown) s.regional[hometown.region] = (s.regional[hometown.region] ?? 0) + 1;
+    s.streetHustle.credibility += performance.credibility;
+    if (s.streetHustle.diyReleased && s.streetHustle.credibility >= 4 && !s.streetHustle.microRouteUsed) s.streetHustle.microRouteReady = true;
+    s.streetHustle.pendingPerformance = null;
+    s.log.unshift({ week:s.week, msg:`Street Circuit: ${performance.name} brought in ${fmtMoney(performance.income)} and ${fmt(performance.fans)} new listeners.`, type:"good" });
+  }
   const previousEra = getMarketEra(s.currentYear ?? 2018);
   s.currentYear = 1990 + Math.floor((s.week - 1) / 52);
   const currentEra = getMarketEra(s.currentYear);
@@ -904,6 +920,17 @@ export function advanceCareerWeek(prev:GameState): GameState {
 
   // Expenses
   s.money -= s.weeklyExpenses;
+
+  if (s.streetHustle && !s.streetHustle.graduated) {
+    const lodging = {
+      couch: { cost: 0, energy: 8, label: "couch/crash pad" },
+      room: { cost: 75, energy: 2, label: "weekly room" },
+      motel: { cost: 160, energy: 0, label: "cheap motel" },
+    }[s.streetHustle.lodging];
+    s.money -= lodging.cost;
+    s.energy = Math.max(0, s.energy - lodging.energy);
+    if (lodging.cost || lodging.energy) s.log.unshift({ week:s.week, msg:`Street Hustle lodging: ${lodging.label}${lodging.cost ? ` · -${fmtMoney(lodging.cost)}` : ""}${lodging.energy ? ` · -${lodging.energy} energy` : ""}.`, type:"neutral" });
+  }
 
   // Manager: weekly retainer + small rep accrual
   if (s.currentManager) {
@@ -1464,6 +1491,14 @@ export function advanceCareerWeek(prev:GameState): GameState {
 
   s.weeklyExpenses = calculateWeeklyOverhead(s);
 
+  if (s.streetHustle && !s.streetHustle.graduated && s.totalReleases >= 3 && s.totalShows >= 4 && s.fans >= 500) {
+    s.streetHustle.graduated = true;
+    s.streetHustle.microRouteReady = false;
+    s.identityScores.independent_spirit = (s.identityScores.independent_spirit ?? 0) + 4;
+    s.log.unshift({ week:s.week, msg:"Street Hustle graduation: you have a real foundation now. Lodging pressure is gone; +4 Independent Spirit.", type:"great" });
+    s.pendingEvent = { msg:"You built a real foundation. The Street Hustle survival arc is complete — lodging pressure is gone.", type:"great" };
+  }
+
   // ── #4 Rivals + #5 Story Arcs (tick after all base sim updates) ──
   // Order matters: tick rivals first (may add log entries), then arcs (may
   // raise pendingArcChoice modal), then maybe spawn a new arc.
@@ -1497,6 +1532,8 @@ export function advanceWithSimulation(prev: GameState): GameState {
     energyDelta: Math.round(s.energy - before.energy),
     burnoutDelta: Number(((s.burnout ?? 0) - (before.burnout ?? 0)).toFixed(1)),
     loanPayment: Math.max(0, loanBalanceBefore - (s.activeLoan?.remainingBalance ?? 0)),
+    streetPerformanceIncome: before.streetHustle?.pendingPerformance?.income ?? 0,
+    lodgingCost: before.streetHustle && !before.streetHustle.graduated ? ({ couch: 0, room: 75, motel: 160 }[before.streetHustle.lodging] ?? 0) : 0,
     rolls: simulation.rolls,
     highlights,
   });
@@ -1577,6 +1614,8 @@ export function useGameState() {
       weeklyLedger: saved.weeklyLedger ?? [],
       activeLoan: saved.activeLoan ?? null,
       overheadModel: saved.overheadModel ?? "legacy",
+      careerOrigin: saved.careerOrigin ?? "standard",
+      streetHustle: saved.streetHustle ?? null,
     });
     return normalizeGameState({...INITIAL_STATE});
   });
@@ -1655,6 +1694,8 @@ export function useGameState() {
     weeklyLedger: s.weeklyLedger ?? [],
     activeLoan: s.activeLoan ?? null,
     overheadModel: s.overheadModel ?? "legacy",
+    careerOrigin: s.careerOrigin ?? "standard",
+    streetHustle: s.streetHustle ?? null,
       // ── Touring Features v2.0 migration ──
       setlistConfig: s.setlistConfig ?? { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 },
       venueReputations: s.venueReputations ?? {},
@@ -1683,7 +1724,7 @@ export function useGameState() {
   },[]);
   const dismissSaveIssue = useCallback(() => setSaveIssue(null), []);
 
-  const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string)=>{
+  const startNewGame = useCallback((name:string,genre:Genre,city:string,archetype:string,origin:"standard"|"street_hustle"="standard")=>{
     const s:GameState={...INITIAL_STATE,screen:"game",hasSave:false,balanceProfile:"progression_v2",overheadModel:"gentle_ramp",artistName:name,genre,city,archetype, simulation:createSimulation(), weeklyLedger:[],
       qualityBase:archHas(archetype,"acousticQBonus")?35+archVal(archetype):35,
       trends:{Country:1,Blues:1},
@@ -1699,6 +1740,8 @@ export function useGameState() {
       pendingSyncOffers: [],
       selloutScore: 0,
       totalPublishingRevenue: 0,
+      careerOrigin: origin,
+      streetHustle: origin === "street_hustle" ? { credibility:0, lodging:"couch", lastCircuitWeek:0, pendingPerformance:null, diyReleased:false, microRouteReady:false, microRouteUsed:false, graduated:false } : null,
 
     };
     withSimulationRandom(s, () => {
@@ -1706,6 +1749,10 @@ export function useGameState() {
       s.currentTrendTheme = pickTrendTheme(null);
       s.rivals = seedRivals(0);
     });
+    if (origin === "street_hustle") {
+      s.money = 750;
+      s.pendingEvent = { msg:"Street Hustle start: build your crowd one legal set at a time. Choose a lodging plan and play the Street Circuit from Hustle.", type:"gold" };
+    }
     s.weeklyExpenses = calculateWeeklyOverhead(s);
     const next = normalizeGameState(s);
     if (typeof window !== "undefined") replaceGameState(window.localStorage, next);
@@ -1745,15 +1792,19 @@ export function useGameState() {
   }),[upd]);
 
   // Project
-  const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard")=>upd(s=>{
+  const doStartProject = useCallback((type:ReleaseType, mode:RecordingMode="standard", diyDemo=false)=>upd(s=>{
     if (s.project) { s.pendingEvent={msg:"Finish or scrap the current project first.",type:"bad"}; return s; }
+    const canMakeDiy = !!s.streetHustle && !s.streetHustle.graduated && s.streetHustle.credibility >= 3 && !s.streetHustle.diyReleased;
+    if (diyDemo && (!canMakeDiy || type !== "Single")) { s.pendingEvent={msg:"The DIY Single requires 3 Street Credibility and is available once during the Street Hustle arc.",type:"bad"}; return s; }
+    if (diyDemo && s.money < 150) { s.pendingEvent={msg:"Need $150 to self-produce this DIY Single.",type:"bad"}; return s; }
     // Dynamic recording time: base weeks + track count × studio × producer × mode
     const mint:Record<string,number>={Single:1,EP:3,Album:8,"Live Album":4};
     const maxt:Record<string,number>={Single:1,EP:6,Album:16,"Live Album":8};
     const trackCount = mint[type] ?? 1;
-    const w = calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
-    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing",labelFunding:false};
-    s.log.unshift({week:s.week,msg:`Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
+    const w = diyDemo ? 2 : calculateRecordingWeeks(type, trackCount, "home_studio", "self", mode);
+    if (diyDemo) s.money -= 150;
+    s.project={type,genre:s.genre,producerId:"self",studioId:"home_studio",title:genAlbumName(s.artistName),tracks:[],weeksLeft:w,totalWeeks:w,minTracks:mint[type]??1,maxTracks:diyDemo ? 1 : maxt[type]??1,marketingBudget:0,mode,pipelineStage:"writing",labelFunding:false,diyDemo};
+    s.log.unshift({week:s.week,msg:diyDemo ? "Started a DIY Single: $150 self-funded, 2 weeks, rough edges included." : `Started recording a new ${type}. ${w} weeks in the studio.`,type:"neutral"});
     if (type === "Album") queueLabelMoment(s, "recording", s.project.title);
     return s;
   }),[upd]);
@@ -1920,7 +1971,7 @@ export function useGameState() {
     }
     const avgTrackQuality = p.tracks.length ? qualitySum / p.tracks.length : 1;
     const avgTrackAppeal = p.tracks.length ? appealSum / p.tracks.length : 1;
-    const avgQuality = Number((avgTrackQuality * 10).toFixed(1));
+    const avgQuality = Number((Math.max(10, avgTrackQuality * 10 - (p.diyDemo ? 8 : 0))).toFixed(1));
     const avgAppeal = Number(avgTrackAppeal.toFixed(1));
     const producer = PRODUCERS.find(item => item.id === p.producerId);
     if (producer && producer.id !== "self") {
@@ -1938,7 +1989,7 @@ export function useGameState() {
     s.unreleased.push({
       id: createGameEntityId(s, "project"), type: p.type, genre: p.genre, title: p.title,
       producerId: p.producerId, studioId: p.studioId, themeId: p.themeId, tracks: p.tracks,
-      avgQuality, avgAppeal, hypeSnapshot: s.hype, marketingBudget: p.marketingBudget,
+      avgQuality, avgAppeal, hypeSnapshot: s.hype, marketingBudget: p.marketingBudget, diyDemo:p.diyDemo,
     });
     s.project = null;
     const notes = [coWriteCount ? `${coWriteCount} co-write${coWriteCount === 1 ? "" : "s"}` : "", avgTrackAppeal >= 7 ? "strong commercial pull" : ""].filter(Boolean);
@@ -2325,6 +2376,10 @@ export function useGameState() {
     }
     s.fame=clamp(s.fame+famD+radioFameBonus,0,100); s.rep=clamp(s.rep+repD+Math.floor(repFromCritic*0.7),0,100);
     s.hype=Math.max(0,s.hype-15); s.weeksSinceRelease=0; s.totalReleases++;
+    if (p.diyDemo && s.streetHustle) {
+      s.streetHustle.diyReleased = true;
+      if (s.streetHustle.credibility >= 4 && !s.streetHustle.microRouteUsed) s.streetHustle.microRouteReady = true;
+    }
     if (q >= 72 || writingMix.critRepBonus > 0) addIdentityScore(s, "critic_darling", q >= 82 ? 4 : 2);
     if (avgAppeal >= 7 || writingMix.streamMult > 1) addIdentityScore(s, "radio_favorite", avgAppeal >= 8 ? 3 : 1);
     if (p.tracks.some(track => track.featId)) addIdentityScore(s, "crossover_act", 2);
@@ -2492,21 +2547,23 @@ export function useGameState() {
     if(s.tourActive){s.pendingEvent={msg:"A tour is already underway.",type:"bad"};return s;}
     if(!s.tourQueue.length) return s;
     const mult=tourCostMult(s.archetype);
+    const usingMicroRoute = !!s.streetHustle?.microRouteReady && !s.streetHustle.microRouteUsed && s.tourQueue.length <= 3;
     // Upfront tour costs: travel + venue deposit + crew advance
     const upfront=s.tourQueue.reduce((sum,q)=>{
       const travel = q.travelCost; // gas, tolls, van wear for the leg
       const venueDeposit = Math.floor(q.venueCost * 0.3); // 30% deposit
-      const crewAdvance = Math.floor(calcCrewCost(q.venueTier) * 0.5); // half crew pay upfront
+      const crewAdvance = usingMicroRoute ? 0 : Math.floor(calcCrewCost(q.venueTier) * 0.5); // street contacts cover the first small route
       return sum + Math.floor((travel + venueDeposit + crewAdvance) * mult);
     },0);
     if(s.money<upfront){s.pendingEvent={msg:`Need ${fmtMoney(upfront)} upfront.`,type:"bad"};return s;}
     s.money-=upfront;
     s.tourActive={shows:[...s.tourQueue],progress:0,ticketMult:s.tourTicketMult,demandDecayIndex:0};
+    if (usingMicroRoute && s.streetHustle) { s.streetHustle.microRouteUsed = true; s.streetHustle.microRouteReady = false; }
     s.tourQueue=[];
     queueLabelMoment(s, "tour", `week ${s.week}`);
     s.log.unshift({week:s.week,msg:`Tour started: ${s.tourActive.shows.map(sh=>sh.cityName).join(" → ")}`,type:"good"});
     // Trigger tour intro cinematic when starting a tour
-    s.pendingEvent={msg:"On the road! End a week to play your first show.",type:"great"};
+    s.pendingEvent={msg:usingMicroRoute ? "Micro Route launched — your street contacts covered the crew advance. End a week to play your first show." : "On the road! End a week to play your first show.",type:"great"};
     // Set flag to trigger tour intro - we'll need to handle this in GameScreen
     return s;
   }),[upd]);
@@ -2561,6 +2618,31 @@ export function useGameState() {
 
   const doAlbumCampaignAction = useCallback((action:AlbumCampaignAction, trackIndex?:number)=>upd(s=>{
     queueAlbumCampaignAction(s, action, trackIndex);
+    return s;
+  }),[upd]);
+
+  const doStreetCircuit = useCallback((id:"tunnel"|"platform"|"patio")=>upd(s=>{
+    const street = s.streetHustle;
+    if (!street || street.graduated) return s;
+    if (street.lastCircuitWeek === s.week || street.pendingPerformance) { s.pendingEvent={msg:"You have already booked a Street Circuit set this week.",type:"bad"}; return s; }
+    const options = {
+      tunnel: { id:"tunnel" as const, name:"Park Tunnel", income:55, fans:18, credibility:1, energy:10, burnout:0 },
+      platform: { id:"platform" as const, name:"Subway Platform", income:80, fans:25, credibility:2, energy:18, burnout:1 },
+      patio: { id:"patio" as const, name:"Late-night Patio", income:115, fans:30, credibility:2, energy:25, burnout:4 },
+    };
+    const performance = options[id];
+    if (s.energy < performance.energy) { s.pendingEvent={msg:"Not enough energy for that Street Circuit set.",type:"bad"}; return s; }
+    s.energy -= performance.energy;
+    street.lastCircuitWeek = s.week;
+    street.pendingPerformance = performance;
+    s.pendingEvent={msg:`${performance.name} is booked. Tips and new listeners settle when you end the week.`,type:"gold"};
+    return s;
+  }),[upd]);
+
+  const doSetStreetLodging = useCallback((lodging:"couch"|"room"|"motel")=>upd(s=>{
+    if (!s.streetHustle || s.streetHustle.graduated) return s;
+    s.streetHustle.lodging = lodging;
+    s.pendingEvent={msg:`Lodging changed to ${lodging === "couch" ? "couch/crash pad" : lodging === "room" ? "weekly room" : "cheap motel"}. It applies when you end the week.`,type:"neutral"};
     return s;
   }),[upd]);
 
@@ -3263,7 +3345,7 @@ export function useGameState() {
     goToMenu, goToSetup, beginNewCareer, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,
     doFinishProject, doReleaseProject, doSubmitLabelRelease, doReviseLabelSubmission, doDeleteUnreleased, doReissueRelease, doScrubProject,
-    doGrind, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
+    doGrind, doStreetCircuit, doSetStreetLodging, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doPromoteTrack, doShootMusicVideo, doAlbumCampaignAction,
     doTakeLoan, doPayOffLoan, doSignBrandDeal, doSignLabel, doSwitchGenre,
     doAcceptLabelOffer, doDismissLabelOffers, doAcceptManagerOffer, doDismissManagerOffers,

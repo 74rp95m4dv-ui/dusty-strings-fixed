@@ -22,7 +22,8 @@ export function forecastRecurringEconomy(state: GameState) {
   const loanPayment = state.activeLoan ? state.activeLoan.arrears + (state.activeLoan.paymentsDue < state.activeLoan.termWeeks ? Math.min(state.activeLoan.weeklyPayment, Math.max(0, state.activeLoan.remainingBalance - state.activeLoan.arrears)) : 0) : 0;
   const studio = state.project ? Math.floor((getStudio(state.project.studioId)?.perWeek ?? 0) * RECORDING_MODE_CONFIG[state.project.mode ?? "standard"].costMult) : 0;
   const overhead = calculateWeeklyOverhead(state);
-  return { market: Math.round(market), brands: Math.round(brands), overhead, manager, studio, loanPayment: Math.round(loanPayment), net: Math.round(market + brands - overhead - manager - studio - loanPayment) };
+  const lodging = state.streetHustle && !state.streetHustle.graduated ? ({ couch: 0, room: 75, motel: 160 }[state.streetHustle.lodging] ?? 0) : 0;
+  return { market: Math.round(market), brands: Math.round(brands), overhead, manager, studio, loanPayment: Math.round(loanPayment), lodging, net: Math.round(market + brands - overhead - manager - studio - loanPayment - lodging) };
 }
 
 /** Builds a reconciled settlement entry without changing any gameplay formulas. */
@@ -38,9 +39,11 @@ export function buildWeeklyEconomyLedger(before: GameState, after: GameState, ba
   if (tour >= 0) add(income, "Tour net", tour); else add(costs, "Tour net loss", -tour);
   const festivalPay = after.festivalBookings.filter(booking => booking.completed && booking.performanceWeek === after.week).reduce((sum, booking) => sum + booking.pay, 0);
   add(income, "Festivals", festivalPay);
+  add(income, "Street performance", base.streetPerformanceIncome ?? 0);
   add(costs, "Recurring overhead", before.weeklyExpenses);
   add(costs, "Manager", before.currentManager?.weeklyFee ?? 0);
   add(costs, "Loan payment", base.loanPayment ?? 0);
+  add(costs, "Lodging", base.lodgingCost ?? 0);
 
   const knownNet = Object.values(income).reduce((sum, amount) => sum + amount, 0) - Object.values(costs).reduce((sum, amount) => sum + amount, 0);
   const remainder = Math.round(after.money - before.money - knownNet);

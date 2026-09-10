@@ -115,6 +115,7 @@ export default function LiveTab(game: any) {
                 </div>
               </div>
               <div className="tip-text" style={{ marginBottom: 8 }}>Upfront route cost: {fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))}. One stop resolves per week and builds fatigue.</div>
+              {state.streetHustle?.microRouteReady && !state.streetHustle.microRouteUsed && <div className="tip-text" style={{ marginBottom: 8 }}>Street Hustle Micro Route ready: choose up to 3 stops and your street contacts cover the crew advance.</div>}
               <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={() => setConfirmTour(true)}>
                 Launch Tour ({fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))})
               </button>

@@ -52,4 +52,18 @@ describe("weekly economy", () => {
     expect(entry.openingCash! + income - costs).toBe(entry.closingCash);
     expect(entry.closingCash).toBe(Math.round(next.money));
   });
+
+  it("settles Street Circuit income and lodging as named ledger categories", () => {
+    const state = clone();
+    state.careerOrigin = "street_hustle";
+    state.streetHustle = { credibility: 0, lodging: "room", lastCircuitWeek: 1, pendingPerformance: { id: "platform", name: "Subway Platform", income: 80, fans: 25, credibility: 2, energy: 18, burnout: 1 }, diyReleased: false, microRouteReady: false, microRouteUsed: false, graduated: false };
+    state.weeklyExpenses = 0;
+    const next = advanceWithSimulation(state);
+    const entry = next.weeklyLedger[0];
+    expect(entry.incomeByCategory?.["Street performance"]).toBe(80);
+    expect(entry.costByCategory?.Lodging).toBe(75);
+    const income = Object.values(entry.incomeByCategory ?? {}).reduce((sum, amount) => sum + amount, 0);
+    const costs = Object.values(entry.costByCategory ?? {}).reduce((sum, amount) => sum + amount, 0);
+    expect(entry.openingCash! + income - costs).toBe(entry.closingCash);
+  });
 });

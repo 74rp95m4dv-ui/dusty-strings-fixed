@@ -8,6 +8,7 @@ export default function SetupScreen(game: any) {
   const [genre, setGenre] = useState<Genre>("Country");
   const [city, setCity] = useState("Nashville, TN");
   const [arch, setArch] = useState("outlaw");
+  const [origin, setOrigin] = useState<"standard" | "street_hustle">("standard");
 
   const canStart = name.trim().length > 0;
 
@@ -16,7 +17,7 @@ export default function SetupScreen(game: any) {
       console.error("startNewGame is not a function.", game);
       return;
     }
-    game.startNewGame(name.trim(), genre, city, arch);
+    game.startNewGame(name.trim(), genre, city, arch, origin);
   };
 
   return (
@@ -64,6 +65,18 @@ export default function SetupScreen(game: any) {
                   </div>
                 </ActionCard>
               ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Career Origin</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <ActionCard className={origin === "standard" ? "sel" : ""} onClick={() => setOrigin("standard")} aria-pressed={origin === "standard"}>
+              <div><div className="pick-name">Standard Start</div><div className="pick-bio">$1,500 and the normal gentle overhead ramp. Start by recording, playing shows, and building your catalog.</div></div>
+            </ActionCard>
+            <ActionCard className={origin === "street_hustle" ? "sel" : ""} onClick={() => setOrigin("street_hustle")} aria-pressed={origin === "street_hustle"}>
+              <div><div className="pick-name">Street Hustle</div><div className="pick-bio">$750, a legal Street Circuit, weekly lodging choices, a DIY Single unlock, and a contact-backed Micro Route.</div></div>
+            </ActionCard>
           </div>
         </div>
 

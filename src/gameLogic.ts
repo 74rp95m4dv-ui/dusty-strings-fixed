@@ -4101,6 +4101,30 @@ export interface RecordingProject {
   pipelineStage?: SongStage;
   /** When enabled, eligible production expenses draw down the label fund first. */
   labelFunding?: boolean;
+  /** A low-cost, self-recorded debut made during the Street Hustle origin. */
+  diyDemo?: boolean;
+}
+
+export type CareerOrigin = "standard" | "street_hustle";
+export type StreetLodging = "couch" | "room" | "motel";
+export interface StreetPerformance {
+  id: "tunnel" | "platform" | "patio";
+  name: string;
+  income: number;
+  fans: number;
+  credibility: number;
+  energy: number;
+  burnout: number;
+}
+export interface StreetHustleState {
+  credibility: number;
+  lodging: StreetLodging;
+  lastCircuitWeek: number;
+  pendingPerformance: StreetPerformance | null;
+  diyReleased: boolean;
+  microRouteReady: boolean;
+  microRouteUsed: boolean;
+  graduated: boolean;
 }
 
 export interface UnreleasedProject {
@@ -4118,6 +4142,7 @@ export interface UnreleasedProject {
   hypeSnapshot: number;
   marketingBudget: number;
   releaseFormat?: ReleaseFormat;
+  diyDemo?: boolean;
 }
 
 export interface DiscographyEntry {
@@ -4711,6 +4736,9 @@ export interface GameState {
   hasSave: boolean;
   /** Legacy saves retain their original tuning; newly started careers use the slower progression curve. */
   balanceProfile: "legacy" | "progression_v2";
+  /** Optional origin selected only when creating a new career. */
+  careerOrigin: CareerOrigin;
+  streetHustle: StreetHustleState | null;
   // player
   artistName: string;
   genre: Genre;
@@ -4871,6 +4899,8 @@ export interface WeeklyLedgerEntry {
   energyDelta: number;
   burnoutDelta: number;
   loanPayment?: number;
+  streetPerformanceIncome?: number;
+  lodgingCost?: number;
   rolls: number;
   highlights: string[];
 }
@@ -4925,6 +4955,8 @@ export const INITIAL_STATE: GameState = {
   screen: "menu",
   hasSave: false,
   balanceProfile: "legacy",
+  careerOrigin: "standard",
+  streetHustle: null,
   artistName: "",
   genre: "Country",
   city: "Nashville, TN",

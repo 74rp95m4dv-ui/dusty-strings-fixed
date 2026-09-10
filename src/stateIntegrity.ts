@@ -35,6 +35,21 @@ export function normalizeGameState(state: GameState): GameState {
   // Careers created before the progression rebalance keep their established tuning.
   state.balanceProfile = state.balanceProfile === "progression_v2" ? "progression_v2" : "legacy";
   state.overheadModel = state.overheadModel === "gentle_ramp" ? "gentle_ramp" : "legacy";
+  state.careerOrigin = state.careerOrigin === "street_hustle" ? "street_hustle" : "standard";
+  if (state.careerOrigin !== "street_hustle") state.streetHustle = null;
+  else {
+    const street = state.streetHustle ?? { credibility: 0, lodging: "couch", lastCircuitWeek: 0, pendingPerformance: null, diyReleased: false, microRouteReady: false, microRouteUsed: false, graduated: false };
+    state.streetHustle = {
+      credibility: wholeAtLeast(street.credibility, 0),
+      lodging: ["couch", "room", "motel"].includes(street.lodging) ? street.lodging : "couch",
+      lastCircuitWeek: wholeAtLeast(street.lastCircuitWeek, 0),
+      pendingPerformance: street.pendingPerformance ?? null,
+      diyReleased: !!street.diyReleased,
+      microRouteReady: !!street.microRouteReady,
+      microRouteUsed: !!street.microRouteUsed,
+      graduated: !!street.graduated,
+    };
+  }
   state.regional = Object.fromEntries(Object.entries(state.regional ?? {}).map(([region, count]) => [region, wholeAtLeast(count, 0)]));
   state.cityLastPlayed = Object.fromEntries(Object.entries(state.cityLastPlayed ?? {}).filter(([city]) => CITIES.some(item => item.name === city)).map(([city, week]) => [city, wholeAtLeast(week, 0)]));
   state.week = wholeAtLeast(state.week, 1);

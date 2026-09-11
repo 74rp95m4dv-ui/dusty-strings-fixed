@@ -169,8 +169,9 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
         <div className="stagger-1">
           <div className="card">
             <div className="card-title">Merch Shop</div>
-            <button className="btn btn-lime btn-block" onClick={() => game.onOpenDrawer?.("merch")} style={{ marginBottom: 12 }}>
-              Add Merch Item
+            {state.currentLabel && <div className="card-sm" style={{ marginBottom: 12 }}><b>{state.currentLabel.name} Merchandise</b><div className="tip-text">Label-managed storefront · artist royalty {Math.round(({ major:.12, boutique:.22, americana:.24, specialty:.26, indie:.30 }[state.currentLabel.type] ?? .20) * 100)}% · lifetime {fmtMoney(state.labelMerchRevenue ?? 0)}</div></div>}
+            <button className="btn btn-lime btn-block" disabled={!!state.currentLabel} onClick={() => game.onOpenDrawer?.("merch")} style={{ marginBottom: 12 }}>
+              {state.currentLabel ? "Label Manages Merch" : "Add Merch Item"}
             </button>
             {(!state.merchShop || state.merchShop.length === 0) && (
               <div className="empty-state">No merch listed yet.</div>

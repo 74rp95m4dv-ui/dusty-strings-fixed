@@ -35,6 +35,7 @@ export function buildWeeklyEconomyLedger(before: GameState, after: GameState, ba
   const brandMultiplier = before.currentManager?.brandDealBoost ?? 1;
   add(income, "Brand deals", before.activeBrandDeals.reduce((sum, deal) => sum + (deal.weeksLeft > 0 ? deal.weeklyIncome * brandMultiplier : 0), 0));
   add(income, "Merch", Math.max(0, (after.totalMerchRevenue ?? 0) - (before.totalMerchRevenue ?? 0)));
+  add(income, "Label merch royalty", Math.max(0, (after.labelMerchRevenue ?? 0) - (before.labelMerchRevenue ?? 0)));
   const tour = after.tourHistory.find(show => show.week === after.week)?.net ?? 0;
   if (tour >= 0) add(income, "Tour net", tour); else add(costs, "Tour net loss", -tour);
   const festivalPay = after.festivalBookings.filter(booking => booking.completed && booking.performanceWeek === after.week).reduce((sum, booking) => sum + booking.pay, 0);

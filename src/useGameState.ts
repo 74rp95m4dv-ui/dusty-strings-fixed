@@ -83,6 +83,7 @@ function archHas(arch: string, bonus: string) { return ARCHETYPES[arch]?.bonus =
 function archVal(arch: string): number { const v = ARCHETYPES[arch]?.bonusVal; return typeof v === "number" ? v : 1; }
 function tourCostMult(arch: string) { return archHas(arch,"tourCostDiscount") ? archVal(arch) : 1; }
 function showRevBonus(arch: string, managerPct: number) { return (archHas(arch,"midwestShowBonus") ? 1 : 1) * (1 + managerPct); }
+function labelMerchRoyalty(type: string) { return ({ major:0.12, boutique:0.22, americana:0.24, specialty:0.26, indie:0.30 } as Record<string, number>)[type] ?? 0.20; }
 function evergreenMult(arch: string) { return archHas(arch,"evergreenBoost") ? archVal(arch) : 1; }
 function featCostMult(arch: string) { return archHas(arch,"featureCostDisc") ? archVal(arch) : 1; }
 function applyArchQuality(arch: string, q: number) {
@@ -222,6 +223,7 @@ function applyLabelMomentChoice(state: GameState, choice: LabelMomentChoice) {
   label.completedMomentIds = [...(label.completedMomentIds ?? []), moment.id];
   label.relationshipHistory = [{ week: state.week, type: moment.stage, outcome: choice.label, relationshipChange: choice.trustDelta }, ...(label.relationshipHistory ?? [])].slice(0, 6);
   state.log.unshift({ week: state.week, msg: `${label.name}: ${choice.label} (${choice.trustDelta >= 0 ? "+" : ""}${choice.trustDelta} A&R trust).`, type: choice.trustDelta >= 0 ? "good" : "neutral" });
+  if (moment.stage === "checkin") label.lastCheckinWeek = state.week;
   state.pendingLabelMoment = null;
 }
 
@@ -976,6 +978,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
       s.labelSigned = false;
       }
     }
+    if (!s.pendingLabelMoment && s.week - (s.currentLabel.lastCheckinWeek ?? s.currentLabel.signedAtWeek) >= 8) queueLabelMoment(s, "checkin", `week ${s.week}`);
   }
 
   // ── Publishing Deal Accounting ──
@@ -1308,9 +1311,21 @@ export function advanceCareerWeek(prev:GameState): GameState {
     s.tourMorale = Math.min(100, s.tourMorale + 5);
   }
 
-// Merch shop weekly sales
+// Merch shop weekly sales. A signed label operates its own storefront; the artist
+// receives a small type-specific royalty while personal inventory waits intact.
   if (!s.merchShop) s.merchShop = [];
   if (s.totalMerchRevenue === undefined) s.totalMerchRevenue = 0;
+  if (s.labelMerchRevenue === undefined) s.labelMerchRevenue = 0;
+  if (s.currentLabel) {
+    const sf = s.superfans ?? 0;
+    const casuals = Math.max(0, s.fans - sf);
+    const grossProfit = Math.floor(((casuals * 0.004) + (sf * 0.035) + (s.fame * 0.7) + (s.hype * 0.35)) * (1 + Math.min(0.35, s.catalog.length * 0.05)));
+    const royalty = Math.max(0, Math.floor(grossProfit * labelMerchRoyalty(s.currentLabel.type)));
+    if (royalty) {
+      s.money += royalty; s.totalEarned += royalty; s.labelMerchRevenue += royalty;
+      s.log.unshift({ week:s.week, msg:`${s.currentLabel.name} merch royalty: ${fmtMoney(royalty)} (${Math.round(labelMerchRoyalty(s.currentLabel.type) * 100)}%).`, type:"good" });
+    }
+  } else {
   let merchProfitWeek = 0;
   let merchUnitsWeek = 0;
   for (const item of s.merchShop) {
@@ -1501,6 +1516,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
     s.log.unshift({ week:s.week, msg:"Street Hustle graduation: you have a real foundation now. Lodging pressure is gone; +4 Independent Spirit.", type:"great" });
     s.pendingEvent = { msg:"You built a real foundation. The Street Hustle survival arc is complete — lodging pressure is gone.", type:"great" };
   }
+  }
 
   // ── #4 Rivals + #5 Story Arcs (tick after all base sim updates) ──
   // Order matters: tick rivals first (may add log entries), then arcs (may
@@ -1587,6 +1603,7 @@ export function useGameState() {
       pendingSyncOffers: saved.pendingSyncOffers ?? [],
       selloutScore: saved.selloutScore ?? 0,
       totalPublishingRevenue: saved.totalPublishingRevenue ?? 0,
+      labelMerchRevenue: saved.labelMerchRevenue ?? 0,
       pendingLabelSubmission: saved.pendingLabelSubmission ?? null,
       pendingLabelMoment: saved.pendingLabelMoment ?? null,
       pendingReissue: saved.pendingReissue ?? null,
@@ -1674,6 +1691,7 @@ export function useGameState() {
     pendingSyncOffers: s.pendingSyncOffers ?? [],
     selloutScore: s.selloutScore ?? 0,
     totalPublishingRevenue: s.totalPublishingRevenue ?? 0,
+    labelMerchRevenue: s.labelMerchRevenue ?? 0,
     pendingLabelSubmission: s.pendingLabelSubmission ?? null,
     pendingLabelMoment: s.pendingLabelMoment ?? null,
     pendingReissue: s.pendingReissue ?? null,
@@ -2745,7 +2763,7 @@ export function useGameState() {
       marketingCommitment: offer.marketingCommitment, marketingBoost: offer.marketingBoost, marketingSpendYTD: 0,
       albumsCommitted: offer.albumsCommitted, albumsDelivered: 0,
       optionsRemaining: offer.options, optionWeeks: offer.optionWeeks,
-      weeksLeft: offer.termWeeks, totalWeeks: offer.termWeeks, signedAtWeek: s.week,
+      weeksLeft: offer.termWeeks, totalWeeks: offer.termWeeks, signedAtWeek: s.week, lastCheckinWeek: s.week,
       deliveryDeadlineWeek: s.week + Math.max(12, Math.floor(offer.termWeeks / Math.max(1, offer.albumsCommitted))),
       deliveryStatus: "good", deliveryExtensions: 0, fundingFrozen: false,
       approvalStrikes: 0, campaignFrozen: false,
@@ -3212,6 +3230,7 @@ export function useGameState() {
     type: MerchType, tiedReleaseId: string | null, name: string, price: number,
     opts?: { variantName?: string; variantColor?: string; editionLabel?: string; bonusCost?: number; bonusPrice?: number; suppressEvent?: boolean }
   ) => upd(s => {
+    if (s.currentLabel) { s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     const tmpl = MERCH_TEMPLATES.find(t => t.type === type);
     if (!tmpl) return s;
     if (tmpl.needsRelease && !tiedReleaseId) {
@@ -3261,6 +3280,7 @@ export function useGameState() {
 
   // Press one or more physical formats at once. selections = [{type, variantName, variantColor, edition, ...}]
   const doQuickPress = useCallback((releaseId: string, selections: Array<{ type: MerchType; variantName: string; variantColor: string; variantPriceMod: number; variantCostMod: number; editionName: string; editionPriceMod: number; editionCostMod: number; }>) => upd(s => {
+    if (s.currentLabel) { s.pendingPressing = null; s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     const rel = s.catalog.find(c => c.id === releaseId);
     if (!rel) { s.pendingPressing = null; return s; }
     let totalSetup = 0;
@@ -3316,12 +3336,14 @@ export function useGameState() {
   }), [upd]);
 
   const doToggleMerchItem = useCallback((id: string) => upd(s => {
+    if (s.currentLabel) { s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     const it = s.merchShop?.find(m => m.id === id);
     if (it) it.active = !it.active;
     return s;
   }), [upd]);
 
   const doRemoveMerchItem = useCallback((id: string) => upd(s => {
+    if (s.currentLabel) { s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     s.merchShop = (s.merchShop ?? []).filter(m => m.id !== id);
     return s;
   }), [upd]);

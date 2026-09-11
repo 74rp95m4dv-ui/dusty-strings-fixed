@@ -4110,6 +4110,7 @@ export type StreetLodging = "couch" | "room" | "motel";
 export interface StreetPerformance {
   id: "tunnel" | "platform" | "patio";
   name: string;
+  lastCheckinWeek?: number;
   income: number;
   fans: number;
   credibility: number;
@@ -4851,6 +4852,7 @@ export interface GameState {
   // merch
   merchShop: MerchItem[];
   totalMerchRevenue: number;
+  labelMerchRevenue: number;
   pendingPressing: { releaseId: string; releaseTitle: string; releaseType: ReleaseType } | null;
   // ── #3 Burnout — persistent stress meter (see BURNOUT_TIERS) ──
   burnout: number;
@@ -5047,6 +5049,7 @@ export const INITIAL_STATE: GameState = {
   newspaperArchive: [],
   merchShop: [],
   totalMerchRevenue: 0,
+  labelMerchRevenue: 0,
   pendingPressing: null,
   burnout: 0,
   vacationCooldown: 0,
@@ -5461,7 +5464,7 @@ export function computeChemistry(base: number, arch1: string, arch2: string): nu
 // • Events where the label wants something you don't
 
 export type LabelRelationshipMood = "supportive" | "neutral" | "strained";
-export type LabelMomentStage = "recording" | "release" | "campaign" | "tour";
+export type LabelMomentStage = "recording" | "release" | "campaign" | "tour" | "checkin";
 
 export interface LabelNegotiation {
   week: number;
@@ -5534,6 +5537,15 @@ export function createLabelMoment(label: SignedLabel, stage: LabelMomentStage, r
     choices: [
       { label: "Activate the label push", sub: "Give the campaign a lane-specific boost and build trust.", trustDelta: 6, campaignChannel: label.type === "major" ? "radio" : label.type === "specialty" ? "press" : "live" },
       { label: "Hold the course", sub: "Keep the campaign intimate and recover some goodwill with your core audience.", trustDelta: -2, rep: 2 },
+    ],
+  };
+  if (stage === "checkin") return {
+    id, stage, emoji: "☎️", title: "Label Check-in", supportLabel: profile.lane,
+    description: `${label.exec} wants a quick read on the road ahead and the label storefront. How do you handle the call?`,
+    choices: [
+      { label: "Share the plan", sub: "Keep the team aligned and strengthen trust.", trustDelta: 5, rep: 1 },
+      { label: "Ask for a little support", sub: "Get a modest resource boost without giving up the whole plan.", trustDelta: 2, recordingFundBonus: 500 },
+      { label: "Keep some distance", sub: "Protect your space, but cool the relationship.", trustDelta: -4, rep: 2 },
     ],
   };
   return {

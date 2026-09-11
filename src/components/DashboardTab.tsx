@@ -219,6 +219,7 @@ export default function DashboardTab(props: DashboardProps) {
             <div className="tip-text" style={{ marginTop: 4 }}>
               Next: {s.tourActive.shows[s.tourActive.progress]?.cityName ?? "Wrapping up..."}
             </div>
+            {s.pendingTourAftercare && <div className="tip-text" style={{ marginTop: 8, color: "var(--amber)" }}>🌃 Choose your after-show move before the next stop.</div>}
             <div className="sbar-track" style={{ marginTop: 10 }}>
               <div
                 className="sbar-fill f-gold"

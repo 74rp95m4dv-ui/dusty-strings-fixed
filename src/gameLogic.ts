@@ -4320,6 +4320,14 @@ export interface ActiveTour {
   demandDecayIndex: number;
 }
 
+export type TourAftercareChoice = "meet_crowd" | "work_promoter" | "cheap_room" | "rest_day";
+export interface TourAftercare {
+  cityName: string;
+  venueName: string;
+  seats: number;
+  attendancePct: number;
+}
+
 export interface ShowResult {
   week: number;
   cityName: string;
@@ -4871,6 +4879,7 @@ export interface GameState {
   pendingFestivalOffers: FestivalBooking[];
   completedFestivals: string[];
   lastBusBreakdownWeek: number;
+  pendingTourAftercare: TourAftercare | null;
 
   // ── Publishing & Sync ──
   currentPublishing: any;
@@ -5061,6 +5070,7 @@ export const INITIAL_STATE: GameState = {
   pendingFestivalOffers: [],
   completedFestivals: [],
   lastBusBreakdownWeek: 0,
+  pendingTourAftercare: null,
 
   // ── Publishing & Sync defaults ──
   currentPublishing: null,

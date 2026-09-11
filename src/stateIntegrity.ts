@@ -130,6 +130,7 @@ export function normalizeGameState(state: GameState): GameState {
       state.tourActive.demandDecayIndex = wholeAtLeast(state.tourActive.demandDecayIndex, 0);
     }
   }
+  if (!state.tourActive || !state.pendingTourAftercare || !cityNames.has(state.pendingTourAftercare.cityName)) state.pendingTourAftercare = null;
 
   if (state.pendingReissue && !state.catalog.some(release => release.id === state.pendingReissue?.releaseId)) state.pendingReissue = null;
   if (state.pendingLabelSubmission && !state.unreleased.some(project => project.id === state.pendingLabelSubmission?.projectId)) state.pendingLabelSubmission = null;

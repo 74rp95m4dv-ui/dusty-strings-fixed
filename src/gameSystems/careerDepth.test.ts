@@ -47,6 +47,23 @@ describe("regional audiences", () => {
     expect(next.regional[city.region]).toBe(1);
     expect(next.tourWrapPresentation?.bestShow?.attendancePct).toBeLessThanOrEqual(100);
   });
+
+  it("requires an after-show choice before a non-final tour stop can advance", () => {
+    const s = state();
+    const city = CITIES[0], nextCity = CITIES[1];
+    const venue = city.venues[0], nextVenue = nextCity.venues[0];
+    s.simulation = createSimulation(123);
+    s.fans = 100000; s.energy = 100; s.money = 100000;
+    s.tourActive = { shows: [
+      { cityName: city.name, region: city.region, genreMod: city.genreMod, travelCost: city.travelCost, venueName: venue.name, venueTier: venue.tier, venueCap: venue.cap, venueCost: venue.cost },
+      { cityName: nextCity.name, region: nextCity.region, genreMod: nextCity.genreMod, travelCost: nextCity.travelCost, venueName: nextVenue.name, venueTier: nextVenue.tier, venueCap: nextVenue.cap, venueCost: nextVenue.cost },
+    ], progress: 0, ticketMult: 1, demandDecayIndex: 0 };
+    const afterFirst = advanceWithSimulation(s);
+    expect(afterFirst.pendingTourAftercare?.cityName).toBe(city.name);
+    const blocked = advanceWithSimulation(afterFirst);
+    expect(blocked.week).toBe(afterFirst.week);
+    expect(blocked.tourActive?.progress).toBe(afterFirst.tourActive?.progress);
+  });
 });
 
 describe("creative direction", () => {

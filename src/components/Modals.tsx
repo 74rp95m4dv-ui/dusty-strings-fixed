@@ -2,6 +2,27 @@ import { fmt, fmtMoney, RANDOM_SCENARIOS, STORY_ARCS } from "../gameLogic";
 import SignComponent from "./SignComponent";
 import { ReleaseCinematic } from "./CinematicModals";
 
+export function TourAftercareModal({ state, doResolveTourAftercare }: any) {
+  const aftercare = state.pendingTourAftercare;
+  if (!aftercare) return null;
+  const crowdFans = Math.max(18, Math.min(180, Math.floor(aftercare.seats * 0.12)));
+  const choices = [
+    { id:"meet_crowd", icon:"🤝", label:"Meet the crowd", detail:`+${fmt(crowdFans)} fans · a few superfans · -10 energy · +4 burnout` },
+    { id:"work_promoter", icon:"🎟️", label:"Work the promoter room", detail:"+$75 · +2 rep · +5 band morale" },
+    { id:"cheap_room", icon:"🛏️", label:"Book a cheap room", detail:"-$120 · +18 energy · -8 burnout · +4 morale" },
+    { id:"rest_day", icon:"🌙", label:"Take a real rest day", detail:"-$220 · +30 energy · -14 burnout · +8 morale" },
+  ];
+  return <div className="modal-overlay"><section className="modal-box tour-aftercare-modal" role="dialog" aria-modal="true" aria-labelledby="tour-aftercare-title">
+    <div className="label-moment-kicker">After the show</div>
+    <div className="signing-emoji">🌃</div>
+    <div className="modal-title" id="tour-aftercare-title">{aftercare.cityName} is still awake.</div>
+    <p style={{ fontSize: 14, lineHeight: 1.6, margin: "12px 0 16px" }}>{aftercare.venueName} was {aftercare.attendancePct}% full. The next stop is waiting—how do you spend the night?</p>
+    <div className="label-moment-choices">
+      {choices.map(choice => <button className="label-moment-choice" key={choice.id} onClick={() => doResolveTourAftercare(choice.id)}><span><b>{choice.icon} {choice.label}</b><small>{choice.detail}</small></span></button>)}
+    </div>
+  </section></div>;
+}
+
 export function LabelMomentModal({ state, doResolveLabelMoment }: any) {
   const moment = state.pendingLabelMoment;
   const label = state.currentLabel;

@@ -1237,6 +1237,9 @@ export function advanceCareerWeek(prev:GameState): GameState {
       s.tourWrapPresentation = wrap;
       s.tourActive=null;
       s.log.unshift({week:s.week,msg:"Tour complete!",type:"great"});
+    } else {
+      s.pendingTourAftercare = { cityName: show.cityName, venueName: show.venueName, seats, attendancePct: Math.floor(fill * 100) };
+      notifMsg = null;
     }
     // Each show on the road burns you down a notch.
     s.burnout = Math.min(100, (s.burnout ?? 0) + 4);
@@ -1475,7 +1478,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
     s.milestonePresentation = mp;
   }
 
-  if (notifMsg) s.pendingEvent={msg:notifMsg,type:notifType};
+  if (notifMsg && !s.pendingTourAftercare) s.pendingEvent={msg:notifMsg,type:notifType};
 
   // Casual fans drift away when there's nothing new to keep them engaged.
   // Superfans don't churn from inactivity — that's what makes them super.
@@ -1511,6 +1514,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
 }
 
 export function advanceWithSimulation(prev: GameState): GameState {
+  if (prev.pendingTourAftercare) return JSON.parse(JSON.stringify(prev)) as GameState;
   const before = JSON.parse(JSON.stringify(prev)) as GameState;
   const loanBalanceBefore = before.activeLoan?.remainingBalance ?? 0;
   const simulation = withSimulationRandom(prev, () => advanceCareerWeek(prev));
@@ -1610,6 +1614,7 @@ export function useGameState() {
       activeArcs: saved.activeArcs ?? [],
       completedArcs: saved.completedArcs ?? [],
       pendingArcChoice: saved.pendingArcChoice ?? null,
+      pendingTourAftercare: saved.pendingTourAftercare ?? null,
       simulation: normalizeSimulation(saved.simulation),
       weeklyLedger: saved.weeklyLedger ?? [],
       activeLoan: saved.activeLoan ?? null,
@@ -1690,6 +1695,7 @@ export function useGameState() {
     activeArcs: s.activeArcs ?? [],
     completedArcs: s.completedArcs ?? [],
     pendingArcChoice: s.pendingArcChoice ?? null,
+    pendingTourAftercare: s.pendingTourAftercare ?? null,
     simulation: normalizeSimulation(s.simulation),
     weeklyLedger: s.weeklyLedger ?? [],
     activeLoan: s.activeLoan ?? null,
@@ -1765,6 +1771,39 @@ export function useGameState() {
     return next;
   }), []);
   const doDismissEvent     = useCallback(()=>upd(s=>{s.pendingEvent=null;return s;}),[upd]);
+  const doResolveTourAftercare = useCallback((choice:"meet_crowd"|"work_promoter"|"cheap_room"|"rest_day")=>upd(s=>{
+    const aftercare = s.pendingTourAftercare;
+    if (!aftercare) return s;
+    const fanBoost = Math.max(18, Math.min(180, Math.floor(aftercare.seats * 0.12)));
+    if (choice === "meet_crowd") {
+      const superfans = Math.max(1, Math.floor(fanBoost * 0.12));
+      s.fans += fanBoost;
+      s.superfans = Math.min(s.fans, (s.superfans ?? 0) + superfans);
+      s.energy = clamp(s.energy - 10, 0, 100);
+      s.burnout = clamp((s.burnout ?? 0) + 4, 0, 100);
+      s.log.unshift({ week:s.week, msg:`After ${aftercare.venueName}: met the crowd — +${fmt(fanBoost)} fans, +${superfans} superfans. Late night, though.`, type:"good" });
+    } else if (choice === "work_promoter") {
+      s.money += 75;
+      s.totalEarned += 75;
+      s.rep = clamp(s.rep + 2, 0, 100);
+      s.tourMorale = clamp(s.tourMorale + 5, 0, 100);
+      s.log.unshift({ week:s.week, msg:`After ${aftercare.venueName}: worked the promoter room — +$75, +2 rep, band morale up.`, type:"good" });
+    } else if (choice === "cheap_room") {
+      s.money -= 120;
+      s.energy = clamp(s.energy + 18, 0, 100);
+      s.burnout = clamp((s.burnout ?? 0) - 8, 0, 100);
+      s.tourMorale = clamp(s.tourMorale + 4, 0, 100);
+      s.log.unshift({ week:s.week, msg:`After ${aftercare.venueName}: booked a cheap room — -$120, recovered for the next stop.`, type:"neutral" });
+    } else {
+      s.money -= 220;
+      s.energy = clamp(s.energy + 30, 0, 100);
+      s.burnout = clamp((s.burnout ?? 0) - 14, 0, 100);
+      s.tourMorale = clamp(s.tourMorale + 8, 0, 100);
+      s.log.unshift({ week:s.week, msg:`After ${aftercare.venueName}: took a real rest day — -$220, everyone reset.`, type:"great" });
+    }
+    s.pendingTourAftercare = null;
+    return s;
+  }),[upd]);
   const dismissModal       = useCallback(()=>upd(s=>{s.modal=null;return s;}),[upd]);
   const dismissNewspaper   = useCallback(()=>upd(s=>{s.pendingNewspaperJson=null;return s;}),[upd]);
   const openArchivedNewspaper = useCallback((json:string)=>upd(s=>{s.pendingNewspaperJson=json;return s;}),[upd]);
@@ -3340,7 +3379,7 @@ export function useGameState() {
   }),[upd]);
 
   return {
-    state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, dismissModal, dismissNewspaper, openArchivedNewspaper, doResolveNewspaperResponse,
+    state, hasSave, saveIssue, restoreBackup, dismissSaveIssue, advance:doAdvance, doDismissEvent, doResolveTourAftercare, dismissModal, dismissNewspaper, openArchivedNewspaper, doResolveNewspaperResponse,
     doCloseReleasePresentation, doResolveScenario,
     goToMenu, goToSetup, beginNewCareer, loadGame, clearSave, startNewGame,
     doStartProject, doUpdateProject, doAddTrack, doRemoveTrack, doConfigureTrackStage,

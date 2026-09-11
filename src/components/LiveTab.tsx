@@ -54,6 +54,7 @@ export default function LiveTab(game: any) {
               <div className="tip-text" style={{ marginTop: 4 }}>
                 Next: {state.tourActive.shows[state.tourActive.progress]?.cityName ?? "Finishing up..."}
               </div>
+              {state.pendingTourAftercare && <div className="card-sm" style={{ marginTop: 10, color: "var(--amber)" }}>🌃 Choose your after-show move before the next stop.</div>}
               <div className="sbar-track" style={{ marginTop: 10 }}>
                 <div className="sbar-fill f-gold" style={{
                   width: `${(state.tourActive.progress / Math.max(1, state.tourActive.shows.length)) * 100}%`,

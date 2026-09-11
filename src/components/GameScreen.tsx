@@ -7,7 +7,7 @@ import LiveTab from "./LiveTab";
 import {
   ReleaseModal, TourWrapModal, SigningModal, AwardModal, LabelMomentModal,
   MilestoneModal, ScenarioModal, NewspaperModal, ArcModal,
-  FeatureModal, ManagerOfferModal, PressingModal, SignComponent,
+  FeatureModal, ManagerOfferModal, PressingModal, SignComponent, TourAftercareModal,
   ReleaseCinematic
 } from "./Modals";
 import LabelOfferModal from "./LabelOfferModal";
@@ -168,6 +168,7 @@ const s = game.state;
       {drawer === "tour" && <TourPlannerDrawer {...game} onClose={closeDrawer} onSwitchTab={setTab} />}
 
       {/* Modal Stack */}
+      {s.pendingTourAftercare && <TourAftercareModal {...game} />}
       {s.pendingEvent && (
         <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) game.doDismissEvent(); }}>
           <Dialog titleId="news-dialog-title" onClose={game.doDismissEvent}>

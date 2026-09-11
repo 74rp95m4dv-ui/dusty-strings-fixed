@@ -135,7 +135,7 @@ const s = game.state;
           <OfficeTab
             {...game}
             onOpenDrawer={openDrawer}
-            
+            onViewLabelOffer={handleViewLabelOffer}
           />
         )}
         {tab === "live" && <LiveTab {...game} />}

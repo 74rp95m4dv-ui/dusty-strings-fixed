@@ -26,6 +26,8 @@ interface DashboardProps {
   doDismissPublishingOffers: () => void;
   doAcceptSyncOffer: (id: string) => void;
   doDismissSyncOffers: () => void;
+  doStreetCircuit: (id: "tunnel" | "platform" | "patio") => void;
+  doSetStreetLodging: (lodging: "couch" | "room" | "motel") => void;
 }
 
 export default function DashboardTab(props: DashboardProps) {
@@ -33,6 +35,9 @@ export default function DashboardTab(props: DashboardProps) {
   const [confirmation, setConfirmation] = useState<"scrub" | "abort" | null>(null);
   const tier = CAREER_TIERS[getCareerTierIdx(s.fame)];
   const burn = getBurnoutTier(s.burnout ?? 0);
+  const street = s.streetHustle && !s.streetHustle.graduated ? s.streetHustle : null;
+  const streetSetBooked = !!street?.pendingPerformance || street?.lastCircuitWeek === s.week;
+  const focusStreetHustle = () => document.getElementById("street-hustle-command")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   const quickActions: { id: DrawerType; icon: string; label: string; highlight?: boolean }[] = [
     { id: "studio", icon: "🎙", label: "Record" },
@@ -58,6 +63,8 @@ export default function DashboardTab(props: DashboardProps) {
       ? { label: "Play the next show", detail: `${s.tourActive.shows[s.tourActive.progress]?.cityName ?? "Your final stop"} resolves when you end the week.`, action: props.advance }
       : totalPending > 0
         ? { label: `Review ${totalPending} offer${totalPending === 1 ? "" : "s"}`, detail: "Respond before the next week brings new opportunities.", action: () => props.onSwitchTab("office") }
+        : street && !streetSetBooked
+          ? { label: "Play the Street Circuit", detail: "Book one legal set this week to earn tips, listeners, and Street Credibility.", action: focusStreetHustle }
         : { label: "Choose this week's move", detail: "Record, release, book a route, or build your name.", action: () => props.onOpenDrawer("studio") };
 
   return (
@@ -108,6 +115,33 @@ export default function DashboardTab(props: DashboardProps) {
           <li><b>End week:</b> pays recurring income and expenses, advances active work, and may trigger industry events.</li>
         </ul>
       </section>
+
+      {street && <section id="street-hustle-command" className="street-hustle-command animate-fadeInUp" tabIndex={-1} aria-label="Street Hustle command center">
+        <div className="street-hustle-heading">
+          <div><span className="next-move-kicker">Street Hustle</span><h2>Make this week count.</h2></div>
+          <div className="street-cred"><strong>{street.credibility}</strong><span>Street Cred</span></div>
+        </div>
+        <p className="street-hustle-copy">{street.pendingPerformance ? `${street.pendingPerformance.name} is booked. Tips and listeners settle when you end the week.` : street.lastCircuitWeek === s.week ? "You already played a Street Circuit set this week. Take care of your lodging and settle up at week’s end." : "Pick one legal set. Each crowd builds cash, listeners, and your name."}</p>
+        <span className="street-section-label">Tonight's set</span>
+        <div className="street-set-grid">
+          {([
+            ["tunnel", "Park Tunnel", "$55", "+18 listeners", "-10 energy"],
+            ["platform", "Subway Platform", "$80", "+25 listeners", "-18 energy"],
+            ["patio", "Late-night Patio", "$115", "+30 listeners", "-25 energy · burnout"],
+          ] as const).map(([id, name, cash, listeners, cost]) => <button key={id} className="street-set" disabled={streetSetBooked} onClick={() => props.doStreetCircuit(id)}><strong>{name}</strong><span>{cash} · {listeners}</span><small>{cost}</small></button>)}
+        </div>
+        <span className="street-section-label">This week's lodging</span>
+        <div className="street-lodging-grid">
+          {([
+            ["couch", "Couch", "$0 · -8 energy"],
+            ["room", "Weekly room", "$75 · -2 energy"],
+            ["motel", "Cheap motel", "$160 · rested"],
+          ] as const).map(([id, name, terms]) => <button key={id} className={`street-lodging ${street.lodging === id ? "selected" : ""}`} onClick={() => props.doSetStreetLodging(id)}><strong>{name}</strong><span>{terms}</span></button>)}
+        </div>
+        <div className="street-next-unlock">
+          {!street.diyReleased ? street.credibility >= 3 ? <><strong>DIY Single unlocked.</strong> Self-produce one track for $150 in <button onClick={() => props.onOpenDrawer("studio")}>Studio</button>.</> : <>Next unlock: earn <strong>{3 - street.credibility} more Street Cred</strong> for a $150 DIY Single.</> : !street.microRouteUsed && street.credibility >= 4 ? <><strong>Micro Route ready.</strong> Your street contacts cover the crew advance for a three-stop route in <button onClick={() => props.onSwitchTab("live")}>Live</button>.</> : !street.microRouteUsed ? <>Next unlock: earn <strong>{4 - street.credibility} more Street Cred</strong> for a contact-backed Micro Route.</> : <>Keep building toward graduation: 3 releases, 4 shows, and 500 fans ends survival lodging.</>}
+        </div>
+      </section>}
 
       {/* Quick Actions */}
       <div className="quick-actions quick-actions-primary">

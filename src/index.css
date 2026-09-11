@@ -3336,6 +3336,39 @@ hr {
 .home-more-actions summary::after { content: "+"; color: var(--amber); font-size: 15px; }
 .home-more-actions[open] summary::after { content: "−"; }
 
+/* Active early-career command center: visible on Home instead of behind a drawer. */
+.street-hustle-command {
+  position: relative;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4);
+  overflow: hidden;
+  border: 1px solid rgba(212, 149, 42, .48);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(71, 43, 24, .76), rgba(27, 30, 25, .94));
+  box-shadow: inset 3px 0 0 var(--amber), 0 10px 30px rgba(0, 0, 0, .14);
+}
+.street-hustle-command::after { content: ""; position: absolute; inset: auto -16% -48px; height: 100px; pointer-events: none; background: radial-gradient(ellipse, rgba(220, 142, 35, .18), transparent 68%); }
+.street-hustle-heading { position: relative; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.street-hustle-heading h2 { margin-top: 4px; color: var(--text); font: 400 clamp(21px, 6vw, 28px)/1 var(--head); letter-spacing: -.025em; }
+.street-cred { min-width: 60px; padding: 7px 8px; border: 1px solid rgba(232, 181, 74, .35); border-radius: 7px; background: rgba(0, 0, 0, .16); text-align: center; }
+.street-cred strong { display: block; color: var(--amber); font: 800 22px/1 var(--head); }
+.street-cred span, .street-section-label { color: var(--muted2); font: 700 8px/1 var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+.street-hustle-copy { position: relative; z-index: 1; margin: 10px 0 14px; color: var(--text2); font-size: 12px; line-height: 1.45; }
+.street-section-label { position: relative; z-index: 1; display: block; margin: 13px 0 7px; color: var(--amber); }
+.street-set-grid, .street-lodging-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.street-set, .street-lodging { min-width: 0; border: 1px solid rgba(236, 218, 165, .18); border-radius: 7px; background: rgba(0, 0, 0, .16); color: var(--text2); text-align: left; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.street-set { min-height: 88px; padding: 9px 8px; }
+.street-lodging { min-height: 52px; padding: 7px; }
+.street-set:hover:not(:disabled), .street-lodging:hover { border-color: rgba(232, 181, 74, .7); background: rgba(115, 70, 26, .32); transform: translateY(-1px); }
+.street-set:disabled { opacity: .48; cursor: not-allowed; }
+.street-set strong, .street-lodging strong { display: block; color: var(--text); font: 700 10px/1.2 var(--mono); }
+.street-set span, .street-lodging span { display: block; margin-top: 6px; color: var(--amber); font: 700 9px/1.25 var(--mono); }
+.street-set small { display: block; margin-top: 4px; color: var(--muted2); font: 8px/1.2 var(--mono); }
+.street-lodging.selected { border-color: var(--amber); background: rgba(155, 96, 29, .28); box-shadow: inset 0 0 0 1px rgba(232, 181, 74, .16); }
+.street-next-unlock { position: relative; z-index: 1; margin-top: 13px; padding-top: 10px; border-top: 1px solid rgba(236, 218, 165, .12); color: var(--text2); font-size: 11px; line-height: 1.45; }
+.street-next-unlock strong { color: var(--amber); }
+.street-next-unlock button { padding: 0; border: 0; background: none; color: var(--lime); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
+
 .quick-actions-secondary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3413,6 +3446,8 @@ hr {
 }
 
 @media (max-width: 390px) {
+  .street-set-grid, .street-lodging-grid { grid-template-columns: 1fr; }
+  .street-set { min-height: 0; }
   .header-dashboard { gap: 6px; }
   .header-stat:last-of-type { display: none; }
   .header-artist { font-size: 16px; }

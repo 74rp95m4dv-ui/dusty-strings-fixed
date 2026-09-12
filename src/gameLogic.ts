@@ -419,6 +419,8 @@ export interface SignedLabel {
   weeksLeft: number;
   totalWeeks: number;
   signedAtWeek: number;
+  /** Week of the most recent A&R check-in, used to pace recurring label moments. */
+  lastCheckinWeek?: number;
   // Delivery enforcement. A contract requires completed Albums, not singles or EPs.
   // The deadline is rebalanced after each accepted delivery so multi-album deals
   // stay readable and fair throughout their term.

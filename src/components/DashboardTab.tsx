@@ -1,34 +1,22 @@
 import { useState } from "react";
-import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, getBurnoutTier } from "../gameLogic";
-import type { DrawerType } from "./GameScreen";
+import { fmt, fmtMoney, getCareerTierIdx, CAREER_TIERS, getBurnoutTier, getFeature } from "../gameLogic";
+import type { FestivalBooking, GameState, WeeklyLedgerEntry } from "../gameLogic";
+import type { GameController } from "../useGameState";
+import type { DrawerType, TabId } from "./GameScreen";
 import Dialog from "./ui/Dialog";
 import ActionCard from "./ui/ActionCard";
 
-interface DashboardProps {
-  state: any;
-  advance: () => void;
+type DashboardProps = Pick<GameController,
+  "state" | "advance" | "doTakeVacation" | "doAbortTour" | "doFinishProject" |
+  "doScrubProject" | "doDismissLabelOffers" | "doDismissManagerOffers" |
+  "doAcceptManagerOffer" | "doAcceptFeatureRequest" | "doDismissFeatureRequests" |
+  "doAcceptOpeningAct" | "doDismissOpeningActOffers" | "doAcceptFestival" |
+  "doDismissFestivalOffers" | "doAcceptPublishingOffer" | "doDismissPublishingOffers" |
+  "doAcceptSyncOffer" | "doDismissSyncOffers" | "doStreetCircuit" | "doSetStreetLodging"
+> & {
   onOpenDrawer: (d: DrawerType) => void;
-  onSwitchTab: (tab: string) => void;
-  doTakeVacation: () => void;
-  doAbortTour: () => void;
-  doFinishProject: () => void;
-  doScrubProject: () => void;
-  doDismissLabelOffers: () => void;
-  doDismissManagerOffers: () => void;
-  doAcceptManagerOffer: (id: string) => void;
-  doAcceptFeatureRequest: (id: string) => void;
-  doDismissFeatureRequests: () => void;
-  doAcceptOpeningAct: (id: string) => void;
-  doDismissOpeningActOffers: () => void;
-  doAcceptFestival: (id: string) => void;
-  doDismissFestivalOffers: () => void;
-  doAcceptPublishingOffer: (id: string) => void;
-  doDismissPublishingOffers: () => void;
-  doAcceptSyncOffer: (id: string) => void;
-  doDismissSyncOffers: () => void;
-  doStreetCircuit: (id: "tunnel" | "platform" | "patio") => void;
-  doSetStreetLodging: (lodging: "couch" | "room" | "motel") => void;
-}
+  onSwitchTab: (tab: TabId) => void;
+};
 
 export default function DashboardTab(props: DashboardProps) {
   const s = props.state;
@@ -259,7 +247,7 @@ export default function DashboardTab(props: DashboardProps) {
                 <ActionCard onClick={() => props.onOpenDrawer("offers")}>
                   <div>
                     <div className="pick-name">🎤 Feature Request</div>
-                    <div className="pick-meta">From {s.pendingFeatureRequests[0]?.featureName || "an artist"}</div>
+                    <div className="pick-meta">From {getFeature(s.pendingFeatureRequests[0]?.featureId ?? "")?.name ?? "an artist"}</div>
                   </div>
                 </ActionCard>
               )}
@@ -300,10 +288,10 @@ export default function DashboardTab(props: DashboardProps) {
         )}
 
         {/* Festival Reminder */}
-        {s.festivalBookings?.filter((b: any) => !b.completed).length > 0 && (
+        {s.festivalBookings?.filter((b: FestivalBooking) => !b.completed).length > 0 && (
           <div className="card animate-fadeInUp">
             <div className="card-title">🎪 Upcoming Festivals</div>
-            {s.festivalBookings.filter((b: any) => !b.completed).map((b: any) => (
+            {s.festivalBookings.filter((b: FestivalBooking) => !b.completed).map((b: FestivalBooking) => (
               <div key={b.festivalId} className="tip-text" style={{ marginBottom: 4 }}>
                 {b.festivalName} — Week {b.performanceWeek} • {b.stage} stage
               </div>
@@ -330,7 +318,7 @@ export default function DashboardTab(props: DashboardProps) {
           {s.activeBrandDeals.length === 0 && s.currentLabel == null && s.currentManager == null && (
             <div className="tip-text">No active deals. Build your rep to get offers.</div>
           )}
-          {s.activeBrandDeals.map((d: any) => (
+          {s.activeBrandDeals.map((d) => (
             <div key={d.id} style={{ fontSize: 12, marginBottom: 4 }}>
               <span className="tag t-lime">{d.name}</span>
               <span className="tip-text" style={{ marginLeft: 8 }}>
@@ -372,7 +360,7 @@ export default function DashboardTab(props: DashboardProps) {
         {/* News Feed */}
         <div className="sec-div">Recent News</div>
         <div className="news-feed">
-          {s.log.slice(0, 8).map((entry: any, i: number) => (
+          {s.log.slice(0, 8).map((entry, i: number) => (
             <div className={`news-item type-${entry.type || "neutral"}`} key={i}>
               <div className="news-week">W{entry.week}</div>
               <div className="news-text">{entry.msg}</div>
@@ -393,7 +381,7 @@ export default function DashboardTab(props: DashboardProps) {
               {s.tourActive && <span>On tour: fatigue {Math.round(s.tourFatigue ?? 0)}</span>}
             </div>
             {(s.weeklyLedger ?? []).length === 0 && <div className="empty-state">End a week to start your career ledger.</div>}
-            {(s.weeklyLedger ?? []).slice(0, 6).map((entry: any) => (
+            {(s.weeklyLedger ?? []).slice(0, 6).map((entry: WeeklyLedgerEntry) => (
               <article className="career-ledger-entry" key={entry.week}>
                 <div className="career-ledger-topline"><b>Week {entry.week}</b><span>{entry.rolls} career roll{entry.rolls === 1 ? "" : "s"}</span></div>
                 <div className="career-ledger-deltas">
@@ -405,10 +393,10 @@ export default function DashboardTab(props: DashboardProps) {
                 {(entry.incomeByCategory || entry.costByCategory) && <details className="career-ledger-breakdown">
                   <summary>Money breakdown</summary>
                   <div className="career-ledger-deltas">
-                    {Object.entries(entry.incomeByCategory ?? {}).map(([label, amount]: [string, any]) => <span className="text-sage" key={`in-${label}`}>+{fmtMoney(amount)} {label}</span>)}
-                    {Object.entries(entry.costByCategory ?? {}).map(([label, amount]: [string, any]) => <span className="text-rust" key={`out-${label}`}>-{fmtMoney(amount)} {label}</span>)}
+                    {Object.entries(entry.incomeByCategory ?? {}).map(([label, amount]) => <span className="text-sage" key={`in-${label}`}>+{fmtMoney(amount ?? 0)} {label}</span>)}
+                    {Object.entries(entry.costByCategory ?? {}).map(([label, amount]) => <span className="text-rust" key={`out-${label}`}>-{fmtMoney(amount ?? 0)} {label}</span>)}
                   </div>
-                  <p>Cash: {fmtMoney(entry.openingCash)} → {fmtMoney(entry.closingCash)}</p>
+                  <p>Cash: {fmtMoney(entry.openingCash ?? 0)} → {fmtMoney(entry.closingCash ?? 0)}</p>
                 </details>}
                 {entry.highlights?.length > 0 && <p>{entry.highlights.join(" · ")}</p>}
               </article>
@@ -421,7 +409,7 @@ export default function DashboardTab(props: DashboardProps) {
           <div className="modal-title" id="confirm-action-title">{confirmation === "scrub" ? "Scrub this project?" : "Abort this tour?"}</div>
           <p className="tip-text">{confirmation === "scrub"
             ? "This permanently deletes the current recording project and all of its unfinished tracks. No cash is refunded."
-            : `This cancels the remaining ${Math.max(0, s.tourActive.shows.length - s.tourActive.progress)} show(s). You will lose reputation but recover energy and burnout.`}</p>
+            : `This cancels the remaining ${Math.max(0, (s.tourActive?.shows.length ?? 0) - (s.tourActive?.progress ?? 0))} show(s). You will lose reputation but recover energy and burnout.`}</p>
           <div className="modal-footer">
             <button data-dialog-initial className="btn btn-danger" onClick={() => { if (confirmation === "scrub") props.doScrubProject(); else props.doAbortTour(); setConfirmation(null); }}>Confirm</button>
             <button className="btn btn-ghost" onClick={() => setConfirmation(null)}>Keep playing</button>

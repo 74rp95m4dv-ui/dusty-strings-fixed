@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS, getMarketEra } from "../gameLogic";
+import { getCareerTierIdx, CAREER_TIERS, RANDOM_SCENARIOS, getMarketEra, type LabelOffer } from "../gameLogic";
+import type { GameController } from "../useGameState";
 import DashboardTab from "./DashboardTab";
 import MusicTab from "./MusicTab";
 import OfficeTab from "./OfficeTab";
@@ -22,7 +23,9 @@ import { IntroCinematic } from "./IntroCinematic";
 import { TourCinematicDetails } from "./CinematicFramework";
 import Dialog from "./ui/Dialog";
 
-const TABS = [
+export type TabId = "home" | "music" | "office" | "live";
+
+const TABS: ReadonlyArray<{ id: TabId; label: string; icon: string }> = [
   { id: "home", label: "Home", icon: "🏠" },
   { id: "music", label: "Music", icon: "🎵" },
   { id: "office", label: "Office", icon: "💼" },
@@ -39,10 +42,10 @@ export type DrawerType =
   | "tour"
   | null;
 
-export default function GameScreen(game: any) {
-const [tab, setTab] = useState("home");
+export default function GameScreen(game: GameController) {
+const [tab, setTab] = useState<TabId>("home");
 const [drawer, setDrawer] = useState<DrawerType>(null);
-const [viewingOffer, setViewingOffer] = useState<any>(null);
+const [viewingOffer, setViewingOffer] = useState<LabelOffer | null>(null);
 const [tourIntro, setTourIntro] = useState<TourCinematicDetails | null>(null);
 const hasMounted = useRef(false);
 const wasOnTour = useRef(false);
@@ -72,14 +75,12 @@ const s = game.state;
   const openDrawer = (d: DrawerType) => setDrawer(d);
   const closeDrawer = () => setDrawer(null);
 
-  const handleViewLabelOffer = (offer: any) => {
+  const handleViewLabelOffer = (offer: LabelOffer) => {
     setViewingOffer(offer);
   };
 
-  const handleSignLabel = (offer: any) => {
-    if (game.doAcceptLabelOffer) {
-      game.doAcceptLabelOffer(offer.labelId);
-    }
+  const handleSignLabel = (offer: LabelOffer) => {
+    game.doAcceptLabelOffer(offer.labelId);
     setViewingOffer(null);
   };
 
@@ -88,7 +89,7 @@ const s = game.state;
   // The tour intro should be triggered by game state changes, not component logic.
   // We'll leave the cinematic component in place but ensure it's properly connected to the game state.
 
-  const activeOffer = game.viewingOffer || viewingOffer;
+  const activeOffer = viewingOffer;
   const officeAlerts = (s.pendingLabelOffers?.length || 0) + (s.pendingManagerOffers?.length || 0) + (s.pendingPublishingOffers?.length || 0) + (s.pendingSyncOffers?.length || 0);
   const liveAlerts = (s.pendingOpeningActOffers?.length || 0) + (s.pendingFestivalOffers?.length || 0);
   const musicAlerts = (s.unreleased?.length || 0) + (s.project ? 1 : 0);

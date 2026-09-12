@@ -188,7 +188,7 @@ function processLabelSubmissionReview(state: GameState) {
   state.log.unshift({ week: state.week, msg: `${label.name} held "${project.title}" after final review.`, type: "bad" });
 }
 
-function queueLabelMoment(state: GameState, stage: "recording" | "release" | "campaign" | "tour", releaseTitle?: string) {
+function queueLabelMoment(state: GameState, stage: "recording" | "release" | "campaign" | "tour" | "checkin", releaseTitle?: string) {
   const label = state.currentLabel;
   if (!label || state.pendingLabelMoment) return;
   const moment = createLabelMoment(label, stage, releaseTitle);
@@ -978,7 +978,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
       s.labelSigned = false;
       }
     }
-    if (!s.pendingLabelMoment && s.week - (s.currentLabel.lastCheckinWeek ?? s.currentLabel.signedAtWeek) >= 8) queueLabelMoment(s, "checkin", `week ${s.week}`);
+    if (s.currentLabel && !s.pendingLabelMoment && s.week - (s.currentLabel.lastCheckinWeek ?? s.currentLabel.signedAtWeek) >= 8) queueLabelMoment(s, "checkin", `week ${s.week}`);
   }
 
   // ── Publishing Deal Accounting ──
@@ -3427,3 +3427,6 @@ export function useGameState() {
     doAcceptSyncOffer, doDismissSyncOffers,
   };
 }
+
+/** Public, type-only contract between the state hook and the primary game UI. */
+export type GameController = ReturnType<typeof useGameState>;

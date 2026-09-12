@@ -2,14 +2,23 @@ import { useState } from "react";
 import {
   BRAND_DEALS, AWARDS, CAREER_TIERS, fmtMoney, RIVALS, fmtPercent, fmt,
   recoupProgress, get360Summary, getRiskLabel, getLabel, getManager, getLabelDeliverySummary,
-  MANAGERS, CAREER_IDENTITIES, type LabelOffer,
+  MANAGERS, CAREER_IDENTITIES, type GameState, type LabelOffer,
 } from "../gameLogic";
+import type { GameController } from "../useGameState";
 import ActionCard from "./ui/ActionCard";
 import { forecastRecurringEconomy } from "../weeklyEconomy";
 import { getLoanDue, getLoanEligibility, LOAN_OFFERS } from "../loanSystem";
 import Dialog from "./ui/Dialog";
 
-export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
+type OfficeTabProps = Pick<GameController,
+  "state" | "doSignBrandDeal" | "doDropLabel" | "doDropManager" | "doSwitchGenre" |
+  "doDismissLabelOffers" | "doDismissManagerOffers" | "doAcceptLabelOffer" |
+  "doAcceptManagerOffer" | "doAcceptPublishingOffer" | "doDismissPublishingOffers" |
+  "doAcceptSyncOffer" | "doDismissSyncOffers" | "doToggleMerchItem" |
+  "doRemoveMerchItem" | "doAddMerchItem" | "beginNewCareer" | "doTakeLoan" | "doPayOffLoan"
+> & { onViewLabelOffer: (offer: LabelOffer) => void; onOpenDrawer: (drawer: "merch") => void };
+
+export default function OfficeTab({ onViewLabelOffer, ...game }: OfficeTabProps) {
   const {
     state, doSignBrandDeal, doDropLabel, doDropManager, doSwitchGenre,
     doDismissLabelOffers, doDismissManagerOffers, doAcceptLabelOffer,
@@ -25,9 +34,9 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
   const loanOfferToConfirm = LOAN_OFFERS.find(offer => offer.id === confirmLoanId) ?? null;
 
   const totalIncome =
-    (state.catalog.reduce((s: number, t: any) => s + (t.streamStats?.weeklyRevenue || 0), 0)) +
-    (state.activeBrandDeals.reduce((s: number, d: any) => s + d.weeklyIncome, 0)) +
-    (state.merchShop?.reduce((s: number, m: any) => {
+    (state.catalog.reduce((s, t) => s + (t.streamStats?.weeklyRevenue || 0), 0)) +
+    (state.activeBrandDeals.reduce((s, d) => s + d.weeklyIncome, 0)) +
+    (state.merchShop?.reduce((s, m) => {
       const recent = m.weeklySales.slice(-1)[0] || 0;
       return s + recent * (m.price - m.cost);
     }, 0) || 0);
@@ -52,7 +61,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
         <div className="stagger-1">
           <div className="card"><div className="card-title">Public Identity</div>{state.currentCareerIdentity ? <><div style={{ fontWeight: 700 }}>{CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES].title}</div><div className="tip-text">{CAREER_IDENTITIES[state.currentCareerIdentity as keyof typeof CAREER_IDENTITIES].perk}</div></> : <div className="tip-text">Still emerging. Consistent creative, commercial, touring, independent, or crossover choices will earn a public identity.</div>}</div>
           {/* Label Contract */}
-          <LabelContractCard state={state} onDrop={doDropLabel} onSign={doAcceptLabelOffer} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
+          <LabelContractCard state={state} onDrop={doDropLabel} onSign={(offer) => doAcceptLabelOffer(offer.labelId)} onView={onViewLabelOffer} onDismiss={doDismissLabelOffers} />
 
           {/* Management */}
           <div className="card">
@@ -69,7 +78,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
               </div>
             ) : state.pendingManagerOffers?.length > 0 ? (
               <div>
-                {state.pendingManagerOffers.map((offer: any) => {
+                {state.pendingManagerOffers.map((offer) => {
                   const M = getManager(offer.managerId);
                   return (
                     <div className="pick-card" key={offer.managerId}>
@@ -94,11 +103,11 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
           <div className="card">
             <div className="card-title">Brand Deals</div>
             {BRAND_DEALS.filter(
-              (b: any) =>
+              (b) =>
                 state.fame >= b.fameReq &&
                 state.rep >= b.repReq &&
-                !state.activeBrandDeals.find((d: any) => d.id === b.id)
-            ).map((b: any) => (
+                !state.activeBrandDeals.find((d) => d.id === b.id)
+            ).map((b) => (
               <ActionCard key={b.id} onClick={() => doSignBrandDeal(b.id)} aria-label={`Sign ${b.name} brand deal`}>
                 <div>
                   <div className="pick-name">{b.name}</div>
@@ -107,10 +116,10 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
               </ActionCard>
             ))}
             {BRAND_DEALS.filter(
-              (b: any) =>
+              (b) =>
                 state.fame >= b.fameReq &&
                 state.rep >= b.repReq &&
-                !state.activeBrandDeals.find((d: any) => d.id === b.id)
+                !state.activeBrandDeals.find((d) => d.id === b.id)
             ).length === 0 && (
               <div className="tip-text">No deals available right now.</div>
             )}
@@ -120,7 +129,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
           {state.pendingPublishingOffers?.length > 0 && (
             <div className="card">
               <div className="card-title">Publishing Offers</div>
-              {state.pendingPublishingOffers.map((offer: any) => (
+              {state.pendingPublishingOffers.map((offer) => (
                 <div className="pick-card" key={offer.id}>
                   <div>
                     <div className="pick-name">{offer.publisherName}</div>
@@ -139,7 +148,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
           {state.pendingSyncOffers?.length > 0 && (
             <div className="card">
               <div className="card-title">Sync Licensing</div>
-              {state.pendingSyncOffers.map((offer: any) => (
+              {state.pendingSyncOffers.map((offer) => (
                 <div className="pick-card" key={offer.id}>
                   <div>
                     <div className="pick-name">{offer.showName}</div>
@@ -169,15 +178,14 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
         <div className="stagger-1">
           <div className="card">
             <div className="card-title">Merch Shop</div>
-            {state.currentLabel && <div className="card-sm" style={{ marginBottom: 12 }}><b>{state.currentLabel.name} Merchandise</b><div className="tip-text">Label-managed storefront · artist royalty {Math.round(({ major:.12, boutique:.22, americana:.24, specialty:.26, indie:.30 }[state.currentLabel.type] ?? .20) * 100)}% · lifetime {fmtMoney(state.labelMerchRevenue ?? 0)}</div></div>}
+            {state.currentLabel && <div className="card-sm" style={{ marginBottom: 12 }}><b>{state.currentLabel.name} Merchandise</b><div className="tip-text">Label-managed storefront · artist royalty {Math.round((({ major:.12, boutique:.22, americana:.24, specialty:.26, indie:.30 } as Record<string, number>)[state.currentLabel.type] ?? .20) * 100)}% · lifetime {fmtMoney(state.labelMerchRevenue ?? 0)}</div></div>}
             <button className="btn btn-lime btn-block" disabled={!!state.currentLabel} onClick={() => game.onOpenDrawer?.("merch")} style={{ marginBottom: 12 }}>
               {state.currentLabel ? "Label Manages Merch" : "Add Merch Item"}
             </button>
             {(!state.merchShop || state.merchShop.length === 0) && (
               <div className="empty-state">No merch listed yet.</div>
             )}
-            {state.merchShop?.map((item: any) => {
-              const tmpl = (game.MERCH_TEMPLATES || []).find((t: any) => t.type === item.type);
+            {state.merchShop?.map((item) => {
               const recentSales = item.weeklySales.slice(-4);
               const avgRecent = recentSales.length ? recentSales.reduce((a: number, b: number) => a + b, 0) / recentSales.length : 0;
               return (
@@ -209,7 +217,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
             <div className="card-title">Awards</div>
             {state.awardsWon.length === 0 && <div className="tip-text">None yet. Keep grinding!</div>}
             {state.awardsWon.map((id: string) => {
-              const a = AWARDS.find((x: any) => x.id === id)!;
+              const a = AWARDS.find((x) => x.id === id)!;
               return (
                 <div className="award-card" key={id}>
                   <div className="award-icon">🏆</div>
@@ -224,7 +232,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
 
           <div className="card">
             <div className="card-title">Career Tier</div>
-            {CAREER_TIERS.map((t: any) => (
+            {CAREER_TIERS.map((t) => (
               <div key={t.idx} style={{ opacity: state.fame >= t.fameReq ? 1 : 0.35, marginBottom: 6, fontSize: 12 }}>
                 <b>{t.icon} {t.name}</b>
                 {state.fame >= t.fameReq ? " ✓" : ` (need ${t.fameReq} fame)`}
@@ -240,8 +248,8 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
         <div className="stagger-1">
           <div className="card">
             <div className="card-title">Scene Rivals</div>
-            {state.rivals.map((r: any) => {
-              const def = RIVALS.find((x: any) => x.id === r.id);
+            {state.rivals.map((r) => {
+              const def = RIVALS.find((x) => x.id === r.id);
               return (
                 <div className="card-sm" key={r.id} style={{ marginBottom: 6 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{def?.name ?? r.id}</div>
@@ -391,7 +399,7 @@ export default function OfficeTab({ onViewLabelOffer, ...game }: any) {
 
 /* ─── Label Contract Card ─── */
 function LabelContractCard({ state, onDrop, onSign, onView, onDismiss }: {
-  state: any; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView?: (offer: LabelOffer) => void; onDismiss: () => void;
+  state: GameState; onDrop: () => void; onSign: (offer: LabelOffer) => void; onView?: (offer: LabelOffer) => void; onDismiss: () => void;
 }) {
   const [confirmTermination, setConfirmTermination] = useState(false);
   if (state.currentLabel) {

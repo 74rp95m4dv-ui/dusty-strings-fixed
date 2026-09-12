@@ -8,8 +8,15 @@ import {
 } from "../gameLogic";
 import Dialog from "./ui/Dialog";
 import { regionalDemandLabel } from "../gameSystems/careerDepth";
+import type { GameController } from "../useGameState";
 
-export default function LiveTab(game: any) {
+type LiveTabProps = Pick<GameController,
+  "state" | "doToggleTourCity" | "doSetVenueTier" | "doSetTicketMult" |
+  "doStartTour" | "doSetSetlist" | "doAcceptOpeningAct" |
+  "doDismissOpeningActOffers" | "doAcceptFestival" | "doDismissFestivalOffers"
+>;
+
+export default function LiveTab(game: LiveTabProps) {
   const {
     state, doToggleTourCity, doSetVenueTier, doSetTicketMult, doStartTour,
     doSetSetlist, doAcceptOpeningAct, doDismissOpeningActOffers,
@@ -18,7 +25,7 @@ export default function LiveTab(game: any) {
   const [sub, setSub] = useState<"tour" | "setlist" | "offers" | "festivals" | "reputation">("tour");
   const [confirmTour, setConfirmTour] = useState(false);
 
-  const inQueue = new Set(state.tourQueue.map((q: any) => q.cityName));
+  const inQueue = new Set(state.tourQueue.map((q) => q.cityName));
   const isHeadliner = state.tourQueue.length > 5;
   const totalSlots = isHeadliner ? 22 : 6;
   const currentTotal = state.setlistConfig?.deepCutCount + state.setlistConfig?.hitCount + state.setlistConfig?.newMaterialCount || 0;
@@ -84,7 +91,7 @@ export default function LiveTab(game: any) {
               <div className="card">
                 <div className="card-title">Venue Tier</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {VENUES.map((v: any) => (
+                  {VENUES.map((v) => (
                     <button key={v.tier} className={`btn btn-sm ${state.tourVenue === v.tier ? "btn-lime" : ""}`} onClick={() => doSetVenueTier(v.tier)}>
                       {v.tier}: {v.name}
                     </button>
@@ -99,8 +106,8 @@ export default function LiveTab(game: any) {
               <div className="card">
                 <div className="card-title">Cities ({state.tourQueue.length} selected)</div>
                 <div style={{ maxHeight: 320, overflowY: "auto" }}>
-                  {CITIES.map((c: any) => {
-                    const v = c.venues.find((v: any) => v.tier === state.tourVenue) ?? c.venues[c.venues.length - 1];
+                  {CITIES.map((c) => {
+                    const v = c.venues.find((v) => v.tier === state.tourVenue) ?? c.venues[c.venues.length - 1];
                     const isIn = inQueue.has(c.name);
                     return (
                       <button key={c.name} type="button" className={`city-row ${isIn ? "booked" : ""}`} onClick={() => doToggleTourCity(c.name)} aria-pressed={isIn}>
@@ -115,10 +122,10 @@ export default function LiveTab(game: any) {
                   })}
                 </div>
               </div>
-              <div className="tip-text" style={{ marginBottom: 8 }}>Upfront route cost: {fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))}. One stop resolves per week and builds fatigue.</div>
+              <div className="tip-text" style={{ marginBottom: 8 }}>Upfront route cost: {fmtMoney(state.tourQueue.reduce((s, q) => s + q.travelCost + q.venueCost, 0))}. One stop resolves per week and builds fatigue.</div>
               {state.streetHustle?.microRouteReady && !state.streetHustle.microRouteUsed && <div className="tip-text" style={{ marginBottom: 8 }}>Street Hustle Micro Route ready: choose up to 3 stops and your street contacts cover the crew advance.</div>}
               <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={() => setConfirmTour(true)}>
-                Launch Tour ({fmtMoney(state.tourQueue.reduce((s: number, q: any) => s + q.travelCost + q.venueCost, 0))})
+                Launch Tour ({fmtMoney(state.tourQueue.reduce((s, q) => s + q.travelCost + q.venueCost, 0))})
               </button>
               {confirmTour && <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmTour(false); }}><Dialog titleId="live-tour-confirm" onClose={() => setConfirmTour(false)}><div className="modal-title" id="live-tour-confirm">Launch this tour?</div><p className="tip-text">You will pay the route cost now and commit to {state.tourQueue.length} stop{state.tourQueue.length === 1 ? "" : "s"}. You can still abort later at a reputation cost.</p><div className="modal-footer"><button data-dialog-initial className="btn btn-lime" onClick={() => { doStartTour(); setConfirmTour(false); }}>Launch tour</button><button className="btn btn-ghost" onClick={() => setConfirmTour(false)}>Review route</button></div></Dialog></div>}
             </>
@@ -204,7 +211,7 @@ export default function LiveTab(game: any) {
                 </div>
               </div>
             )}
-            {state.pendingOpeningActOffers?.map((offer: any) => (
+            {state.pendingOpeningActOffers?.map((offer) => (
               <div key={offer.id} className="card" style={{ marginBottom: 8 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{offer.headlinerName}</div>
                 <div className="tip-text">
@@ -227,11 +234,11 @@ export default function LiveTab(game: any) {
           <div className="card">
             <div className="card-title">Festival Bookings</div>
 
-            {state.festivalBookings?.filter((b: any) => !b.completed).length > 0 && (
+            {state.festivalBookings?.filter((b) => !b.completed).length > 0 && (
               <>
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--sage)" }}>📅 Upcoming</div>
-                {state.festivalBookings.filter((b: any) => !b.completed).map((booking: any) => {
-                  const fest = FESTIVALS.find((f: any) => f.id === booking.festivalId);
+                {state.festivalBookings.filter((b) => !b.completed).map((booking) => {
+                  const fest = FESTIVALS.find((f) => f.id === booking.festivalId);
                   return (
                     <div key={booking.festivalId} className="card" style={{ marginBottom: 8, borderColor: "var(--sage)" }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -252,8 +259,8 @@ export default function LiveTab(game: any) {
             {state.pendingFestivalOffers?.length > 0 && (
               <>
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, marginTop: 12, color: "var(--amber)" }}>📨 Offers</div>
-                {state.pendingFestivalOffers.map((offer: any) => {
-                  const fest = FESTIVALS.find((f: any) => f.id === offer.festivalId);
+                {state.pendingFestivalOffers.map((offer) => {
+                  const fest = FESTIVALS.find((f) => f.id === offer.festivalId);
                   return (
                     <div key={offer.festivalId} className="card" style={{ marginBottom: 8 }}>
                       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -280,7 +287,7 @@ export default function LiveTab(game: any) {
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, marginTop: 12, color: "var(--muted)" }}>✓ Completed</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                   {state.completedFestivals.map((fid: string) => {
-                    const fest = FESTIVALS.find((f: any) => f.id === fid);
+                    const fest = FESTIVALS.find((f) => f.id === fid);
                     return (
                       <span key={fid} className="tag t-gray">{fest?.emoji} {fest?.name}</span>
                     );
@@ -290,7 +297,7 @@ export default function LiveTab(game: any) {
             )}
 
             {(!state.pendingFestivalOffers || state.pendingFestivalOffers.length === 0) &&
-             (!state.festivalBookings || state.festivalBookings.filter((b: any) => !b.completed).length === 0) &&
+             (!state.festivalBookings || state.festivalBookings.filter((b) => !b.completed).length === 0) &&
              (!state.completedFestivals || state.completedFestivals.length === 0) && (
               <div className="empty-state">No festival bookings yet. Build fame and rep!</div>
             )}
@@ -309,7 +316,7 @@ export default function LiveTab(game: any) {
             {Object.keys(state.venueReputations || {}).length === 0 && (
               <div className="empty-state">No venue reputation yet. Start touring!</div>
             )}
-            {Object.values(state.venueReputations || {}).map((rep: any) => {
+            {Object.values(state.venueReputations || {}).map((rep) => {
               const perk = getVenuePerkDisplay(rep.venueName, rep.playCount);
               return (
                 <div key={rep.venueName} className="card" style={{ marginBottom: 8 }}>
@@ -335,7 +342,7 @@ export default function LiveTab(game: any) {
       {/* Tour History (always visible at bottom) */}
       <div className="sec-div">Tour History</div>
       {(!state.tourHistory || state.tourHistory.length === 0) && <div className="empty-state">No shows yet.</div>}
-      {state.tourHistory?.slice(0, 10).map((h: any, i: number) => (
+      {state.tourHistory?.slice(0, 10).map((h, i: number) => (
         <div className="news-item" key={i}>
           <div className="news-week">W{h.week}</div>
           <div><b>{h.cityName}</b> @ {h.venueName} — {h.attendancePct}% full • {fmtMoney(h.net)} net</div>

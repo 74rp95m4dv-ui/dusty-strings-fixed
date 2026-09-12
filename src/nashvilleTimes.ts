@@ -790,6 +790,57 @@ NPC_ODD_STORIES.push(
   () => ({ section:"Scene", headline:`${pick(NPC_ARTISTS).toUpperCase()} RECORDS ENTIRE EP IN A GRAIN SILO`, byline:`By ${pick(REPORTERS)}`, body:`The natural echo was the point. The engineer still has questions about the dust.` }),
 );
 
+// A second desk of evergreen stories keeps recurring issues varied without
+// changing their size, player coverage, or mechanical effects.
+COUNTRY_STORIES.push(
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} CUTS ACOUSTIC VERSION OF FAN FAVORITE`, byline:`By ${pick(REPORTERS)}`,
+    body:`The stripped-back session was taped after midnight at ${pick(VENUES)} with one microphone, a borrowed upright piano, and no second takes.` }),
+  () => ({ section:"Country", headline:`${pick(NPC_ARTISTS).toUpperCase()} REVIVES OLD-FASHIONED RADIO REQUEST LINE`, byline:`By ${pick(REPORTERS)}`,
+    body:`Listeners can call in one song and one reason it matters. The station says the stories have become as popular as the records.` }),
+);
+
+BLUES_STORIES.push(
+  () => ({ section:"Blues", headline:`${pick(NPC_ARTISTS).toUpperCase()} BRINGS JUKE JOINT REVUE TO ${pick(CITIES).toUpperCase()}`, byline:`By ${pick(REPORTERS)}`,
+    body:`The traveling bill features three bands, a horn section, and a promise that nobody will leave before the last slow blues.` }),
+  () => ({ section:"Blues", headline:`HAND-BUILT AMPLIFIER SHOP BECOMES PILGRIMAGE STOP`, byline:`By ${pick(REPORTERS)}`,
+    body:`Players from across the region are lining up for custom repairs and the owner’s famously blunt advice about tone.` }),
+);
+
+INDUSTRY_STORIES.push(
+  () => ({ section:"Industry", headline:`REGIONAL RADIO GROUP EXPANDS LOCAL-MUSIC HOURS`, byline:`By ${pick(REPORTERS)}`,
+    body:`Program directors say the new evening block will favor requests, local sessions, and songs that have already proved themselves in rooms.` }),
+  () => ({ section:"Industry", headline:`SMALL PRESSING PLANT ADDS NIGHT SHIFT FOR INDIE ORDERS`, byline:`By ${pick(REPORTERS)}`,
+    body:`The added capacity will not end the backlog, but it may get a few patient artists their records before the next tour.` }),
+);
+
+SCENE_STORIES.push(
+  () => ({ section:"Scene", headline:`${pick(FESTIVALS).toUpperCase()} ADDS SUNRISE SONGWRITER STAGE`, byline:`By ${pick(REPORTERS)}`,
+    body:`The new set begins before the gates fully open, with coffee, folding chairs, and no production beyond a quiet PA.` }),
+  () => ({ section:"Scene", headline:`TOUR BUS BOOK EXCHANGE BECOMES ROAD TRADITION`, byline:`By ${pick(REPORTERS)}`,
+    body:`A dog-eared novel left in a green room in ${pick(CITIES)} has now traveled through twelve venues and collected handwritten notes in the margins.` }),
+);
+
+LOCAL_STORIES.push(
+  () => ({ section:"Local", headline:`${pick(CITIES).toUpperCase()} LIBRARY OPENS LISTENING BOOTH FOR LOCAL DEMOS`, byline:`By ${pick(REPORTERS)}`,
+    body:`The small archive includes self-released CDs, cassette recordings, and a handwritten sign asking visitors to leave the cases where they found them.` }),
+  () => ({ section:"Local", headline:`OLD THEATER MARQUEE LIGHTS UP FOR COMMUNITY SING`, byline:`By ${pick(REPORTERS)}`,
+    body:`No headliner was announced. By nightfall, half the neighborhood had brought a chair and somebody had found a pedal steel.` }),
+);
+
+CHART_STORIES.push(
+  () => ({ section:"Charts", headline:`LIVE VERSIONS OUTPACE STUDIO CUTS ON REGIONAL PLAYLISTS`, byline:`By ${pick(REPORTERS)}`,
+    body:`Listeners are gravitating toward crowd noise, missed notes, and performances that sound like someone had to be there.` }),
+  () => ({ section:"Charts", headline:`${pick(NPC_ARTISTS).toUpperCase()} CLIMBS AFTER COLLEGE-RADIO BREAKOUT`, byline:`By ${pick(REPORTERS)}`,
+    body:`A late-night host played the song once, then twice more after callers would not stop asking for it.` }),
+);
+
+NPC_RIVALRY_STORIES.push(
+  () => { const a=pick(NPC_ARTISTS), b=pickOther(NPC_ARTISTS,a); return { section:"Industry", headline:`${a.toUpperCase()} AND ${b.toUpperCase()} BOTH CLAIM SAME CO-WRITE`, byline:`By ${pick(REPORTERS)}`, body:`The disputed song has not been released, but two sets of social posts suggest the chorus has already become a point of pride.` }; },
+);
+NPC_COMEBACK_STORIES.push(
+  () => ({ section:"Blues", headline:`${pick(NPC_ARTISTS).toUpperCase()} RETURNS WITH SUNDAY-NIGHT RESIDENCY`, byline:`By ${pick(REPORTERS)}`, body:`The weekly set is deliberately small, long on stories, and already impossible to get into after 8 p.m.` }),
+);
+
 // ── LETTERS TO THE EDITOR ──────────────────────────────────
 const LETTER_CITIES = [
   "Nashville, TN","Memphis, TN","Knoxville, TN","Chattanooga, TN","Bowling Green, KY",

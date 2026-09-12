@@ -34,4 +34,14 @@ describe("Nashville Times editorial balance", () => {
     expect(playerLetters.length).toBeLessThanOrEqual(1);
     expect((issue.letters ?? []).length).toBeGreaterThan(1);
   });
+
+  it("keeps world-news issues full and within the established newsroom sections", () => {
+    const sections = new Set(["Front Page", "Country", "Blues", "Industry", "Scene", "Charts", "Local"]);
+    for (let week = 4; week <= 80; week += 4) {
+      const issue = generateNashvilleTimes({ ...INITIAL_STATE, artistName: "The Test Artist", week });
+      expect(issue.stories).toHaveLength(18);
+      expect(issue.stories.filter(story => !story.isPlayer)).toHaveLength(18);
+      expect(issue.stories.every(story => sections.has(story.section))).toBe(true);
+    }
+  });
 });

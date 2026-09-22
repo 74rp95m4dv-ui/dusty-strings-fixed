@@ -3758,3 +3758,57 @@ hr {
     transform: translateY(0);
   }
 }
+
+/* Keep the game dashboard usable across laptop and larger desktop widths. */
+@media (min-width: 1024px) {
+  body {
+    max-width: none;
+  }
+
+  .responsive-app-shell > .app-shell {
+    display: grid;
+    grid-template-columns: clamp(176px, 16vw, 220px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "nav header"
+      "nav content";
+    width: min(100%, 1440px);
+    margin-inline: auto;
+  }
+
+  .responsive-app-shell > .app-shell > .app-header {
+    grid-area: header;
+    min-width: 0;
+  }
+
+  .responsive-app-shell > .app-shell > .app-content {
+    grid-area: content;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding-bottom: var(--space-8);
+  }
+
+  .responsive-app-shell > .app-shell > .bottom-nav {
+    grid-area: nav;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .app-header .header-artist {
+    max-width: min(32vw, 420px);
+  }
+
+  .app-header .header-meta {
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    line-height: 1.35;
+  }
+
+  .bigstat-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -9,7 +9,7 @@ import {
   CAREER_TIERS, getCareerTierIdx, getCareerReadiness, applyCareerProgressionCaps,
   burnoutQualityPenalty, burnoutShowMult, burnoutCancelChance, getBurnoutTier, pickRivalTitle,
   MerchType, MerchItem, MERCH_TEMPLATES, generateMerchReview,
-  getPressingVariants, isPhysicalFormat, MERCH_EDITIONS, priceDemandMultiplier,
+  priceDemandMultiplier,
   STUDIOS, getStudio,
   THEMES, getSignatureTheme, pickTrendTheme,
   TREND_THEME_SCORE_MULT, TREND_THEME_FAN_MULT,
@@ -73,6 +73,7 @@ import { generateNashvilleTimes } from "./nashvilleTimes";
 import { clearGameState, loadGameState, replaceGameState, restoreBackupToPrimary, saveGameState } from "./persistence";
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
+import { getMerchSetupCost, isValidMerchPrice, quickPressMerch, type QuickPressSelection } from "./merchandise";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
 import { collectLoanPayment, createLoan, getLoanEligibility, getLoanOffer, payOffLoanEarly } from "./loanSystem";
 import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
@@ -3228,23 +3229,26 @@ export function useGameState() {
   // Merch shop
   const doAddMerchItem = useCallback((
     type: MerchType, tiedReleaseId: string | null, name: string, price: number,
-    opts?: { variantName?: string; variantColor?: string; editionLabel?: string; bonusCost?: number; bonusPrice?: number; suppressEvent?: boolean }
+    opts?: { variantName?: string; variantColor?: string; editionLabel?: string; bonusCost?: number; suppressEvent?: boolean }
   ) => upd(s => {
     if (s.currentLabel) { s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     const tmpl = MERCH_TEMPLATES.find(t => t.type === type);
     if (!tmpl) return s;
+    if (!isValidMerchPrice(price)) {
+      s.pendingEvent = { msg: "Enter a positive whole-dollar selling price.", type: "bad" };
+      return s;
+    }
     if (tmpl.needsRelease && !tiedReleaseId) {
       s.pendingEvent = { msg: `${type} requires an album to tie to.`, type: "bad" };
       return s;
     }
     const unitCost = tmpl.baseCost + (opts?.bonusCost ?? 0);
-    const setup = Math.max(40, Math.floor(unitCost * 25));
+    const setup = getMerchSetupCost(unitCost);
     if (s.money < setup) {
       s.pendingEvent = { msg: `Need ${fmtMoney(setup)} to set up the ${type} run.`, type: "bad" };
       return s;
     }
     const tied = tiedReleaseId ? s.catalog.find(c => c.id === tiedReleaseId) : null;
-    const finalPrice = Math.max(1, Math.floor(price + (opts?.bonusPrice ?? 0)));
     const editionTag = opts?.editionLabel && opts.editionLabel !== "Standard" ? ` — ${opts.editionLabel}` : "";
     const variantTag = opts?.variantName && opts.variantName !== "Standard Black" && opts.variantName !== "Standard Jewel Case" && opts.variantName !== "Black Shell" ? ` (${opts.variantName})` : "";
     const baseName = name.trim() || tmpl.defaultName(tied?.title ?? null, s.artistName);
@@ -3254,7 +3258,7 @@ export function useGameState() {
       emoji: tmpl.emoji,
       tiedToReleaseId: tiedReleaseId,
       tiedToReleaseTitle: tied?.title ?? null,
-      price: finalPrice,
+      price,
       cost: unitCost,
       releasedWeek: s.week,
       weeklySales: [],
@@ -3278,63 +3282,8 @@ export function useGameState() {
 
   const doDismissPressing = useCallback(() => upd(s => { s.pendingPressing = null; return s; }), [upd]);
 
-  // Press one or more physical formats at once. selections = [{type, variantName, variantColor, edition, ...}]
-  const doQuickPress = useCallback((releaseId: string, selections: Array<{ type: MerchType; variantName: string; variantColor: string; variantPriceMod: number; variantCostMod: number; editionName: string; editionPriceMod: number; editionCostMod: number; }>) => upd(s => {
-    if (s.currentLabel) { s.pendingPressing = null; s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
-    const rel = s.catalog.find(c => c.id === releaseId);
-    if (!rel) { s.pendingPressing = null; return s; }
-    let totalSetup = 0;
-    for (const sel of selections) {
-      const tmpl = MERCH_TEMPLATES.find(t => t.type === sel.type);
-      if (!tmpl) continue;
-      const unitCost = tmpl.baseCost + sel.variantCostMod + sel.editionCostMod;
-      totalSetup += Math.max(40, Math.floor(unitCost * 30));
-    }
-    if (s.money < totalSetup) {
-      s.pendingEvent = { msg: `Need ${fmtMoney(totalSetup)} to press these. You have ${fmtMoney(s.money)}.`, type: "bad" };
-      return s;
-    }
-    if (!s.merchShop) s.merchShop = [];
-    let pressed = 0;
-    for (const sel of selections) {
-      const tmpl = MERCH_TEMPLATES.find(t => t.type === sel.type);
-      if (!tmpl) continue;
-      const unitCost = tmpl.baseCost + sel.variantCostMod + sel.editionCostMod;
-      const setup = Math.max(40, Math.floor(unitCost * 25));
-      const finalPrice = tmpl.basePrice + sel.variantPriceMod + sel.editionPriceMod;
-      const variantTag = sel.variantName && sel.variantName !== "Standard Black" && sel.variantName !== "Standard Jewel Case" && sel.variantName !== "Black Shell" ? ` (${sel.variantName})` : "";
-      const editionTag = sel.editionName && sel.editionName !== "Standard" ? ` — ${sel.editionName}` : "";
-      const item: MerchItem = {
-        id: createGameEntityId(s, "merch"),
-        type: sel.type,
-        name: tmpl.defaultName(rel.title, s.artistName) + variantTag + editionTag,
-        emoji: tmpl.emoji,
-        tiedToReleaseId: releaseId,
-        tiedToReleaseTitle: rel.title,
-        price: finalPrice,
-        cost: unitCost,
-        releasedWeek: s.week,
-        weeklySales: [],
-        totalSold: 0,
-        totalRevenue: 0,
-        reviews: [],
-        active: true,
-        variantName: sel.variantName,
-        variantColor: sel.variantColor,
-        editionLabel: sel.editionName && sel.editionName !== "Standard" ? sel.editionName : undefined,
-      };
-      s.money -= setup;
-      s.merchShop.unshift(item);
-      pressed++;
-    }
-    s.log.unshift({ week: s.week, msg: `Pressed ${pressed} format${pressed===1?"":"s"} of "${rel.title}" — ${fmtMoney(totalSetup)} setup`, type: "good" });
-    s.pendingPressing = null;
-    s.pendingEvent = { msg: `${pressed} pressing${pressed===1?"":"s"} live for "${rel.title}".`, type: "good" };
-    // touch helpers so TS sees they're referenced
-    void getPressingVariants; void isPhysicalFormat; void MERCH_EDITIONS;
-    return s;
-  }), [upd]);
-
+  const doQuickPress = useCallback((releaseId: string, selections: QuickPressSelection[]) =>
+    upd(s => quickPressMerch(s, releaseId, selections)), [upd]);
   const doToggleMerchItem = useCallback((id: string) => upd(s => {
     if (s.currentLabel) { s.pendingEvent={msg:`${s.currentLabel.name} manages merchandise while this contract is active.`,type:"neutral"}; return s; }
     const it = s.merchShop?.find(m => m.id === id);

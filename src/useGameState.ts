@@ -74,6 +74,7 @@ import { clearGameState, loadGameState, replaceGameState, restoreBackupToPrimary
 import { createSimulation, normalizeSimulation, withSimulationRandom } from "./simulation";
 import { createGameEntityId, normalizeGameState } from "./stateIntegrity";
 import { getMerchSetupCost, isValidMerchPrice, quickPressMerch, type QuickPressSelection } from "./merchandise";
+import { getSavedSetlist, getSetlistRewards, getSetlistSlots, getTourSetlistIssue, saveSetlist } from "./gameSystems/setlist";
 import { buildWeeklyEconomyLedger, calculateWeeklyOverhead } from "./weeklyEconomy";
 import { collectLoanPayment, createLoan, getLoanEligibility, getLoanOffer, payOffLoanEarly } from "./loanSystem";
 import { queueAlbumCampaignAction, resolveAlbumCampaignWeek as resolveAlbumCampaignWeekSystem } from "./gameSystems/albumCampaign";
@@ -1071,7 +1072,7 @@ export function advanceCareerWeek(prev:GameState): GameState {
   // ── Setlist Satisfaction ──
   let setlistSatisfaction: SetlistSatisfaction | null = null;
   if (s.tourActive && s.tourActive.progress < s.tourActive.shows.length && s.catalog.length > 0) {
-    setlistSatisfaction = calculateSetlistSatisfaction(s.setlistConfig, s.catalog, s.tourActive.shows.length > 5 ? 22 : 6);
+    setlistSatisfaction = calculateSetlistSatisfaction(getSavedSetlist(s), s.catalog, getSetlistSlots(s));
   }
 
   if (s.tourActive && s.tourActive.progress<s.tourActive.shows.length) {
@@ -1123,8 +1124,9 @@ export function advanceCareerWeek(prev:GameState): GameState {
     let setlistRepBonus = 0;
     if (setlistSatisfaction) {
       setlistFillMod = 0.7 + (setlistSatisfaction.score / 100) * 0.6; // 0.7 to 1.3
-      setlistFanBonus = setlistSatisfaction.hitBonus + setlistSatisfaction.newMaterialBonus;
-      setlistRepBonus = setlistSatisfaction.deepCutBonus;
+      const rewards = getSetlistRewards(setlistSatisfaction);
+      setlistFanBonus = rewards.fans;
+      setlistRepBonus = rewards.rep;
     }
 
     const fill=clamp(calcFill(demand,show.venueCap,s.tourActive.ticketMult) * burnoutMult * setlistFillMod, 0, 1);
@@ -2604,6 +2606,8 @@ export function useGameState() {
   const doStartTour = useCallback(()=>upd(s=>{
     if(s.tourActive){s.pendingEvent={msg:"A tour is already underway.",type:"bad"};return s;}
     if(!s.tourQueue.length) return s;
+    const setlistIssue = getTourSetlistIssue(s);
+    if (setlistIssue) { s.pendingEvent = { msg: setlistIssue, type: "bad" }; return s; }
     const mult=tourCostMult(s.archetype);
     const usingMicroRoute = !!s.streetHustle?.microRouteReady && !s.streetHustle.microRouteUsed && s.tourQueue.length <= 3;
     // Upfront tour costs: travel + venue deposit + crew advance
@@ -3063,23 +3067,7 @@ export function useGameState() {
 
 
   // ── Setlist Builder ──
-  const doSetSetlist = useCallback((config: SetlistConfig) => upd(s => {
-    const counts = [config.deepCutCount, config.hitCount, config.newMaterialCount];
-    if (!counts.every(Number.isInteger) || counts.some(count => count < 0)) {
-      s.pendingEvent = { msg: "Setlist counts must be whole, non-negative numbers.", type: "bad" };
-      return s;
-    }
-    const total = config.deepCutCount + config.hitCount + config.newMaterialCount;
-    const slots = s.tourActive && s.tourActive.shows.length > 5 ? 22 : 6;
-    if (total !== slots || config.totalSlots !== slots) {
-      s.pendingEvent = { msg: `Setlist must have exactly ${slots} songs. You have ${total}.`, type: "bad" };
-    } else {
-      s.setlistConfig = { ...config, totalSlots: slots };
-      const sat = calculateSetlistSatisfaction(s.setlistConfig, s.catalog, slots);
-      s.pendingEvent = { msg: `Setlist updated: ${sat.label} (${sat.score}/100). ${sat.feedback}`, type: sat.score >= 75 ? "good" : "neutral" };
-    }
-    return s;
-  }), [upd]);
+  const doSetSetlist = useCallback((config: SetlistConfig) => upd(s => saveSetlist(s, config)), [upd]);
 
   // ── Opening Act Offers ──
   const doAcceptOpeningAct = useCallback((offerId: string) => upd(s => {

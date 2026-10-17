@@ -1722,7 +1722,7 @@ export interface SetlistSatisfaction {
   label: string;           // "Ecstatic", "Happy", "Satisfied", "Bored", "Disappointed"
   deepCutBonus: number;    // rep gain from deep cuts
   hitBonus: number;        // fan gain from hits
-  newMaterialBonus: number; // hype gain from new material
+  newMaterialBonus: number; // additional fan gain (or loss) from new material
   feedback: string;        // fan quote
 }
 

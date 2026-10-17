@@ -9,6 +9,9 @@ import {
 import Dialog from "./ui/Dialog";
 import { regionalDemandLabel } from "../gameSystems/careerDepth";
 import type { GameController } from "../useGameState";
+import { getSavedSetlist, getSetlistIssue, getSetlistRewards, getSetlistSlots, getTourSetlistIssue } from "../gameSystems/setlist";
+
+const signed = (value: number) => `${value >= 0 ? "+" : ""}${value}`;
 
 type LiveTabProps = Pick<GameController,
   "state" | "doToggleTourCity" | "doSetVenueTier" | "doSetTicketMult" |
@@ -24,15 +27,29 @@ export default function LiveTab(game: LiveTabProps) {
   } = game;
   const [sub, setSub] = useState<"tour" | "setlist" | "offers" | "festivals" | "reputation">("tour");
   const [confirmTour, setConfirmTour] = useState(false);
+  const [draftEdits, setDraftEdits] = useState<SetlistConfig | null>(null);
 
   const inQueue = new Set(state.tourQueue.map((q) => q.cityName));
-  const isHeadliner = state.tourQueue.length > 5;
-  const totalSlots = isHeadliner ? 22 : 6;
-  const currentTotal = state.setlistConfig?.deepCutCount + state.setlistConfig?.hitCount + state.setlistConfig?.newMaterialCount || 0;
-  const setlistValid = currentTotal === totalSlots;
+  const totalSlots = getSetlistSlots(state);
+  const savedSetlist = getSavedSetlist(state);
+  const draft = { ...(draftEdits ?? savedSetlist), totalSlots };
+  const currentTotal = draft.deepCutCount + draft.hitCount + draft.newMaterialCount;
+  const setlistValid = !getSetlistIssue(draft, totalSlots);
+  const hasChanges = draft.deepCutCount !== savedSetlist.deepCutCount ||
+    draft.hitCount !== savedSetlist.hitCount || draft.newMaterialCount !== savedSetlist.newMaterialCount ||
+    draft.totalSlots !== savedSetlist.totalSlots;
+  const launchSetlistIssue = state.tourQueue.length > 0 ? getTourSetlistIssue(state) : null;
   const setlistPreview = state.catalog?.length > 0
-    ? calculateSetlistSatisfaction(state.setlistConfig || { deepCutCount: 1, hitCount: 4, newMaterialCount: 1, totalSlots: 6 }, state.catalog, totalSlots)
+    ? calculateSetlistSatisfaction(draft, state.catalog, totalSlots)
     : null;
+  const savedSetlistPreview = state.catalog?.length > 0
+    ? calculateSetlistSatisfaction(savedSetlist, state.catalog, totalSlots)
+    : null;
+  const previewRewards = setlistPreview ? getSetlistRewards(setlistPreview) : null;
+
+  const editSetlist = (field: "deepCutCount" | "hitCount" | "newMaterialCount", value: number) => {
+    setDraftEdits(previous => ({ ...(previous ?? savedSetlist), [field]: value, totalSlots }));
+  };
 
   return (
     <div className="animate-fadeIn">
@@ -79,10 +96,10 @@ export default function LiveTab(game: LiveTabProps) {
                   }} />
                 </div>
               </div>
-              {setlistPreview && (
+              {savedSetlistPreview && (
                 <div className="card-sm" style={{ marginTop: 10 }}>
-                  <div style={{ fontWeight: 600 }}>Setlist: {setlistPreview.label} ({setlistPreview.score}/100)</div>
-                  <div className="tip-text">{setlistPreview.feedback}</div>
+                  <div style={{ fontWeight: 600 }}>Saved setlist: {savedSetlistPreview.label} ({savedSetlistPreview.score}/100)</div>
+                  <div className="tip-text">{savedSetlistPreview.feedback}</div>
                 </div>
               )}
             </div>
@@ -124,7 +141,11 @@ export default function LiveTab(game: LiveTabProps) {
               </div>
               <div className="tip-text" style={{ marginBottom: 8 }}>Upfront route cost: {fmtMoney(state.tourQueue.reduce((s, q) => s + q.travelCost + q.venueCost, 0))}. One stop resolves per week and builds fatigue.</div>
               {state.streetHustle?.microRouteReady && !state.streetHustle.microRouteUsed && <div className="tip-text" style={{ marginBottom: 8 }}>Street Hustle Micro Route ready: choose up to 3 stops and your street contacts cover the crew advance.</div>}
-              <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0} onClick={() => setConfirmTour(true)}>
+              {launchSetlistIssue && <div className="card-sm" role="status">
+                <p className="tip-text">{launchSetlistIssue}</p>
+                <button type="button" className="btn btn-sm" onClick={() => setSub("setlist")}>Edit Setlist</button>
+              </div>}
+              <button className="btn btn-lime btn-block" disabled={state.tourQueue.length === 0 || !!launchSetlistIssue} onClick={() => setConfirmTour(true)}>
                 Launch Tour ({fmtMoney(state.tourQueue.reduce((s, q) => s + q.travelCost + q.venueCost, 0))})
               </button>
               {confirmTour && <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmTour(false); }}><Dialog titleId="live-tour-confirm" onClose={() => setConfirmTour(false)}><div className="modal-title" id="live-tour-confirm">Launch this tour?</div><p className="tip-text">You will pay the route cost now and commit to {state.tourQueue.length} stop{state.tourQueue.length === 1 ? "" : "s"}. You can still abort later at a reputation cost.</p><div className="modal-footer"><button data-dialog-initial className="btn btn-lime" onClick={() => { doStartTour(); setConfirmTour(false); }}>Launch tour</button><button className="btn btn-ghost" onClick={() => setConfirmTour(false)}>Review route</button></div></Dialog></div>}
@@ -139,33 +160,34 @@ export default function LiveTab(game: LiveTabProps) {
           <div className="card">
             <div className="card-title">Setlist Builder</div>
             <div className="tip-text" style={{ marginBottom: 10 }}>
-              {isHeadliner ? "Headliner slot = 22 songs" : "Opening slot = 6 songs"}
+              Required set length: {totalSlots} songs
               <br />Deep cuts vs hits vs new material affects fan satisfaction
+              <br />Edit your mix, then save it to use it at shows. Unsaved edits are discarded when you leave Live.
             </div>
 
             <SetlistSlider
               label="🎵 Deep Cuts"
               desc="Earns rep with diehard fans"
-              value={state.setlistConfig?.deepCutCount || 0}
-              onChange={(v) => doSetSetlist({ ...state.setlistConfig, deepCutCount: v, totalSlots })}
+              value={draft.deepCutCount}
+              onChange={v => editSetlist("deepCutCount", v)}
               max={totalSlots}
             />
             <SetlistSlider
               label="🔥 Hits"
               desc="Maximizes fan satisfaction"
-              value={state.setlistConfig?.hitCount || 0}
-              onChange={(v) => doSetSetlist({ ...state.setlistConfig, hitCount: v, totalSlots })}
+              value={draft.hitCount}
+              onChange={v => editSetlist("hitCount", v)}
               max={totalSlots}
             />
             <SetlistSlider
               label="✨ New Material"
-              desc="Builds hype but risks alienating casuals"
-              value={state.setlistConfig?.newMaterialCount || 0}
-              onChange={(v) => doSetSetlist({ ...state.setlistConfig, newMaterialCount: v, totalSlots })}
+              desc="Can win new fans, but too much risks alienating casuals"
+              value={draft.newMaterialCount}
+              onChange={v => editSetlist("newMaterialCount", v)}
               max={totalSlots}
             />
 
-            <div style={{
+            <div role="status" aria-live="polite" style={{
               padding: 10,
               background: setlistValid ? "var(--sage-d)" : "var(--rust-d)",
               borderRadius: 6,
@@ -176,19 +198,29 @@ export default function LiveTab(game: LiveTabProps) {
             }}>
               Total: {currentTotal} / {totalSlots} songs {setlistValid ? "✓" : "⚠"}
             </div>
+            {!setlistValid && <p className="tip-text">Adjust the mix to exactly {totalSlots} songs before saving.</p>}
+            {hasChanges && <p className="tip-text">Changes have not been saved.</p>}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              <button type="button" className="btn btn-lime" disabled={!setlistValid || !hasChanges}
+                onClick={() => { doSetSetlist(draft); setDraftEdits(null); }}>Save Setlist</button>
+              <button type="button" className="btn btn-ghost" disabled={!draftEdits}
+                onClick={() => setDraftEdits(null)}>Reset Changes</button>
+            </div>
 
-            {setlistPreview && (
+            {setlistPreview && previewRewards && (
               <div className="card-sm" style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Preview: {setlistPreview.label}</div>
+                {!setlistValid && <div className="tip-text">Provisional preview — this draft has an incorrect song count.</div>}
                 <div style={{ fontSize: 20, fontWeight: 700, margin: "4px 0" }}>{setlistPreview.score}/100</div>
                 <div className="tip-text" style={{ fontStyle: "italic" }}>"{setlistPreview.feedback}"</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8, fontSize: 11 }}>
-                  <span className="text-sage">+{setlistPreview.deepCutBonus} rep</span>
-                  <span style={{ color: "var(--amber)" }}>+{setlistPreview.hitBonus} fans</span>
-                  <span className="text-muted">{setlistPreview.newMaterialBonus >= 0 ? "+" : ""}{setlistPreview.newMaterialBonus} hype</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, fontSize: 11 }}>
+                  <span style={{ color: previewRewards.rep < 0 ? "var(--rust)" : "var(--sage)" }}>{signed(previewRewards.rep)} rep</span>
+                  <span style={{ color: previewRewards.fans < 0 ? "var(--rust)" : "var(--amber)" }}>{signed(previewRewards.fans)} fans</span>
                 </div>
+                <div className="tip-text">Additive setlist bonuses per show. Audience satisfaction also affects attendance.</div>
               </div>
             )}
+            {!setlistPreview && <p className="tip-text">Release music to see audience satisfaction and show rewards.</p>}
           </div>
         </div>
       )}
@@ -363,8 +395,8 @@ function SetlistSlider({ label, desc, value, onChange, max }: {
       </div>
       <div className="tip-text" style={{ marginBottom: 4 }}>{desc}</div>
       <div style={{ display: "flex", gap: 4 }}>
-        <button className="btn btn-sm" onClick={() => onChange(Math.max(0, value - 1))}>−</button>
-        <button className="btn btn-sm" onClick={() => onChange(Math.min(max, value + 1))}>+</button>
+        <button type="button" className="btn btn-sm" aria-label={`Decrease ${label}`} disabled={value <= 0} onClick={() => onChange(Math.max(0, value - 1))}>−</button>
+        <button type="button" className="btn btn-sm" aria-label={`Increase ${label}`} disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>+</button>
       </div>
     </div>
   );
